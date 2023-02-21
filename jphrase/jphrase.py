@@ -5,11 +5,12 @@ __copyright__   = "Copyright 2023"
 import numpy as np
 import pandas as pd
 from collections import Counter
+from IPython.display import display
 import re
 
-class jphrase():
+class extracter():
 
-    def __init__(self, min_count, max_length=-1, min_length=2, weight_freq=1.0, weight_len=1.0,
+    def __init__(self, min_count=6, max_length=-1, min_length=2, weight_freq=1.0, weight_len=1.0,
                 removes="#�\n。. 、,！？!?「」【】()（）～:：\u3000",#走査時にあらかじめ除去する文字(ノイズ)
                 unnecesary = ["http", "www", "＼", "／"],#既知の不要語
                 threshold_originality = 0.5,#他と重複のあるフレーズを除去
@@ -187,9 +188,10 @@ class jphrase():
         for i, row in df.iterrows():
             flags = [(row[ self.clm_seqchar ] in higher_phrase) for higher_phrase in df.loc[:i-1, self.clm_seqchar].values]
             dups.append(any(flags))
-        df = df.loc[~np.array(dups)]
-
+        if len(df):
+            df = df.loc[~np.array(dups)]
         return df
+
 
     #不要文字列含有シーケンスを除外：少しでもseqcharに混ざったら、そのseqcharを捨ててよい　e.g.) http, www
     def exclude_unnecessary(self , df ):
@@ -302,6 +304,9 @@ class jphrase():
         df_knowns = self.count_knowns(sentences)#既知語は別にカウント
         df_concat = pd.concat([df_knowns, df_count])
 
+        if not len(df_concat):
+            return df_concat
+
         df_sorted = self.hold_higherrank(df_concat)#情報量でソート、重複除去        
         df_sorted = self.exclude_unnecessary(df_sorted)#不要語/不要文字　を含むseqcharを排除
         df_sorted = self.set_features(df_sorted)
@@ -379,31 +384,37 @@ class jphrase():
 
         df_concat = pd.DataFrame()
         for partial_sentences in self.gen_sentences(sentences):
-            df_tmp = self.find_uniques(partial_sentences)#ここで頑張る
+            df_tmp = self.find_uniques(partial_sentences)
             df_concat = pd.concat([df_concat, df_tmp])
 
-            if self.verbose >= 1:
+            if len(df_concat) & self.verbose >= 1:
                 print("途中経過")#暫定平均で集計
                 df_toshow = df_concat\
                     .groupby(self.clm_seqchar, as_index =False).agg(dict_agg(df_concat))\
                     .sort_values(by=[self.clm_knowns, self.clm_sc], ascending=False)
-                print(df_toshow.iloc[:5,:5])#.head())
+                display(df_toshow.iloc[:5,:5])#
 
-        if self.verbose >= 1:
-            print("concat終了 -> ソーティング -> セレクション -> 重複除去")
-        #一括化とソート&選定(下記では groupbyで平均できない文字列の扱いを定義)
-        df_uniques_all = df_concat.groupby(self.clm_seqchar, as_index=False).agg(dict_agg(df_concat))
-        df_uniques_all = self.hold_higherrank(df_uniques_all)#ここ時間かかる
+        if not len(df_concat):
+            if self.verbose >= 1:
+                print("フレーズが見つかりませんでした。")
+            return df_concat
 
-        if self.selection <= 0:
-            df_uniques_all.drop(columns="index", inplace=True)
-            return df_uniques_all
-         
-        df_phrase = self.select_phrase(df_uniques_all)
-        df_phrase = df_phrase.drop(columns="index").reset_index(drop=True)
-        df_phrase = self.remove_similar(df_phrase)#時間かかる（最後の過程）
-        return df_phrase
-                      
+        else:
+            if self.verbose >= 1:
+                print("concat終了 -> ソーティング -> セレクション -> 重複除去")
+            #一括化とソート&選定(下記では groupbyで平均できない文字列の扱いを定義)
+            df_uniques_all = df_concat.groupby(self.clm_seqchar, as_index=False).agg(dict_agg(df_concat))
+            df_uniques_all = self.hold_higherrank(df_uniques_all)#ここ時間かかる
+
+            if self.selection <= 0:
+                df_uniques_all.drop(columns="index", inplace=True)
+                return df_uniques_all
+            
+            df_phrase = self.select_phrase(df_uniques_all)
+            df_phrase = df_phrase.drop(columns="index").reset_index(drop=True)
+            df_phrase = self.remove_similar(df_phrase)#時間かかる（最後の過程）
+            return df_phrase
+                        
 
 
 #与えられたセンテンスの中から有意味な文字連＝フレーズを抽出したい（自己教師あり学習）
@@ -434,8 +445,9 @@ if __name__ == "__main__":
                                 #周期性は不要、ひらがなや数字の開始終了も不要 　文字連の最大値は不使用
     params["threshold_originality"] = 0.60#独自性の閾値（.0にすれば全く絞らず、.9なら順位の低い似たフレーズが除去される）
     params["knowns"] = []
-    jp = jphrase(**params)
+    jp = extracter(**params)
 
     df_texts = pd.read_table("jphrase/text.tsv", header=None, lineterminator='\n', names=["sentence"])
-    jp = jphrase(**params)
+    jp = extracter(**params)
     jp.get_dfphrase(df_texts["sentence"])
+    #jp.get_dfphrase(["あいうあぶ","あぶぶぶ"])
