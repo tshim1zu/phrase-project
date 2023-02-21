@@ -1,1 +1,1 @@
-from jphrase.extracter import extracter, test
+from jphrase.extracter import *
