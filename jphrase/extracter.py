@@ -11,16 +11,19 @@ import re
 class extracter():
 
     def __init__(self, min_count=6, max_length=15, min_length=6, weight_freq=1.0, weight_len=1.0,
-                removes="#�\n。. 、,！？!?「」【】()（）～:：\u3000",#走査時にあらかじめ除去する文字(ノイズ)
-                unnecesary = ["http", "www", "＼", "／"],#既知の不要語
+                removes = "⠀ #�\n.：.…!！？?･ｰ￣*～\r\u3000、/＼／「」『』【】",#走査前に除去する文字
+                unnecesary = ["http", "www", "ｗｗｗ", "&amp;", "&gt;"],#走査後に除去する文字列
                 threshold_originality = 0.5,#他と重複のあるフレーズを除去
                 size_sentence = 3000,#一度にスキャンする配列のサイズ
                 knowns=[],#カウント時に　優先してほしい既知語
-                positive_filter = ["_2_","__2","___2","____2","______2",#カタカナのみ#半カナのみ
-                                   "T1_10_","T_110_", "00011_", ],#漢字のみ#アルファベットのみ#全角アルファベットのみ#カナ漢#半カナ漢#アルファ漢                                                                                                                                                  
-                negative_filter = {"start":[0,8,9,-1], "end":[0,8,9,-1],#ひらがな・数字の開始終了、その他文字での開始終了
-                                   "periodic": True, "smalla":True,#周期性と小文字アルファベットは不要
-                                   "kanantsu": True, "less_than_maxlen": True },
+                positive_filter = ["_2","__2", "___2","____2TZ___",#英単語（半角英文字のみ、ただし大文字が１つ以上入る  
+                                "_______2__",#全角英文字のみ
+                                "_1_10___00","__110___00",#カナ漢（情報コミュニケーション学、途中で挟まるひらがなは構わない、数字の混入は認めない） #ｶﾅ漢
+                                "00011___00","0001___100",#漢英#漢全英
+                                ],
+                negative_filter = {"start":[0,8,9,-1], "end":[0,8,9,-1],#ひらがな/数字 での開始or終了
+                                "periodic": True, "smalla":True, #周期性のあるフレーズは不要、ひらがなや数字の開始終了も不要 
+                                "kanantsu":True, "less_than_maxlen":True },#ンッの開始は不要、文字連の最大値は不使用                                           
                 selection = 1,#Falseの場合、選定しない結果を取得する
                 verbose = 1,
                   ):
@@ -416,38 +419,3 @@ class extracter():
             return df_phrase
                         
 
-
-#与えられたセンテンスの中から有意味な文字連＝フレーズを抽出したい（自己教師あり学習）
-#実際には、走査対象となるテキストは 複数のファイルに分かれていたり、１つのセンテンスが膨大であることも多い
-#進捗が分かりにくい verboseを引数にとる
-#sc_indexでソートする、とか。　groupを処理しておくとか？
-
-if __name__ == "__main__":
-    print("フレーズの検知を始めます。")
-    params = {}#ハイパーパラメータのデフォルト値を設定
-    params["verbose"] = 1
-    params["size_sentence"] = 5000#一回で処理するセンテンスの数：大きすぎると計算が終わらない
-    params["min_count"] = 10#文字連カウントの最小数閾値：小さくすると計算終わらない
-    params["min_length"] = 4 #文字の長さ最小値
-    params["max_length"] = 16#文字の長さ最大値
-    params["weight_freq"] = 1 #頻度への重み（たくさんある連なりを重視）
-    params["weight_len"] = 2   #長さへの重み（長い連なりを重視）
-    params["removes"] = "⠀ #�\n.：.…!！？?･ｰ￣*～\r\u3000、/＼／「」『』【】"#走査前に除去する文字
-    params["unnecesary"] = ["http", "www", "ｗｗｗ", "&amp;", "&gt;"]#走査後に除去する文字列
-    params["selection"] = 1# 0: セレクションの有無
-    params["positive_filter"] = ["_2","__2", "___2","____2TZ___",#英単語（半角英文字のみ、ただし大文字が１つ以上入る  
-                                "_______2__",#全角英文字のみ
-                                "_1_10___00","__110___00",#カナ漢（情報コミュニケーション学、途中で挟まるひらがなは構わない、数字の混入は認めない） #ｶﾅ漢
-                                "00011___00","0001___100",#漢英#漢全英
-                                ]
-    params["negative_filter"] = {"start":[0,8,9,-1], "end":[0,8,9,-1],#ひらがな/数字 での開始or終了
-                                "periodic": True, "smalla":True, "kanantsu":True, "less_than_maxlen":True }
-                                #周期性は不要、ひらがなや数字の開始終了も不要 　文字連の最大値は不使用
-    params["threshold_originality"] = 0.60#独自性の閾値（.0にすれば全く絞らず、.9なら順位の低い似たフレーズが除去される）
-    params["knowns"] = []
-    jp = extracter(**params)
-
-    df_texts = pd.read_table("jphrase/text.tsv", header=None, lineterminator='\n', names=["sentence"])
-    jp = extracter(**params)
-    jp.get_dfphrase(df_texts["sentence"])
-    #jp.get_dfphrase(["あいうあぶ","あぶぶぶ"])
