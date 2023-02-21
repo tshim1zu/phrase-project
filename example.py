@@ -3,7 +3,11 @@ import pandas as pd
 import os
 from jphrase import extracter
 
-def test(path):
+def test():
+
+    path = os.path.dirname(os.path.abspath("__file__")) 
+    print(path)
+
     df_texts = pd.read_table(path + "/text.tsv", header=None, lineterminator='\n', names=["sentence"])
 
     print("パラメータを指定して、フレーズの検知を始めます。")
@@ -35,6 +39,4 @@ def test(path):
 
 from IPython.display import display
 if __name__ == "__main__":
-    path = os.path.dirname(os.path.abspath("__file__")) 
-    print(path)
-    display(test(path))
+    display(test())
