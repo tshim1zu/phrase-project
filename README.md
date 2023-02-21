@@ -36,3 +36,7 @@ To detect new phrases or unknown words for texts in Japanese
                                 #周期性は不要、ひらがなや数字の開始終了も不要 　文字連の最大値は不使用
     params["threshold_originality"] = 0.60#独自性の閾値（.0にすれば全く絞らず、.9なら順位の低い似たフレーズが除去される）
     params["knowns"] = []
+    
+    jp = jphrase(**params)
+    jp.get_dfphrase(df_texts["sentence"])
+
