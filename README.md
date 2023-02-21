@@ -6,18 +6,19 @@ To detect new phrases or unknown words for texts in Japanese
 
 
 ## スクリプトの使用例
+    from jphrase import extracter
 
     df_texts = pd.read_table("text.tsv", header=None, lineterminator='\n', names=["sentence"])
-    jp = extracter(**params)
-    jp.get_dfphrase(df_texts["sentence"])
+    jpex = extracter(**params)
+    jpex.get_dfphrase(df_texts["sentence"])
 
 
 
 ## オプション
 
-    params = {}#ハイパーパラメータのデフォルト値を設定    
+    params = {}#フレーズ検出におけるパラメータの設定    
     params["verbose"] = 1    
-    params["size_sentence"] = 5000#一回で処理するセンテンスの数：大きすぎると計算が終わらない    
+    params["size_sentence"] = 5000#一回で処理するセンテンスの数：大きすぎると計算が終わらないので注意    
     params["min_count"] = 10#文字連カウントの最小数閾値：小さくすると計算終わらない    
     params["min_length"] = 4 #文字の長さ最小値    
     params["max_length"] = 16#文字の長さ最大値
@@ -34,9 +35,9 @@ To detect new phrases or unknown words for texts in Japanese
     params["negative_filter"] = {"start":[0,8,9,-1], "end":[0,8,9,-1],#ひらがな/数字 での開始or終了
                                 "periodic": True, "smalla":True, "kanantsu":True, "less_than_maxlen":True }
                                 #周期性は不要、ひらがなや数字の開始終了も不要 　文字連の最大値は不使用
-    params["threshold_originality"] = 0.60#独自性の閾値（.0にすれば全く絞らず、.9なら順位の低い似たフレーズが除去される）
+    params["threshold_originality"] = 0.50#独自性の閾値（.0 全く絞らず ～ .9 順位の低い似たフレーズが除去される）
     params["knowns"] = []
     
-    jp = extracter(**params)
-    jp.get_dfphrase(df_texts["sentence"])
+    jpex = extcter(**params)
+    jpex.get_dfphrase(df_texts["sentence"])
 

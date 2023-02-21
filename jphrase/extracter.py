@@ -196,6 +196,7 @@ class extracter():
         return df
 
 
+
     #不要文字列含有シーケンスを除外：少しでもseqcharに混ざったら、そのseqcharを捨ててよい　e.g.) http, www
     def exclude_unnecessary(self , df ):
         mask_unnec = np.array( [False] * len(df) )
@@ -310,6 +311,9 @@ class extracter():
         if not len(df_concat):
             return df_concat
 
+        if not len(df_concat):
+            return df_concat
+
         df_sorted = self.hold_higherrank(df_concat)#情報量でソート、重複除去        
         df_sorted = self.exclude_unnecessary(df_sorted)#不要語/不要文字　を含むseqcharを排除
         df_sorted = self.set_features(df_sorted)
@@ -418,11 +422,19 @@ class extracter():
             df_phrase = self.remove_similar(df_phrase)#時間かかる（最後の過程）
             return df_phrase
                         
+            if self.selection <= 0:
+                df_uniques_all.drop(columns="index", inplace=True)
+                return df_uniques_all
+            
+            df_phrase = self.select_phrase(df_uniques_all)
+            df_phrase = df_phrase.drop(columns="index").reset_index(drop=True)
+            df_phrase = self.remove_similar(df_phrase)#時間かかる（最後の過程）
+            return df_phrase
+                        
 
 
 
 
-import os
 import numpy as np
 from IPython.display import display
 
@@ -455,9 +467,7 @@ def test(texts=[]):
 
     if not len(texts):
         texts = sentences
-
     print(texts)
-
 
     print("パラメータを指定して、フレーズの検知を始めます。")
     params = {}#ハイパーパラメータのデフォルト値を設定
@@ -486,7 +496,6 @@ def test(texts=[]):
     jpex = extracter(**params)
     df = jpex.get_dfphrase(texts)
     display(df)
-
 
 
 if __name__ == "__main__":
