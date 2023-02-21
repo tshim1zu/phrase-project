@@ -424,69 +424,36 @@ class extracter():
                         
 
 
+    def test_random(self, num_sent = 50, wnum_in_asent = 12, words =["こんにちは", "はじめまして",
+                    "ランダム", "センテンス", "を", "大量に", "生成", "させて", "検知", "できる", "か",
+                    "どうか", "実験的に", "確かめ", "て", "みよう", "と", "思います",  "読書", "の",
+                    "最中", 'スコティッシュフォールド', "が", '飲み物','もっと', "たくさん", "欲しがって",
+                    "ようやく", "満足","しました", '明日', "マグカップ", "購入予定"]):
+        
+    
+        def gen_sentence(word, n_word_in_sent, pi):
+            sentence = "".join( np.random.choice(word, n_word_in_sent, p=pi/sum(pi)) )
+            return sentence
 
-import numpy as np
-from IPython.display import display
+        def gen_sentences(num_sentence, word, n_word_in_sent, pi):
+            sentences = []
+            for i in range(num_sentence):
+                sentence = gen_sentence(word, n_word_in_sent, pi)
+                sentences.append(sentence)
+            return sentences
 
-def gen_sentence(word, n_word_in_sent, pi):
-    sentence = "".join( np.random.choice(word, n_word_in_sent, p=pi/sum(pi)) )
-    return sentence
+        pi =np.ones(len(words))
+        sentences = gen_sentences(num_sent, words, wnum_in_asent, pi)
 
-def gen_sentences(num_sentence, word, n_word_in_sent, pi):
-    sentences = []
-    for i in range(num_sentence):
-        sentence = gen_sentence(word, n_word_in_sent, pi)
-        sentences.append(sentence)
-    return sentences
+        print(sentences)
 
-word = ["こんにちは", "はじめまして", "ランダム", "センテンス", "を",
-        "大量に", "生成", "させて", "検知", "できる", "か", "どうか",
-        "実験的に", "確かめ", "て", "みよう", "と", "思います",
-        "読書", "の", "最中", 'スコティッシュフォールド', "が",
-        '飲み物','もっと', "たくさん", "欲しがって", "ようやく",
-        "満足","しました", '明日', "マグカップ", "購入予定"]
+        df = self.get_dfphrase(sentences)
+        display(df)
+        return
 
-
-num_sentence = 50
-n_word_in_a_sentence = 12
-pi =np.ones(len(word))
-sentences = gen_sentences(num_sentence, word, n_word_in_a_sentence, pi)
-
-
-def test(texts=[]):
-
-    if not len(texts):
-        texts = sentences
-    print(texts)
-
-    print("パラメータを指定して、フレーズの検知を始めます。")
-    params = {}#ハイパーパラメータのデフォルト値を設定
-    params["verbose"] = 1
-    params["size_sentence"] = 5000#一回で処理するセンテンスの数：大きすぎると計算が終わらない
-    params["min_count"] = 10#文字連カウントの最小数閾値：小さくすると計算終わらない
-    params["max_length"] = 16#文字の長さ最大値
-    params["min_length"] = 4 #文字の長さ最小値
-    params["weight_freq"] = 1 #頻度への重み（たくさんある連なりを重視）
-    params["weight_len"] = 1   #長さへの重み（長い連なりを重視）
-    params["removes"] = "⠀ #�\n.：.…!！？?･ｰ￣*～\r\u3000、/＼／「」『』【】"#走査前に除去する文字
-    params["unnecesary"] = ["http", "www", "ｗｗｗ", "&amp;", "&gt;"]#走査後に除去する文字列
-    params["selection"] = 1# 0: セレクションの有無
-    params["positive_filter"] = ["_2","__2", "___2","____2TZ___",#英単語（半角英文字のみ、ただし大文字が１つ以上入る  
-                                "_______2__",#全角英文字のみ
-                                "_1_10___00","__110___00",#カナ漢（情報コミュニケーション学、途中で挟まるひらがなは構わない、数字の混入は認めない） #ｶﾅ漢
-                                "00011___00","0001___100",#漢英#漢全英
-                                ]
-    params["negative_filter"] = {"start":[0,8,9,-1], "end":[0,8,9,-1],#ひらがな/数字 での開始or終了
-                                "periodic": True, "smalla":True, "kanantsu":True, "less_than_maxlen":True }
-                                #周期性は不要、ひらがなや数字の開始終了も不要 　文字連の最大値は不使用
-    params["threshold_originality"] = 0.60#独自性の閾値（.0にすれば全く絞らず、.9なら順位の低い似たフレーズが除去される）
-    params["knowns"] = []
-
-
-    jpex = extracter(**params)
-    df = jpex.get_dfphrase(texts)
-    display(df)
 
 
 if __name__ == "__main__":
-    test()
+    jpex = extracter()
+    jpex.test_random()
+
