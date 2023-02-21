@@ -16,9 +16,9 @@ To detect new phrases or unknown words for texts in Japanese
 
 ## オプション
 
-    params = {}#ハイパーパラメータのデフォルト値を設定    
+    params = {}#フレーズ検出におけるパラメータの設定    
     params["verbose"] = 1    
-    params["size_sentence"] = 5000#一回で処理するセンテンスの数：大きすぎると計算が終わらない    
+    params["size_sentence"] = 5000#一回で処理するセンテンスの数：大きすぎると計算が終わらないので注意    
     params["min_count"] = 10#文字連カウントの最小数閾値：小さくすると計算終わらない    
     params["min_length"] = 4 #文字の長さ最小値    
     params["max_length"] = 16#文字の長さ最大値
