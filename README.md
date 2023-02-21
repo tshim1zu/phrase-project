@@ -8,7 +8,7 @@ To detect new phrases or unknown words for texts in Japanese
 ## スクリプトの使用例
 
     df_texts = pd.read_table("text.tsv", header=None, lineterminator='\n', names=["sentence"])
-    jp = jphrase(**params)
+    jp = extracter(**params)
     jp.get_dfphrase(df_texts["sentence"])
 
 
@@ -37,6 +37,6 @@ To detect new phrases or unknown words for texts in Japanese
     params["threshold_originality"] = 0.60#独自性の閾値（.0にすれば全く絞らず、.9なら順位の低い似たフレーズが除去される）
     params["knowns"] = []
     
-    jp = jphrase(**params)
+    jp = extracter(**params)
     jp.get_dfphrase(df_texts["sentence"])
 
