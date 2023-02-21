@@ -412,7 +412,7 @@ class jphrase():
 #sc_indexでソートする、とか。　groupを処理しておくとか？
 
 if __name__ == "__main__":
-
+    print("フレーズの検知を始めます。")
     params = {}#ハイパーパラメータのデフォルト値を設定
     params["verbose"] = 1
     params["size_sentence"] = 5000#一回で処理するセンテンスの数：大きすぎると計算が終わらない
@@ -435,3 +435,7 @@ if __name__ == "__main__":
     params["threshold_originality"] = 0.60#独自性の閾値（.0にすれば全く絞らず、.9なら順位の低い似たフレーズが除去される）
     params["knowns"] = []
     jp = jphrase(**params)
+
+    df_texts = pd.read_table("jphrase/text.tsv", header=None, lineterminator='\n', names=["sentence"])
+    jp = jphrase(**params)
+    jp.get_dfphrase(df_texts["sentence"])
