@@ -10,11 +10,11 @@ import re
 
 class extracter():
 
-    def __init__(self, min_count=6, max_length=15, min_length=6, weight_freq=1.0, weight_len=1.0,
+    def __init__(self, min_count=6, max_length=16, min_length=4, weight_freq=1.0, weight_len=1.0,
                 removes = "⠀ #�\n.：.…!！？?･ｰ￣*～\r\u3000、/＼／「」『』【】",#走査前に除去する文字
                 unnecesary = ["http", "www", "ｗｗｗ", "&amp;", "&gt;"],#走査後に除去する文字列
                 threshold_originality = 0.5,#他と重複のあるフレーズを除去
-                size_sentence = 3000,#一度にスキャンする配列のサイズ
+                size_sentence = 5000,#一度にスキャンする配列のサイズ
                 knowns=[],#カウント時に　優先してほしい既知語
                 positive_filter = ["_2","__2", "___2","____2TZ___",#英単語（半角英文字のみ、ただし大文字が１つ以上入る  
                                 "_______2__",#全角英文字のみ
@@ -422,16 +422,6 @@ class extracter():
             df_phrase = self.remove_similar(df_phrase)#時間かかる（最後の過程）
             return df_phrase
                         
-            if self.selection <= 0:
-                df_uniques_all.drop(columns="index", inplace=True)
-                return df_uniques_all
-            
-            df_phrase = self.select_phrase(df_uniques_all)
-            df_phrase = df_phrase.drop(columns="index").reset_index(drop=True)
-            df_phrase = self.remove_similar(df_phrase)#時間かかる（最後の過程）
-            return df_phrase
-                        
-
 
 
 
@@ -474,10 +464,10 @@ def test(texts=[]):
     params["verbose"] = 1
     params["size_sentence"] = 5000#一回で処理するセンテンスの数：大きすぎると計算が終わらない
     params["min_count"] = 10#文字連カウントの最小数閾値：小さくすると計算終わらない
-    params["min_length"] = 4 #文字の長さ最小値
     params["max_length"] = 16#文字の長さ最大値
+    params["min_length"] = 4 #文字の長さ最小値
     params["weight_freq"] = 1 #頻度への重み（たくさんある連なりを重視）
-    params["weight_len"] = 2   #長さへの重み（長い連なりを重視）
+    params["weight_len"] = 1   #長さへの重み（長い連なりを重視）
     params["removes"] = "⠀ #�\n.：.…!！？?･ｰ￣*～\r\u3000、/＼／「」『』【】"#走査前に除去する文字
     params["unnecesary"] = ["http", "www", "ｗｗｗ", "&amp;", "&gt;"]#走査後に除去する文字列
     params["selection"] = 1# 0: セレクションの有無
