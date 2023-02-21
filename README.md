@@ -6,13 +6,12 @@ To detect new phrases or unknown words for texts in Japanese
 
 
 ## スクリプトの使用例
-
-    df_texts = pd.read_table("text.tsv", header=None, lineterminator='\n', names=["sentence"])
-
+    import pandas as pd
     from jphrase import extracter
+    
+    df_texts = pd.read_table("text.tsv", header=None, lineterminator='\n', names=["sentence"])
     jpex = extracter()
     jpex.get_dfphrase(df_texts)
-
 
 
 ## オプション
