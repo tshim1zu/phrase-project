@@ -7,6 +7,7 @@ setuptools.setup(
     version="0.1.0",
     author="Takeshi SHIMIZU",
     author_email="shim1zu@hotmail.com",
+    license='MIT',
     description="You can detect new phrases or unknown words for texts in Japanese",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -14,9 +15,10 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    entry_points = {
+    entry_points = {    
     },
     python_requires='>=3.7',
 )
