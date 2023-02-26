@@ -59,12 +59,6 @@ dict_negative = {
     "x_Gana" :  re.compile("[ぁ-ゖ]+"),#ひらがなのみ #{0,} は * と、{1,} は + と同じ意味
     "x_smalla": re.compile("[a-z\* _.]+"),#ほぼノイズ
     "x_start" : re.compile(f"^[ンッー、んっ～。](.*)+"),
-    "x_money" : re.compile("^(0|([1-9](\d{0,2})((,\d{3}){0,2})))[千|万|億|兆]?円$"),
-    "x_Money" : re.compile("^([0０]|([1-9１-９](\d{0,2})((,\d{3}){0,2})))[千|万|億|兆]?円$"),
-    "x_MONEY" : re.compile("^(０|([１-９](\d{0,2})((,\d{3}){0,2})))[千|万|億|兆]?円$"),
-    "x_dol" :   re.compile("^(0|([1-9](\d{0,2})((,\d{3}){0,2})))ドル$"),
-    "x_DOL" :   re.compile("^(０|([１-９](\d{0,2})((,\d{3}){0,2})))ドル$"),
-    "x_tel" :   re.compile(r'[(]?\d{2,4}[-)]?\d{2,4}-\d{3,4}'),
     "x_phone" : re.compile(r'((\d{2,4}|\(\d{2,4}\))(\s|-)(\d{3,4})(\s|-)(\d{4}))'),# 市外局番# 区切りは空白もしくはハイフン# 市内局番# 区切りは空白もしくはハイフン# 加入者番号                  
     "x_mobile": re.compile( "0[789]0-[0-9]{4}-[0-9]{4}$" ),
     "x_mail" :  re.compile( r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+' ),
@@ -118,7 +112,7 @@ class extracter():
 
 
 
-    def chopup(self, sentences):
+    def make_ngrampieces(self, sentences):
         
         max_length = self.max_length
         if max_length == -1:
@@ -163,7 +157,7 @@ class extracter():
                     start = a_str.find(sub, start)
                     if start == -1: return
                     yield start
-                    start += len(sub) # use start += 1 to find overlapping matches
+                    start += len(sub)
             return len(list(find_all(sent, target)))
             
         dict_n = {}
@@ -306,8 +300,8 @@ class extracter():
 
     def find_uniques(self, sentences):
 
-        manymany_stones = self.chopup(sentences)#切り刻んで ngramを作成
-        df_count = self.count_characters(manymany_stones)#数える
+        many_ngrams = self.make_ngrampieces(sentences)
+        df_count = self.count_characters(many_ngrams)#数える
         df_knowns = self.count_knowns(sentences)#既知語は別にカウント
         df_concat = pd.concat([df_knowns, df_count])
 
@@ -432,11 +426,12 @@ class extracter():
                         
 
 
-    def test_random(self, num_sent = 50, wnum_in_asent = 12, words =["こんにちは", "はじめまして",
+    def test_random(self, num_sent = 50, wnum_in_asent = 12,
+                    words =["こんにちは", "はじめまして",
                     "ランダム", "センテンス", "を", "大量に", "生成", "させて", "検知", "できる", "か",
-                    "どうか", "実験的に", "確かめ", "て", "みよう", "と", "思います",  "読書", "の",
-                    "最中", 'スコティッシュフォールド', "が", '飲み物','もっと', "たくさん", "欲しがって",
-                    "ようやく", "満足","しました", '明日', "マグカップ", "購入予定"]):
+                    "どうか", "実験的に", "確かめ", "て", "みよう", "と", "思います",
+                    "コーディング", "の",  "最中", "マグカップ", "から", "飲み物", "が", "こぼれて",
+                    "しまい", "ました", "明日", "再度", "やり直し", "ます"]):
         
     
         def gen_sentence(word, n_word_in_sent, pi):
