@@ -40,36 +40,39 @@ FIRST_KANJI=\
 '錐錘錠錦錨錫錬錯録鍋鍍鍔鍛鍬鍵鍾鎌鎖鎗鎚鎧鎮鏑鏡鐘鐙鐸鑑鑓長門閃閉開閏閑間関閣閤閥閲闇闘阜阪防阻阿陀附降限陛院陣除陥陪陰陳陵陶陸険陽隅隆隈隊階随隔隙際障隠隣隷隻隼雀雁雄雅集雇雌雑雛離難雨雪雫雰雲零雷電'\
 '需震霊霜霞霧露青靖静非面革靭靴鞄鞍鞘鞠鞭韓韮音韻響頁頂頃項順須預頑頒頓頗領頚頬頭頴頻頼題額顎顔顕願顛類顧風飛食飢飯飲飴飼飽飾餅養餌餐餓館饗首香馨馬馳馴駁駄駅駆駈駐駒駕駿騎騒験騨騰驚骨骸髄高髪髭鬼魁魂魅'\
 '魔魚魯鮎鮒鮪鮫鮭鮮鯉鯖鯛鯨鯵鰍鰐鰭鰯鰹鰻鱈鱒鱗鳥鳩鳳鳴鳶鴇鴎鴛鴨鴫鴬鴻鵜鵠鵡鵬鶏鶴鷲鷹鷺鹸鹿麓麗麟麦麹麺麻麿黄黍黒黙黛鼎鼓鼠鼻齢龍'
-        
+
+
 dict_match = {
-    "Kana": re.compile(f'[ァ-ヶー]{2,}'),#カタカナ
-    "Hana": re.compile(f'[ｦ-ﾟ]{2,}'),#半角カタカナ
+    "Kana": re.compile('[ァ-ヶー]{2,}'),#カタカナ
+    "Hana": re.compile('[ｦ-ﾟ]{2,}'),#半角カタカナ
     "HAN": re.compile(f'[{FIRST_KANJI}]{2,}'),#漢字二文字以上
-    "ZA": re.compile(f"[Ａ-Ｚ]{2,}"),#全角英文字
+    "ZA": re.compile("[Ａ-Ｚ]{2,}"),#全角英文字
     "alpha": re.compile(f"[a-zA-Z]{2,}"),#アルファベット
     "ALPHA": re.compile(f"[A-Z]{2,}"),#大文字アルファベット
     "Kana_HAN": re.compile( f"^[ァ-ヶー]+[{FIRST_KANJI}]+" ),
     "HAN_Kana": re.compile( f"^[{FIRST_KANJI}]+[ァ-ヶー]+" ),
     "HAN_GaKa": re.compile( f"^[{FIRST_KANJI}]+[ぁ-ゖ]+[ァ-ヶー]+" ),
     "ZaGaKa": re.compile( f"^[Ａ-Ｚ]+[ぁ-ゖ]+[{FIRST_KANJI}]+" ),
-    "Kana_Gana": re.compile( f"^[ァ-ヶー]{2,}[ぁ-ゖ]{2,}" ),
+    "Kana_Gana": re.compile("^[ァ-ヶー]{2,}[ぁ-ゖ]{2,}" ),
 }
 
+
+
 dict_negative = {
-    "x_Gana" : re.compile(f"[ぁ-ゖ]+"),#ひらがなのみ #{0,} は * と、{1,} は + と同じ意味
-    "x_smalla": re.compile(f"[a-z\* _.]+"),#ほぼノイズ
-    "x_start" : re.compile(f"^[ンッー、んっ～。](.*)+"),
-    "x_Yen" : re.compile(f"^([0０]|([\d](\d{0,2})((,\d{3}){0,2})))[千|万|億|兆]?円$"),
-    "x_Dollar" : re.compile(f"^([0０]|([\d](\d{0,2})((,\d{3}){0,2})))[千|万|億|兆]?ドル$"),
-    "x_Euro" : re.compile(f"^([0０]|([\d](\d{0,2})((,\d{3}){0,2})))[千|万|億|兆]?ユーロ$"),
+    "x_Gana" : re.compile("[ぁ-ゖ]+"),#ひらがなのみ #{0,} は * と、{1,} は + と同じ意味
+    "x_smalla": re.compile("[a-z\* _.]+"),#ほぼノイズ
+    "x_start" : re.compile("^[ンッー、んっ～。](.*)+"),
+    "x_Yen" : re.compile("^([0０]|([\d](\d{0,2})((,\d{3}){0,2})))[千|万|億|兆]?円$"),
+    "x_Dollar" : re.compile("^([0０]|([\d](\d{0,2})((,\d{3}){0,2})))[千|万|億|兆]?ドル$"),
+    "x_Euro" : re.compile("^([0０]|([\d](\d{0,2})((,\d{3}){0,2})))[千|万|億|兆]?ユーロ$"),
     "x_Phone" : re.compile(r'((\d{2,4}|\(\d{2,4}\))(\s|-)(\d{3,4})(\s|-)(\d{4}))'),# 市外局番# 区切りは空白もしくはハイフン# 市内局番# 区切りは空白もしくはハイフン# 加入者番号                  
     "x_Tel" : re.compile( r'[(]?\d{2,4}[-)]?\d{2,4}-\d{3,4}'),
-    "x_mobile": re.compile(f"0[789]0-[0-9]{4}-[0-9]{4}$" ),
+    "x_mobile": re.compile("0[789]0-[0-9]{4}-[0-9]{4}$" ),
     "x_mail" : re.compile( r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+' ),
     "x_url" : re.compile( r'https?://[\w/:%#\$&\?\(\)~\.=\+\-]+' ),
-    "x_Num": re.compile(f"[\d,，]+"),#全半角数字
+    "x_Num": re.compile("[\d,，]+"),#全半角数字
     "x_ymd" :  re.compile( r'\d{4}[-年/]\d{1,2}[-月/]\d{1,2}日?'),
-    "x_Num_ymd":re.compile(f"[\d]{1,4}[日|月|年]"),#全角数字の日付
+    "x_Num_ymd":re.compile("[\d]{1,4}[日|月|年]"),#全角数字の日付
 }
 
 class extracter():
@@ -111,8 +114,6 @@ class extracter():
         self.verbose = verbose
         self.positive_filter = positive
         self.negative_filter = negative
-
-
 
 
 
@@ -226,12 +227,12 @@ class extracter():
 
     def select_patterns(self, sr, dict_patterns):
         df_ret = pd.DataFrame()
-        for pname in dict_patterns:
-            sr_ret = self.select_pattern(sr, dict_patterns[pname], pname)
+        for key_ptn in dict_patterns:
+            sr_ret = self.select_pattern(sr, dict_patterns[key_ptn], key_ptn)
             df_ret = pd.concat([df_ret, sr_ret], axis=1)
         return df_ret
 
-    def select_pattern(self, sr, pattern, colname="判定結果"):        
+    def select_pattern(self, sr, pattern, colname):
         #正規表現パターンへの　完全一致判定
         def equal_search(s):
             res = re.search(pattern, s)
@@ -265,39 +266,38 @@ class extracter():
 
     def select_phrase(self, df):
 
+        df = df.reset_index(drop=True)
         sr = df[self.clm_seqchar]
 
         #正規表現との全一致（ポジティブフィルター）
         df_match = self.select_patterns(sr, self.positive_filter)
+        df = pd.concat([df, df_match], axis=1)#列方向にconcat
 
         clm_ptn = "match_ptn"
-        df_match[clm_ptn] = ""
-        f_posi = np.array([False] * len(sr))
+        f_posi = pd.Series( np.array([False] * len(sr)), name = "Select" )
         for c in df_match.columns:
-            if c != clm_ptn:
-                f_match = df_match.loc[:, c]
-                df_match.loc[f_match, clm_ptn] = c
-                f_posi = f_posi | f_match
-                
+            f_match = df.loc[:, c] == True
+            df.loc[f_match, clm_ptn] = c
+            f_posi = f_posi | f_match#..
+            
         #正規表現との全一致（ネガティブフィルター）
         df_nega = self.select_patterns(sr, self.negative_filter)
+        df = pd.concat([df, df_nega], axis=1)#列方向にconcat
+
         clm_nptn = "negative_ptn"
-        f_nega = np.array([False] * len(sr))
+        f_nega = pd.Series( np.array([False] * len(sr)), name = "Remove" )
         for c in df_nega.columns:
-            f_match = df_nega.loc[:, c]
+            f_match = df.loc[:, c]
             f_nega = f_nega | f_match
-            df_nega.loc[f_match, clm_nptn] = c
-                
-        #長さ#予め１を足しておいて「未満」に限定して返す（これで秩序化されたフレーズが返る）
+            df.loc[f_match, clm_nptn] = c
+
+        #長さ#予め１を足しておいて「未満」に限定して返す（秩序化されたフレーズが返る）
         f_len = df[self.clm_length] < self.max_length
         
-        #周期性
+        #周期性（ゴロゴロ、ビリビリ等を除外）
         f_periodic = df[self.clm_periodic] = df[self.clm_seqchar].map(self.doubt_periodic_letter)
-        #f_periodic = df[self.clm_periodic] == 1
 
-        #全フィルターを併せて抽出
-        df = pd.concat([df, df_match], axis=1)#最終出力だけが欲しい場合は clmnを指定すればよい
-
+        #df = pd.concat([df, f_posi, f_nega], axis=1)
         return df.loc[ f_posi & f_len & ~f_nega & ~f_periodic,:]
 
 
@@ -316,8 +316,8 @@ class extracter():
         df_sorted = self.exclude_unnecessary(df_sorted)#不要語/不要文字　を含むseqcharを排除
         df_sorted.drop(columns="index", inplace=True)
 
-        if self.selection > 0:
-            return self.select_phrase(df_sorted)        
+        #if self.selection > 0:
+        #   return self.select_phrase(df_sorted)        
         
         return df_sorted
 
@@ -413,19 +413,19 @@ class extracter():
 
         else:
             if self.verbose >= 1:
-                print("走査終了 -> 並び変え -> 選別 -> 重複削除")
+                print("走査終了 -> 並び変え -> 類似削除 ")
 
             #一括化とソート&選定(下記では groupbyで平均できない文字列の扱いを定義)
             df_uniques_all = df_concat.groupby(self.clm_seqchar, as_index=False).agg(dict_agg(df_concat))
-            df_uniques_all = self.hold_higherrank(df_uniques_all)#ここ時間かかる
-
-            if self.selection <= 0:
-                df_uniques_all.drop(columns="index", inplace=True)
-                return df_uniques_all
-            
-            df_phrase = self.select_phrase(df_uniques_all)
+            df_phrase = self.hold_higherrank(df_uniques_all)#ここ時間かかる
             df_phrase = df_phrase.drop(columns="index").reset_index(drop=True)
-            df_phrase = self.remove_similar(df_phrase)#サイズが大きいと時間かかる（最後の過程）
+
+            df_phrase = self.remove_similar(df_phrase)#サイズが大きいと時間かかる（最後の過程）1000->300程度
+
+            if self.selection > 0:            
+                df_phrase = self.select_phrase(df_phrase)
+
+            #df_phrase = df_phrase.drop(columns="index").reset_index(drop=True)
             return df_phrase
                         
 
