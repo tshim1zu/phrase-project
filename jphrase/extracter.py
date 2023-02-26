@@ -42,12 +42,12 @@ FIRST_KANJI=\
 '魔魚魯鮎鮒鮪鮫鮭鮮鯉鯖鯛鯨鯵鰍鰐鰭鰯鰹鰻鱈鱒鱗鳥鳩鳳鳴鳶鴇鴎鴛鴨鴫鴬鴻鵜鵠鵡鵬鶏鶴鷲鷹鷺鹸鹿麓麗麟麦麹麺麻麿黄黍黒黙黛鼎鼓鼠鼻齢龍'
         
 dict_match = {
-    "Kana": re.compile('[ァ-ヶー]{2,}'),#カタカナ
-    "Hana": re.compile('[ｦ-ﾟ]{2,}'),#半角カタカナ
+    "Kana": re.compile(f'[ァ-ヶー]{2,}'),#カタカナ
+    "Hana": re.compile(f'[ｦ-ﾟ]{2,}'),#半角カタカナ
     "HAN": re.compile(f'[{FIRST_KANJI}]{2,}'),#漢字二文字以上
-    "ZA": re.compile("[Ａ-Ｚ]{2,}"),#全角英文字
-    "alpha": re.compile("[a-zA-Z]{2,}"),#アルファベット
-    "ALPHA": re.compile("[A-Z]{2,}"),#大文字アルファベット
+    "ZA": re.compile(f"[Ａ-Ｚ]{2,}"),#全角英文字
+    "alpha": re.compile(f"[a-zA-Z]{2,}"),#アルファベット
+    "ALPHA": re.compile(f"[A-Z]{2,}"),#大文字アルファベット
     "Kana_HAN": re.compile( f"^[ァ-ヶー]+[{FIRST_KANJI}]+" ),
     "HAN_Kana": re.compile( f"^[{FIRST_KANJI}]+[ァ-ヶー]+" ),
     "HAN_GaKa": re.compile( f"^[{FIRST_KANJI}]+[ぁ-ゖ]+[ァ-ヶー]+" ),
@@ -56,16 +56,20 @@ dict_match = {
 }
 
 dict_negative = {
-    "x_Gana" :  re.compile("[ぁ-ゖ]+"),#ひらがなのみ #{0,} は * と、{1,} は + と同じ意味
-    "x_smalla": re.compile("[a-z\* _.]+"),#ほぼノイズ
+    "x_Gana" : re.compile(f"[ぁ-ゖ]+"),#ひらがなのみ #{0,} は * と、{1,} は + と同じ意味
+    "x_smalla": re.compile(f"[a-z\* _.]+"),#ほぼノイズ
     "x_start" : re.compile(f"^[ンッー、んっ～。](.*)+"),
-    "x_phone" : re.compile(r'((\d{2,4}|\(\d{2,4}\))(\s|-)(\d{3,4})(\s|-)(\d{4}))'),# 市外局番# 区切りは空白もしくはハイフン# 市内局番# 区切りは空白もしくはハイフン# 加入者番号                  
-    "x_mobile": re.compile( "0[789]0-[0-9]{4}-[0-9]{4}$" ),
-    "x_mail" :  re.compile( r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+' ),
-    "x_url" :   re.compile( r'https?://[\w/:%#\$&\?\(\)~\.=\+\-]+' ),
-    "x_Num":    re.compile("[0-9０-９,，]+"),#半角全角数字
-    "x_Num_ymd":re.compile("[0-9０-９]{1,4}[日|月|年]"),#全角数字の日付
-    "x_ymd" :   re.compile(r'\d{4}[年/]\d{1,2}[月/]\d{1,2}日?'),
+    "x_Yen" : re.compile(f"^([0０]|([\d](\d{0,2})((,\d{3}){0,2})))[千|万|億|兆]?円$"),
+    "x_Dollar" : re.compile(f"^([0０]|([\d](\d{0,2})((,\d{3}){0,2})))[千|万|億|兆]?ドル$"),
+    "x_Euro" : re.compile(f"^([0０]|([\d](\d{0,2})((,\d{3}){0,2})))[千|万|億|兆]?ユーロ$"),
+    "x_Phone" : re.compile(r'((\d{2,4}|\(\d{2,4}\))(\s|-)(\d{3,4})(\s|-)(\d{4}))'),# 市外局番# 区切りは空白もしくはハイフン# 市内局番# 区切りは空白もしくはハイフン# 加入者番号                  
+    "x_Tel" : re.compile( r'[(]?\d{2,4}[-)]?\d{2,4}-\d{3,4}'),
+    "x_mobile": re.compile(f"0[789]0-[0-9]{4}-[0-9]{4}$" ),
+    "x_mail" : re.compile( r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+' ),
+    "x_url" : re.compile( r'https?://[\w/:%#\$&\?\(\)~\.=\+\-]+' ),
+    "x_Num": re.compile(f"[\d,，]+"),#全半角数字
+    "x_ymd" :  re.compile( r'\d{4}[-年/]\d{1,2}[-月/]\d{1,2}日?'),
+    "x_Num_ymd":re.compile(f"[\d]{1,4}[日|月|年]"),#全角数字の日付
 }
 
 class extracter():
