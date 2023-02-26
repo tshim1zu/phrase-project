@@ -8,55 +8,73 @@ from collections import Counter
 from IPython.display import display
 import re
 
+# 第1水準の漢字 (亜-腕)
+FIRST_KANJI=\
+'一丁七万丈三上下不与丑且世丘丙丞両並中串丸丹主乃久之乍乎乏乗乙九乞也乱乳乾亀了予争事二云互五井亘亙些亜亡交亥亦亨享京亭亮人什仁仇今介仏仔仕他付仙代令以仮仰仲件任企伊伍伎伏伐休会伝伯伴伶伸伺似伽佃但位低'\
+'住佐佑体何余作佳併佼使侃例侍供依侠価侭侮侯侵侶便係促俄俊俗保信俣修俳俵俸俺倉個倍倒倖候借倣値倦倫倭倶倹偉偏停健偲側偵偶偽傍傑傘備催傭債傷傾僅働像僑僕僚僧僻儀億儒償優儲允元兄充兆兇先光克免兎児党兜入全八'\
+'公六共兵其具典兼内円冊再冒冗写冠冥冨冬冴冶冷凄准凋凌凍凝凡処凧凪凱凶凸凹出函刀刃分切刈刊刑列初判別利到制刷券刺刻剃則削前剖剛剣剤剥副剰割創劃劇劉力功加劣助努劫励労効劾勃勅勇勉動勘務勝募勢勤勧勲勺勾勿匁'\
+'匂包化北匙匝匠匡匪匹区医匿十千升午半卑卒卓協南単博卜占卦卯印危即却卵卸卿厄厘厚原厨厩厭厳去参又叉及友双反収叔取受叙叛叡叢口古句叩只叫召可台叱史右叶号司吃各合吉吊吋同名后吏吐向君吟吠否含吸吹吻吾呂呆呈呉'\
+'告呑周呪味呼命咋和咲咳咽哀品哉員哨哩哲唄唆唇唐唖唯唱唾啄商問啓善喉喋喚喜喝喧喪喫喬喰営嗣嘆嘉嘗嘘嘩嘱噂噌噛器噴噸噺嚇嚢囚四回因団困囲図固国圃圏園土圧在圭地坂均坊坐坑坤坦坪垂型垢垣埋城埜域埠埴執培基埼堀'\
+'堂堅堆堕堤堪堰報場堵堺塀塁塊塑塔塗塘塙塚塞塩填塵塾境墓増墜墨墳墾壁壇壊壌壕士壬壮声壱売壷変夏夕外夙多夜夢大天太夫央失夷奄奇奈奉奏契奔套奥奨奪奮女奴好如妃妄妊妓妖妙妥妨妬妹妻妾姉始姐姑姓委姥姦姪姫姶姻姿'\
+'威娃娘娠娩娯娼婁婆婚婦婿媒媛嫁嫉嫌嫡嬉嬢嬬嬰子孔字存孜孝孟季孤学孫宅宇守安宋完宍宏宕宗官宙定宛宜宝実客宣室宥宮宰害宴宵家容宿寂寄寅密富寒寓寛寝察寡寧審寮寵寸寺対寿封専射将尉尊尋導小少尖尚尤尭就尺尻尼尽'\
+'尾尿局居屈届屋屍屑展属屠屡層履屯山岐岡岨岩岬岱岳岸峠峡峨峯峰島峻崇崎崖崩嵐嵩嵯嶋嶺巌川州巡巣工左巧巨差己巳巴巷巻巽巾市布帆希帖帝帥師席帯帰帳常帽幅幌幕幡幣干平年幸幹幻幼幽幾庁広庄庇床序底庖店庚府度座庫'\
+'庭庵庶康庸廃廉廊廓廟廠延廷建廻廼廿弁弄弊式弐弓弔引弗弘弛弟弥弦弧弱張強弼弾彊当形彦彩彪彫彬彰影役彼往征径待律後徐徒従得御復循微徳徴徹徽心必忌忍志忘忙応忠快念忽怒怖怜思怠急性怨怪怯恋恐恒恕恢恥恨恩恭息恰'\
+'恵悉悌悔悟悠患悦悩悪悲悶悼情惇惑惚惜惟惣惨惰想惹愁愈愉意愚愛感慈態慌慎慕慢慣慧慨慮慰慶慾憂憎憐憤憧憩憲憶憾懇懐懲懸戊戎成我戒或戚戟戦戯戴戸戻房所扇扉手才打払托扮扱扶批承技抄把抑投抗折抜択披抱抵抹押抽担'\
+'拍拐拒拓拘拙招拝拠拡括拭拳拶拷拾持指按挑挙挟挨挫振挺挽挿捉捌捕捗捜捧捨据捲捷捺捻掃授掌排掘掛掠採探接控推掩措掬掲掴掻揃描提揖揚換握揮援揺損搬搭携搾摂摘摩摸摺撃撒撚撞撤撫播撮撰撲撹擁操擢擦擬擾支改攻放政'\
+'故敏救敗教敢散敦敬数整敵敷文斉斌斎斐斑斗料斜斡斤斥斧斬断斯新方於施旅旋族旗既日旦旧旨早旬旭旺昂昆昇昌明昏易昔星映春昧昨昭是昼時晃晋晒晦晩普景晴晶智暁暇暑暖暗暢暦暫暮暴曇曙曜曝曲曳更書曹曽曾替最月有朋服'\
+'朔朕朗望朝期木未末本札朱朴机朽杉李杏材村杓杖杜束条杢来杭杯東杵杷松板枇析枕林枚果枝枠枢枯架柁柄柊柏某柑染柔柘柚柱柳柴柵査柾柿栂栃栄栓栖栗校栢株栴核根格栽桁桂桃案桐桑桓桔桜桝桟桧桶梁梅梓梗梢梧梨梯械梱梶'\
+'梼棄棉棋棒棚棟森棲棺椀椅椋植椎椙椛検椴椿楊楓楕楚楠楢業楯楳極楼楽概榊榎榔榛構槌槍様槙槻槽樋樗標樟模権横樫樵樹樺樽橋橘機橡橿檀檎櫓櫛櫨欄欝欠次欣欧欲欺欽款歌歎歓止正此武歩歪歯歳歴死殆殉殊残殖殴段殺殻殿毅'\
+'母毎毒比毘毛氏民気水氷永氾汀汁求汎汐汗汚汝江池汰汲決汽沃沈沌沓沖沙没沢沫河沸油治沼沿況泉泊泌法泡波泣泥注泰泳洋洗洛洞津洩洪洲活派流浄浅浜浦浩浪浬浮浴海浸消涌涙涛涜涯液涼淀淋淑淘淡淫深淳淵混添清渇済渉渋'\
+'渓渚減渠渡渥渦温測港湊湖湘湛湧湯湾湿満溌源準溜溝溢溶溺滅滋滑滝滞滴漁漂漆漉漏演漕漠漢漣漫漬漸潅潔潜潟潤潮潰澄澗澱激濁濃濠濡濫濯瀕瀞瀦瀧瀬灘火灯灰灸灼災炉炊炎炭点為烈烏烹焔焚無焦然焼煉煎煙煤照煩煮煽熊熔'\
+'熟熱燃燈燐燕燥燦燭爆爪爵父爺爽爾片版牌牒牙牛牝牟牡牢牧物牲特牽犀犠犬犯状狂狐狗狙狛狩独狭狸狼狽猛猟猪猫献猶猷猿獄獅獣獲玄率玉王玖玩玲珂珊珍珠珪班現球理琉琢琳琴琵琶瑚瑛瑞瑠瑳璃環璽瓜瓢瓦瓶甑甘甚甜生産甥'\
+'用甫田由甲申男町画界畏畑畔留畜畝畠畢略畦番異畳畷畿疋疎疏疑疫疲疹疾病症痔痕痘痛痢痩痴療癌癒癖発登白百的皆皇皐皮皿盃盆盈益盗盛盟監盤目盲直相盾省眉看県真眠眺眼着睡督睦瞥瞬瞭瞳矛矢知矧矩短矯石砂研砕砥砦砧'\
+'砲破砺砿硝硫硬硯硲碁碇碍碑碓碕碗碧碩確磁磐磨磯礁礎示礼社祁祇祈祉祐祖祝神祢祥票祭祷禁禄禅禍禎福禦禰禽禾禿秀私秋科秒秘租秤秦秩称移稀程税稔稗稚稜種稲稼稽稿穀穂穆積穎穏穐穣穫穴究空穿突窃窄窒窓窟窪窮窯窺竃'\
+'立竜章竣童竪端競竹竺竿笈笑笛笠笥符第笹筆筈等筋筏筑筒答策箆箇箔箕算管箪箭箱箸節範篇築篠篤篭簡簸簾簿籍米籾粁粂粉粋粍粒粕粗粘粛粟粥粧精糊糎糖糞糟糠糧糸系糾紀約紅紋納紐純紗紘紙級紛素紡索紫紬累細紳紹紺終絃'\
+'組経結絞絡絢給統絵絶絹継続綜綬維綱網綴綻綾綿緊緋総緑緒線締編緩緬緯練縁縄縛縞縦縫縮績繁繊繋繍織繕繭繰纂纏缶罪罫置罰署罵罷羅羊美群羨義羽翁翌習翠翫翰翻翼耀老考者而耐耕耗耳耶耽聖聞聡聯聴職聾肇肉肋肌肖肘肝'\
+'股肢肥肩肪肯肱育肴肺胃胆背胎胞胡胤胴胸能脂脅脆脇脈脊脚脱脳脹腎腐腔腕腫腰腸腹腺腿膏膚膜膝膨膳膿臆臓臣臥臨自臭至致臼興舌舎舗舘舛舜舞舟航般舵舶舷船艇艦艮良色艶芋芙芝芥芦芭芯花芳芸芹芽苅苑苓苔苗苛若苦苧苫'\
+'英茂茄茅茎茜茨茶茸草荊荏荒荘荷荻莞莫莱菅菊菌菓菖菜菟菩華菰菱萄萌萎萩萱落葉葎著葛葡董葦葬葱葵葺蒋蒐蒔蒙蒜蒲蒸蒼蓄蓉蓋蓑蓬蓮蔀蔑蔓蔚蔦蔭蔵蔽蕃蕉蕊蕎蕗蕨蕩蕪薄薗薙薦薩薪薫薬薮薯藁藍藤藩藷藻蘇蘭虎虐虚虜虞'\
+'虫虹虻蚊蚕蚤蛇蛋蛍蛎蛙蛤蛭蛮蛸蛾蜂蜘蜜蝉蝋蝕蝦蝶蝿融螺蟹蟻血衆行術街衛衝衡衣表衰衷衿袈袋袖被袴袷裁裂装裏裕補裟裡裳裸製裾複褐褒襖襟襲西要覆覇見規視覗覚覧親観角解触言訂計訊討訓託記訟訣訪設許訳訴診註証詐'\
+'詑詔評詞詠詣試詩詫詮詰話該詳誇誉誌認誓誕誘語誠誤説読誰課誹誼調談請諌諏諒論諜諦諭諮諸諺諾謀謁謂謄謎謙講謝謡謬謹識譜警議譲護讃讐谷豆豊豚象豪豹貌貝貞負財貢貧貨販貫責貯貰貴買貸費貼貿賀賂賃賄資賊賎賑賓賛賜'\
+'賞賠賢賦質賭購贈贋赤赦赫走赴起超越趣趨足距跡跨路跳践踊踏蹄蹟蹴躍身躯車軌軍軒軟転軸軽較載輔輝輩輪輯輸輿轄轍轟轡辛辞辰辱農辺辻込辿迂迄迅迎近返迦迩迫迭述迷追退送逃逆透逐逓途逗這通逝速造逢連逮週進逸逼遁遂'\
+'遅遇遊運遍過道達違遜遠遡遣遥適遭遮遵遷選遺遼避還邑那邦邪邸郁郊郎郡部郭郵郷都鄭酉酋酌配酎酒酔酢酪酬酵酷酸醇醍醐醒醗醜醤醸釆采釈里重野量金釘釜針釣釦釧鈍鈎鈴鈷鉄鉛鉢鉦鉱鉾銀銃銅銑銘銚銭鋒鋤鋪鋭鋲鋳鋸鋼錆'\
+'錐錘錠錦錨錫錬錯録鍋鍍鍔鍛鍬鍵鍾鎌鎖鎗鎚鎧鎮鏑鏡鐘鐙鐸鑑鑓長門閃閉開閏閑間関閣閤閥閲闇闘阜阪防阻阿陀附降限陛院陣除陥陪陰陳陵陶陸険陽隅隆隈隊階随隔隙際障隠隣隷隻隼雀雁雄雅集雇雌雑雛離難雨雪雫雰雲零雷電'\
+'需震霊霜霞霧露青靖静非面革靭靴鞄鞍鞘鞠鞭韓韮音韻響頁頂頃項順須預頑頒頓頗領頚頬頭頴頻頼題額顎顔顕願顛類顧風飛食飢飯飲飴飼飽飾餅養餌餐餓館饗首香馨馬馳馴駁駄駅駆駈駐駒駕駿騎騒験騨騰驚骨骸髄高髪髭鬼魁魂魅'\
+'魔魚魯鮎鮒鮪鮫鮭鮮鯉鯖鯛鯨鯵鰍鰐鰭鰯鰹鰻鱈鱒鱗鳥鳩鳳鳴鳶鴇鴎鴛鴨鴫鴬鴻鵜鵠鵡鵬鶏鶴鷲鷹鷺鹸鹿麓麗麟麦麹麺麻麿黄黍黒黙黛鼎鼓鼠鼻齢龍'
+        
+dict_match = {
+    "Kana": re.compile('[ァ-ヶー]{2,}'),#カタカナ
+    "Hana": re.compile('[ｦ-ﾟ]{2,}'),#半角カタカナ
+    "HAN": re.compile(f'[{FIRST_KANJI}]{2,}'),#漢字二文字以上
+    "ZA": re.compile("[Ａ-Ｚ]{2,}"),#全角英文字
+    "alpha": re.compile("[a-zA-Z]{2,}"),#アルファベット
+    "ALPHA": re.compile("[A-Z]{2,}"),#大文字アルファベット
+    "Kana_HAN": re.compile( f"^[ァ-ヶー]+[{FIRST_KANJI}]+" ),
+    "HAN_Kana": re.compile( f"^[{FIRST_KANJI}]+[ァ-ヶー]+" ),
+    "HAN_GaKa": re.compile( f"^[{FIRST_KANJI}]+[ぁ-ゖ]+[ァ-ヶー]+" ),
+    "ZaGaKa": re.compile( f"^[Ａ-Ｚ]+[ぁ-ゖ]+[{FIRST_KANJI}]+" ),
+    "Kana_Gana": re.compile( f"^[ァ-ヶー]{2,}[ぁ-ゖ]{2,}" ),
+}
+
+dict_negative = {
+    "x_Gana" :  re.compile("[ぁ-ゖ]+"),#ひらがなのみ #{0,} は * と、{1,} は + と同じ意味
+    "x_smalla": re.compile("[a-z\* _.]+"),#ほぼノイズ
+    "x_start" : re.compile(f"^[ンッー、んっ～。](.*)+"),
+    "x_money" : re.compile("^(0|([1-9](\d{0,2})((,\d{3}){0,2})))[千|万|億|兆]?円$"),
+    "x_Money" : re.compile("^([0０]|([1-9１-９](\d{0,2})((,\d{3}){0,2})))[千|万|億|兆]?円$"),
+    "x_MONEY" : re.compile("^(０|([１-９](\d{0,2})((,\d{3}){0,2})))[千|万|億|兆]?円$"),
+    "x_dol" :   re.compile("^(0|([1-9](\d{0,2})((,\d{3}){0,2})))ドル$"),
+    "x_DOL" :   re.compile("^(０|([１-９](\d{0,2})((,\d{3}){0,2})))ドル$"),
+    "x_tel" :   re.compile(r'[(]?\d{2,4}[-)]?\d{2,4}-\d{3,4}'),
+    "x_phone" : re.compile(r'((\d{2,4}|\(\d{2,4}\))(\s|-)(\d{3,4})(\s|-)(\d{4}))'),# 市外局番# 区切りは空白もしくはハイフン# 市内局番# 区切りは空白もしくはハイフン# 加入者番号                  
+    "x_mobile": re.compile( "0[789]0-[0-9]{4}-[0-9]{4}$" ),
+    "x_mail" :  re.compile( r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+' ),
+    "x_url" :   re.compile( r'https?://[\w/:%#\$&\?\(\)~\.=\+\-]+' ),
+    "x_Num":    re.compile("[0-9０-９,，]+"),#半角全角数字
+    "x_Num_ymd":re.compile("[0-9０-９]{1,4}[日|月|年]"),#全角数字の日付
+    "x_ymd" :   re.compile(r'\d{4}[年/]\d{1,2}[月/]\d{1,2}日?'),
+}
+
 class extracter():
-
-    def __init__(self, min_count=6, max_length=16, min_length=4, weight_freq=1.0, weight_len=1.0,
-                removes = "⠀ #�\n.：.…!！？?･ｰ￣*～\r\u3000、/＼／「」『』【】",#走査前に除去する文字
-                unnecesary = ["http", "www", "ｗｗｗ", "&amp;", "&gt;"],#走査後に除去する文字列
-                threshold_originality = 0.5,#他と重複のあるフレーズを除去
-                size_sentence = 5000,#一度にスキャンする配列のサイズ
-                knowns=[],#カウント時に　優先してほしい既知語
-                positive_filter = ["_2","__2", "___2","____2TZ___",#英単語（半角英文字のみ、ただし大文字が１つ以上入る  
-                                "_______2__",#全角英文字のみ
-                                "_1_10___00","__110___00",#カナ漢（情報コミュニケーション学、途中で挟まるひらがなは構わない、数字の混入は認めない） #ｶﾅ漢
-                                "00011___00","0001___100",#漢英#漢全英
-                                ],
-                negative_filter = {"start":[0,8,9,-1], "end":[0,8,9,-1],#ひらがな/数字 での開始or終了
-                                "periodic": True, "smalla":True, #周期性のあるフレーズは不要、ひらがなや数字の開始終了も不要 
-                                "kanantsu":True, "less_than_maxlen":True },#ンッの開始は不要、文字連の最大値は不使用                                           
-                selection = 1,#Falseの場合、選定しない結果を取得する
-                verbose = 1,
-                  ):
-
-        #ハイパーパラメータ
-        self.min_count = min_count
-        self.weight_freq = weight_freq
-        self.weight_len = weight_len
-        self.max_length = max_length
-        self.min_length = min_length
-        self.removes = removes        #除去文字（探索時に不要な文字を除外する）
-        self.unnecessary = unnecesary# ["http", "www"]        #不要語（出力時に欲しくない文字の連なり）
-        self.knowns = knowns
-        self.size_sentence = size_sentence#一度に処理するセンテンスのリストのサイズ
-        self.threshold_originality = threshold_originality#類似度の閾値（独自性の無い語を除去する
-        self.selection = selection
-        self.verbose = verbose
-
-        #取り出すフレーズのルール ポジティブとネガティブ
-        self.positive_filter = positive_filter
-        #例
-        #["_2_",#全てカタカナのフレーズを拾う
-        # "__2",#全て半カナのフレーズを拾う
-        # "___2",#全て漢字のフレーズを拾う
-        # "____2",#全てアルファベットのフレーズを拾う
-        # "______2",#全て全角アルファベットのフレーズを拾う
-        # "T1_10_",#カナ漢＝カタカナと漢字の混合、ひらがな混入ＯＫ
-        # "T_110_",#半カナ漢
-        # "00011_",#アルファ漢
-        # ]
-        self.negative_filter = negative_filter
-        # {"start":[0,8,-1], "end":[0,8,-1], "periodic": True, "smalla":True }#周期性は不要
-        #除外するフレーズのルール        #周期        #開始が　数字、ひらがな、記号        #終了が　数字、ひらがな、記号
 
     #列名
     clm_seqchar = "seqchar"
@@ -66,57 +84,38 @@ class extracter():
     clm_originality = "originality"
     clm_knowns = "knowns"
     clm_periodic = "periodic"
+    #others = "others"
 
-    #文字列定義
-    others = "others"
+    def __init__(self, min_count=6, max_length=16, min_length=4, weight_freq=1.0, weight_len=1.0,
+                removes = "⠀ #�\n.：.…!！？?･ｰ￣*～\r\u3000、/＼／「」『』【】",#走査前に除去する文字
+                unnecesary = ["http", "www", "ｗｗｗ", "&amp;", "&gt;"],#走査後に除去する文字列
+                threshold_originality = 0.5,#他と重複のあるフレーズを除去
+                size_sentence = 5000,#一度にスキャンする配列のサイズ
+                knowns=[],#カウント時に　優先してほしい既知語
+                selection = 1,#Falseの場合、選定しない結果を取得する
+                verbose = 1,
+                positive = dict_match,
+                negative = dict_negative,
+            ):
+
+        #ハイパーパラメータ
+        self.min_count = min_count
+        self.weight_freq = weight_freq
+        self.weight_len = weight_len
+        self.max_length = max_length + 1#指定された数よりも１つ多く数えておき、指定された数までの長さで結果を返す
+        self.min_length = min_length
+        self.removes = removes        #除去文字（探索時に不要な文字を除外する）
+        self.unnecessary = unnecesary# ["http", "www"]        #不要語（出力時に欲しくない文字の連なり）
+        self.knowns = knowns
+        self.size_sentence = size_sentence#一度に処理するセンテンスのリストのサイズ
+        self.threshold_originality = threshold_originality#類似度の閾値（独自性の無い語を除去する
+        self.selection = selection
+        self.verbose = verbose
+        self.positive_filter = positive
+        self.negative_filter = negative
 
 
-    # 第1水準の漢字 (亜-腕)
-    FIRST_KANJI=\
-    '一丁七万丈三上下不与丑且世丘丙丞両並中串丸丹主乃久之乍乎乏乗乙九乞也乱乳乾亀了予争事二云互五井亘亙些亜亡交亥亦亨享京亭亮人什仁仇今介仏仔仕他付仙代令以仮仰仲件任企伊伍伎伏伐休会伝伯伴伶伸伺似伽佃但位低'\
-    '住佐佑体何余作佳併佼使侃例侍供依侠価侭侮侯侵侶便係促俄俊俗保信俣修俳俵俸俺倉個倍倒倖候借倣値倦倫倭倶倹偉偏停健偲側偵偶偽傍傑傘備催傭債傷傾僅働像僑僕僚僧僻儀億儒償優儲允元兄充兆兇先光克免兎児党兜入全八'\
-    '公六共兵其具典兼内円冊再冒冗写冠冥冨冬冴冶冷凄准凋凌凍凝凡処凧凪凱凶凸凹出函刀刃分切刈刊刑列初判別利到制刷券刺刻剃則削前剖剛剣剤剥副剰割創劃劇劉力功加劣助努劫励労効劾勃勅勇勉動勘務勝募勢勤勧勲勺勾勿匁'\
-    '匂包化北匙匝匠匡匪匹区医匿十千升午半卑卒卓協南単博卜占卦卯印危即却卵卸卿厄厘厚原厨厩厭厳去参又叉及友双反収叔取受叙叛叡叢口古句叩只叫召可台叱史右叶号司吃各合吉吊吋同名后吏吐向君吟吠否含吸吹吻吾呂呆呈呉'\
-    '告呑周呪味呼命咋和咲咳咽哀品哉員哨哩哲唄唆唇唐唖唯唱唾啄商問啓善喉喋喚喜喝喧喪喫喬喰営嗣嘆嘉嘗嘘嘩嘱噂噌噛器噴噸噺嚇嚢囚四回因団困囲図固国圃圏園土圧在圭地坂均坊坐坑坤坦坪垂型垢垣埋城埜域埠埴執培基埼堀'\
-    '堂堅堆堕堤堪堰報場堵堺塀塁塊塑塔塗塘塙塚塞塩填塵塾境墓増墜墨墳墾壁壇壊壌壕士壬壮声壱売壷変夏夕外夙多夜夢大天太夫央失夷奄奇奈奉奏契奔套奥奨奪奮女奴好如妃妄妊妓妖妙妥妨妬妹妻妾姉始姐姑姓委姥姦姪姫姶姻姿'\
-    '威娃娘娠娩娯娼婁婆婚婦婿媒媛嫁嫉嫌嫡嬉嬢嬬嬰子孔字存孜孝孟季孤学孫宅宇守安宋完宍宏宕宗官宙定宛宜宝実客宣室宥宮宰害宴宵家容宿寂寄寅密富寒寓寛寝察寡寧審寮寵寸寺対寿封専射将尉尊尋導小少尖尚尤尭就尺尻尼尽'\
-    '尾尿局居屈届屋屍屑展属屠屡層履屯山岐岡岨岩岬岱岳岸峠峡峨峯峰島峻崇崎崖崩嵐嵩嵯嶋嶺巌川州巡巣工左巧巨差己巳巴巷巻巽巾市布帆希帖帝帥師席帯帰帳常帽幅幌幕幡幣干平年幸幹幻幼幽幾庁広庄庇床序底庖店庚府度座庫'\
-    '庭庵庶康庸廃廉廊廓廟廠延廷建廻廼廿弁弄弊式弐弓弔引弗弘弛弟弥弦弧弱張強弼弾彊当形彦彩彪彫彬彰影役彼往征径待律後徐徒従得御復循微徳徴徹徽心必忌忍志忘忙応忠快念忽怒怖怜思怠急性怨怪怯恋恐恒恕恢恥恨恩恭息恰'\
-    '恵悉悌悔悟悠患悦悩悪悲悶悼情惇惑惚惜惟惣惨惰想惹愁愈愉意愚愛感慈態慌慎慕慢慣慧慨慮慰慶慾憂憎憐憤憧憩憲憶憾懇懐懲懸戊戎成我戒或戚戟戦戯戴戸戻房所扇扉手才打払托扮扱扶批承技抄把抑投抗折抜択披抱抵抹押抽担'\
-    '拍拐拒拓拘拙招拝拠拡括拭拳拶拷拾持指按挑挙挟挨挫振挺挽挿捉捌捕捗捜捧捨据捲捷捺捻掃授掌排掘掛掠採探接控推掩措掬掲掴掻揃描提揖揚換握揮援揺損搬搭携搾摂摘摩摸摺撃撒撚撞撤撫播撮撰撲撹擁操擢擦擬擾支改攻放政'\
-    '故敏救敗教敢散敦敬数整敵敷文斉斌斎斐斑斗料斜斡斤斥斧斬断斯新方於施旅旋族旗既日旦旧旨早旬旭旺昂昆昇昌明昏易昔星映春昧昨昭是昼時晃晋晒晦晩普景晴晶智暁暇暑暖暗暢暦暫暮暴曇曙曜曝曲曳更書曹曽曾替最月有朋服'\
-    '朔朕朗望朝期木未末本札朱朴机朽杉李杏材村杓杖杜束条杢来杭杯東杵杷松板枇析枕林枚果枝枠枢枯架柁柄柊柏某柑染柔柘柚柱柳柴柵査柾柿栂栃栄栓栖栗校栢株栴核根格栽桁桂桃案桐桑桓桔桜桝桟桧桶梁梅梓梗梢梧梨梯械梱梶'\
-    '梼棄棉棋棒棚棟森棲棺椀椅椋植椎椙椛検椴椿楊楓楕楚楠楢業楯楳極楼楽概榊榎榔榛構槌槍様槙槻槽樋樗標樟模権横樫樵樹樺樽橋橘機橡橿檀檎櫓櫛櫨欄欝欠次欣欧欲欺欽款歌歎歓止正此武歩歪歯歳歴死殆殉殊残殖殴段殺殻殿毅'\
-    '母毎毒比毘毛氏民気水氷永氾汀汁求汎汐汗汚汝江池汰汲決汽沃沈沌沓沖沙没沢沫河沸油治沼沿況泉泊泌法泡波泣泥注泰泳洋洗洛洞津洩洪洲活派流浄浅浜浦浩浪浬浮浴海浸消涌涙涛涜涯液涼淀淋淑淘淡淫深淳淵混添清渇済渉渋'\
-    '渓渚減渠渡渥渦温測港湊湖湘湛湧湯湾湿満溌源準溜溝溢溶溺滅滋滑滝滞滴漁漂漆漉漏演漕漠漢漣漫漬漸潅潔潜潟潤潮潰澄澗澱激濁濃濠濡濫濯瀕瀞瀦瀧瀬灘火灯灰灸灼災炉炊炎炭点為烈烏烹焔焚無焦然焼煉煎煙煤照煩煮煽熊熔'\
-    '熟熱燃燈燐燕燥燦燭爆爪爵父爺爽爾片版牌牒牙牛牝牟牡牢牧物牲特牽犀犠犬犯状狂狐狗狙狛狩独狭狸狼狽猛猟猪猫献猶猷猿獄獅獣獲玄率玉王玖玩玲珂珊珍珠珪班現球理琉琢琳琴琵琶瑚瑛瑞瑠瑳璃環璽瓜瓢瓦瓶甑甘甚甜生産甥'\
-    '用甫田由甲申男町画界畏畑畔留畜畝畠畢略畦番異畳畷畿疋疎疏疑疫疲疹疾病症痔痕痘痛痢痩痴療癌癒癖発登白百的皆皇皐皮皿盃盆盈益盗盛盟監盤目盲直相盾省眉看県真眠眺眼着睡督睦瞥瞬瞭瞳矛矢知矧矩短矯石砂研砕砥砦砧'\
-    '砲破砺砿硝硫硬硯硲碁碇碍碑碓碕碗碧碩確磁磐磨磯礁礎示礼社祁祇祈祉祐祖祝神祢祥票祭祷禁禄禅禍禎福禦禰禽禾禿秀私秋科秒秘租秤秦秩称移稀程税稔稗稚稜種稲稼稽稿穀穂穆積穎穏穐穣穫穴究空穿突窃窄窒窓窟窪窮窯窺竃'\
-    '立竜章竣童竪端競竹竺竿笈笑笛笠笥符第笹筆筈等筋筏筑筒答策箆箇箔箕算管箪箭箱箸節範篇築篠篤篭簡簸簾簿籍米籾粁粂粉粋粍粒粕粗粘粛粟粥粧精糊糎糖糞糟糠糧糸系糾紀約紅紋納紐純紗紘紙級紛素紡索紫紬累細紳紹紺終絃'\
-    '組経結絞絡絢給統絵絶絹継続綜綬維綱網綴綻綾綿緊緋総緑緒線締編緩緬緯練縁縄縛縞縦縫縮績繁繊繋繍織繕繭繰纂纏缶罪罫置罰署罵罷羅羊美群羨義羽翁翌習翠翫翰翻翼耀老考者而耐耕耗耳耶耽聖聞聡聯聴職聾肇肉肋肌肖肘肝'\
-    '股肢肥肩肪肯肱育肴肺胃胆背胎胞胡胤胴胸能脂脅脆脇脈脊脚脱脳脹腎腐腔腕腫腰腸腹腺腿膏膚膜膝膨膳膿臆臓臣臥臨自臭至致臼興舌舎舗舘舛舜舞舟航般舵舶舷船艇艦艮良色艶芋芙芝芥芦芭芯花芳芸芹芽苅苑苓苔苗苛若苦苧苫'\
-    '英茂茄茅茎茜茨茶茸草荊荏荒荘荷荻莞莫莱菅菊菌菓菖菜菟菩華菰菱萄萌萎萩萱落葉葎著葛葡董葦葬葱葵葺蒋蒐蒔蒙蒜蒲蒸蒼蓄蓉蓋蓑蓬蓮蔀蔑蔓蔚蔦蔭蔵蔽蕃蕉蕊蕎蕗蕨蕩蕪薄薗薙薦薩薪薫薬薮薯藁藍藤藩藷藻蘇蘭虎虐虚虜虞'\
-    '虫虹虻蚊蚕蚤蛇蛋蛍蛎蛙蛤蛭蛮蛸蛾蜂蜘蜜蝉蝋蝕蝦蝶蝿融螺蟹蟻血衆行術街衛衝衡衣表衰衷衿袈袋袖被袴袷裁裂装裏裕補裟裡裳裸製裾複褐褒襖襟襲西要覆覇見規視覗覚覧親観角解触言訂計訊討訓託記訟訣訪設許訳訴診註証詐'\
-    '詑詔評詞詠詣試詩詫詮詰話該詳誇誉誌認誓誕誘語誠誤説読誰課誹誼調談請諌諏諒論諜諦諭諮諸諺諾謀謁謂謄謎謙講謝謡謬謹識譜警議譲護讃讐谷豆豊豚象豪豹貌貝貞負財貢貧貨販貫責貯貰貴買貸費貼貿賀賂賃賄資賊賎賑賓賛賜'\
-    '賞賠賢賦質賭購贈贋赤赦赫走赴起超越趣趨足距跡跨路跳践踊踏蹄蹟蹴躍身躯車軌軍軒軟転軸軽較載輔輝輩輪輯輸輿轄轍轟轡辛辞辰辱農辺辻込辿迂迄迅迎近返迦迩迫迭述迷追退送逃逆透逐逓途逗這通逝速造逢連逮週進逸逼遁遂'\
-    '遅遇遊運遍過道達違遜遠遡遣遥適遭遮遵遷選遺遼避還邑那邦邪邸郁郊郎郡部郭郵郷都鄭酉酋酌配酎酒酔酢酪酬酵酷酸醇醍醐醒醗醜醤醸釆采釈里重野量金釘釜針釣釦釧鈍鈎鈴鈷鉄鉛鉢鉦鉱鉾銀銃銅銑銘銚銭鋒鋤鋪鋭鋲鋳鋸鋼錆'\
-    '錐錘錠錦錨錫錬錯録鍋鍍鍔鍛鍬鍵鍾鎌鎖鎗鎚鎧鎮鏑鏡鐘鐙鐸鑑鑓長門閃閉開閏閑間関閣閤閥閲闇闘阜阪防阻阿陀附降限陛院陣除陥陪陰陳陵陶陸険陽隅隆隈隊階随隔隙際障隠隣隷隻隼雀雁雄雅集雇雌雑雛離難雨雪雫雰雲零雷電'\
-    '需震霊霜霞霧露青靖静非面革靭靴鞄鞍鞘鞠鞭韓韮音韻響頁頂頃項順須預頑頒頓頗領頚頬頭頴頻頼題額顎顔顕願顛類顧風飛食飢飯飲飴飼飽飾餅養餌餐餓館饗首香馨馬馳馴駁駄駅駆駈駐駒駕駿騎騒験騨騰驚骨骸髄高髪髭鬼魁魂魅'\
-    '魔魚魯鮎鮒鮪鮫鮭鮮鯉鯖鯛鯨鯵鰍鰐鰭鰯鰹鰻鱈鱒鱗鳥鳩鳳鳴鳶鴇鴎鴛鴨鴫鴬鴻鵜鵠鵡鵬鶏鶴鷲鷹鷺鹸鹿麓麗麟麦麹麺麻麿黄黍黒黙黛鼎鼓鼠鼻齢龍'
-        
 
-    dict_features = {
-            "hiragana": re.compile('[ぁ-ゖ]+'),#ー を除外 #ゔゞ゛゜ー]+'),
-            "katakana": re.compile('[ァ-ヶー]+'),#カタカナ
-            "hankana": re.compile('[ｦ-ﾟ]+'),#半角カタカナ
-            "kanji": re.compile(f'[{FIRST_KANJI}]+'),#漢字
-            "alphabet": re.compile("[a-zA-Z]+"),#アルファベット
-            "smalla": re.compile("[a-z]+"),#小文字アルファベット
-            "largea": re.compile("[A-Z]+"),#大文字アルファベット
-            "zalpha": re.compile("[Ａ-Ｚ]+"),#全角英文字
-            "number": re.compile("[0-9]+"),#半角数字
-            "znumber": re.compile("[０-９]+"),#全角数字
-                         }
 
 
     def chopup(self, sentences):
@@ -205,105 +204,109 @@ class extracter():
         df = df[~mask_unnec]
         return df
 
-    def set_features(self, df):
-        #フレーズには、ひらがなやカタカナ、漢字やアルファベットなどの含有率に特有の規則がある
-        def contains_pattern(text, pattern):
-            pattern_search = pattern.search(text)
-            if pattern_search:
-                span = pattern_search.span()
-                if (span[0] == 0) and (len(text) == span[1]):
-                    return 2#全てが該当
-                return 1#一部が該当
-            return 0#該当せず
+    #周期的な語（"回レ回レ回レ"）
+    def doubt_periodic_letter(self, str_scan, len_period=2):
+        if len(str_scan) <= 2:#二文字以下はスルー
+            return 0
+        if len(str_scan) == 3:#３文字の扱い e.g. ゲゲゲ:True
+            if (str_scan[0] == str_scan[1]) & (str_scan[0] == str_scan[2]):
+                return True
+            else:
+                return False
 
-        for k, pattern in self.dict_features.items():
-            df[k] = df[self.clm_seqchar].map(lambda text: contains_pattern(text, pattern))
-
-        #指定した位置の文字種類を列情報化
-        def what_is(a_char):
-            for k, pattern in self.dict_features.items():
-                if a_char in "ンッーﾝｯｰ、んっ":#"ン,ッ,ー、んっ"は先頭に来ないものと定義（ンジャメナのような例外も？）
-                    return "kanantsu"
-                if pattern.search(a_char):
-                    return k
-            return self.others# "others"
-        
-        df["start_what"] = df[self.clm_seqchar].str[0].map(lambda a_char: what_is(a_char))
-        df["end_what"] = df[self.clm_seqchar].str[-1].map(lambda a_char: what_is(a_char))
-
-        #周期的な語（"回レ回レ回レ"）
-        def doubt_periodic_letter(str_scan, len_period=2):
-            if len(str_scan) <= 2:#二文字以下はスルー
-                return 0
-            if len(str_scan) == 3:#３文字の扱い e.g. ゲゲゲ:True
-                if (str_scan[0] == str_scan[1]) & (str_scan[0] == str_scan[2]):
-                    return 1
-                else:
-                    return 0
-            doubt = str_scan[0:len_period]
-            ret = True
-            step = len(doubt)
-            for i in range(0, len(str_scan), step):
-                if i + 1 == len(str_scan):
-                    break#奇数長文字対策
-                ret *= int(doubt in str_scan[i: i+step])
-            return ret
-            doubt_periodic_letter("ガルガルガルガ")#くり返しでも奇数の場合に判定できるかどうか
-            doubt_periodic_letter("ーーー")
-
-        df[self.clm_periodic] = df[self.clm_seqchar].map(doubt_periodic_letter)
-        return df
+        doubt = str_scan[0:len_period]
+        ret = True
+        step = len(doubt)
+        for i in range(0, len(str_scan), step):
+            if i + 1 == len(str_scan):
+                break#文字列の長さが奇数の場合は直前までの走査で打ち切り
+            ret = ret & (doubt in str_scan[i: i+step])
+        return ret
+        doubt_periodic_letter("ガルガルガルガ")#くり返しでも奇数の場合に判定できるかどうか
+        doubt_periodic_letter("ーーー")
 
 
+    def select_patterns(self, sr, dict_patterns):
+        df_ret = pd.DataFrame()
+        for pname in dict_patterns:
+            sr_ret = self.select_pattern(sr, dict_patterns[pname], pname)
+            df_ret = pd.concat([df_ret, sr_ret], axis=1)
+        return df_ret
+
+    def select_pattern(self, sr, pattern, colname="判定結果"):        
+        #正規表現パターンへの　完全一致判定
+        def equal_search(s):
+            res = re.search(pattern, s)
+            if res:
+                st, ed = res.span()[0], res.span()[1]
+                return bool(s == s[st: ed])#全体が条件に一致しているか判別
+            return False        
+        ret = sr.astype(str).apply(equal_search)
+        ret.name = colname
+        return ret
+
+    #contains patterns
+    def contains_patterns(self, sr, dict_patterns):
+        df_ret = pd.DataFrame()
+        for pname in dict_patterns:
+            sr_ret = self.contains_pattern(sr, dict_patterns[pname], pname)
+            df_ret = pd.concat([df_ret, sr_ret], axis=1)
+        return df_ret
+
+    #正規表現パターンに一致するものを含む場合にTrue
+    def contains_pattern(self, sr, pattern, colname = "contains"):
+        def equal_search(s):
+            res = re.search(pattern, s)
+            if res:
+                st, ed = res.span()[0], res.span()[1]
+                return s[st: ed]
+            return None        
+        ret = sr.astype(str).apply(equal_search)
+        ret.name = colname
+        return ret
 
     def select_phrase(self, df):
+
+        sr = df[self.clm_seqchar]
+
+        #正規表現との全一致（ポジティブフィルター）
+        df_match = self.select_patterns(sr, self.positive_filter)
+
+        clm_ptn = "match_ptn"
+        df_match[clm_ptn] = ""
+        f_posi = np.array([False] * len(sr))
+        for c in df_match.columns:
+            if c != clm_ptn:
+                f_match = df_match.loc[:, c]
+                df_match.loc[f_match, clm_ptn] = c
+                f_posi = f_posi | f_match
+                
+        #正規表現との全一致（ネガティブフィルター）
+        df_nega = self.select_patterns(sr, self.negative_filter)
+        clm_nptn = "negative_ptn"
+        f_nega = np.array([False] * len(sr))
+        for c in df_nega.columns:
+            f_match = df_nega.loc[:, c]
+            f_nega = f_nega | f_match
+            df_nega.loc[f_match, clm_nptn] = c
+                
+        #長さ#予め１を足しておいて「未満」に限定して返す（これで秩序化されたフレーズが返る）
+        f_len = df[self.clm_length] < self.max_length
         
-        list_feature = list(self.dict_features.keys())
-        list_feature.append(self.others)
+        #周期性
+        f_periodic = df[self.clm_periodic] = df[self.clm_seqchar].map(self.doubt_periodic_letter)
+        #f_periodic = df[self.clm_periodic] == 1
 
-        #ポジティブマスク#hiragana, katakana, hankana, kanji, alpha, small, large, zalpha, number, znumber, 
-        def filter_from(str_filter):
-            ret_mask = np.array([True] * len(df))
-            for i, c in enumerate(str_filter):
-                if c == "_": continue
-                elif c == "Z": ret_mask = ret_mask & (df[list_feature[i]] != 0)#1 or 2
-                elif c == "E": ret_mask = ret_mask & (df[list_feature[i]] != 1)#0 or 2
-                elif c == "T": ret_mask = ret_mask & (df[list_feature[i]] != 2)#0 or 1
-                else: ret_mask = ret_mask & (df[list_feature[i]] == int(c))# df["hiragana"] == 2
-            return ret_mask
-        masks = [filter_from(str_filter) for str_filter in self.positive_filter]
+        #全フィルターを併せて抽出
+        df = pd.concat([df, df_match], axis=1)#最終出力だけが欲しい場合は clmnを指定すればよい
 
-        #ネガティブマスク
-        negative_mask = np.array([True] * len(df))
-        for idx in self.negative_filter["start"]:#ひらがな・数字の開始は認めない
-            negative_mask = negative_mask & ~( df["start_what"] == list_feature[idx] )
-        for idx in self.negative_filter["end"]:#ひらがな・数字で終了も認めない
-            negative_mask = negative_mask & ~( df["end_what"] == list_feature[idx] )        
-        if self.negative_filter[self.clm_periodic]:
-            negative_mask = negative_mask & ~(df[self.clm_periodic] == 1)            
-        if self.negative_filter["smalla"]:#アルファベット小文字のみは除外対象
-            negative_mask = negative_mask & ~filter_from("_____2")#smalla
-        if self.negative_filter["kanantsu"]:#ン/ッ/ーでの開始はフレーズとして認めない
-            for idx in self.negative_filter["start"]:
-                negative_mask = negative_mask & ~( df["start_what"] == "kanantsu")
-        if self.negative_filter["less_than_maxlen"]:#走査する長さ最大値未満のseqcharに限定（アルゴリズムの性質上、最大長ではフレーズは取得しにくい）
-            negative_mask = negative_mask & ~(df[self.clm_length] == self.max_length)
-            
-        # ポジティブマスクとネガティブマスクを使って、フレーズを選定
-        is_known = df[self.clm_knowns] == True
-        df_newphrase = df[is_known].sort_values(by=self.clm_sc, ascending=False)# "sc_index"
+        return df.loc[ f_posi & f_len & ~f_nega & ~f_periodic,:]
 
-        for mask in masks:
-            mask_ = mask & ~is_known & negative_mask# negative_mask#消したい条件
-            df_tmp = df[mask_].sort_values(by=self.clm_sc , ascending=False)#"sc_index"
-            if len(df_tmp):
-                df_newphrase = pd.concat([ df_newphrase, df_tmp ])
-
-        return df_newphrase
 
 
     def find_uniques(self, sentences):
-        manymany_stones = self.chopup(sentences)#切り刻む
+
+        manymany_stones = self.chopup(sentences)#切り刻んで ngramを作成
         df_count = self.count_characters(manymany_stones)#数える
         df_knowns = self.count_knowns(sentences)#既知語は別にカウント
         df_concat = pd.concat([df_knowns, df_count])
@@ -311,27 +314,24 @@ class extracter():
         if not len(df_concat):
             return df_concat
 
-        if not len(df_concat):
-            return df_concat
-
         df_sorted = self.hold_higherrank(df_concat)#情報量でソート、重複除去        
         df_sorted = self.exclude_unnecessary(df_sorted)#不要語/不要文字　を含むseqcharを排除
-        df_sorted = self.set_features(df_sorted)
         df_sorted.drop(columns="index", inplace=True)
 
         if self.selection > 0:
             return self.select_phrase(df_sorted)        
+        
         return df_sorted
 
 
-    def gen_sentences(self, sent_array):#分析対象となるテキストは多いこともあるので、yieldで分けて処理することで　計算時間が安定する
+    def gen_sentences(self, sent_array):#分析対象となるテキストをyieldで小分けに処理、計算時間を安定させる
         sentences = []
         for multiple_sentence in sent_array:
             #センテンスの区切り文字になりそうなものは、あらかじめ統一して"\n"にしておく
             for delim in ["\r","。","．"]:
                 multiple_sentence = multiple_sentence.replace(delim, "\n")
 
-            for a_sentence in multiple_sentence.split("\n"):
+            for a_sentence in multiple_sentence.split("\n"):#統一的に扱える？
                 if len(a_sentence):
                     sentences.append(a_sentence)
                 if len(sentences) >= self.size_sentence:
@@ -356,15 +356,16 @@ class extracter():
         return df_tmp[mask_similar]
 
     #レーベンシュタイン距離から類似性を計算
-    def similarity(self, seq1,seq2):
-        d = self.levenshtein(seq1, seq2)
-        seq_length = (len(seq1) + len(seq2) )/2
+    def similarity(self, seq_x, seq_y):
+        d = self.levenshtein(seq_x, seq_y)
+        seq_length = (len(seq_x) + len(seq_y) )/2
         d_ratio = d/seq_length #文字長に占める　異なる文字数の割合
         return 1 - d_ratio
 
-    def levenshtein(self, seq1, seq2):
-        size_x = len(seq1) + 1
-        size_y = len(seq2) + 1
+    #レーベンシュタイン距離
+    def levenshtein(self, seq_x, seq_y):
+        size_x = len(seq_x) + 1
+        size_y = len(seq_y) + 1
         matrix = np.zeros ((size_x, size_y))
         for x in range(size_x):
             matrix [x, 0] = x
@@ -373,7 +374,7 @@ class extracter():
 
         for x in range(1, size_x):
             for y in range(1, size_y):
-                if seq1[x-1] == seq2[y-1]:
+                if seq_x[x-1] == seq_y[y-1]:
                     matrix [x,y] = min(matrix[x-1,y] + 1, matrix[x-1,y-1], matrix[x, y-1] + 1)
                 else:
                     matrix [x,y] = min(matrix[x-1,y] + 1, matrix[x-1,y-1] + 1, matrix[x,y-1] + 1 )
@@ -386,20 +387,26 @@ class extracter():
         sentences = np.array(sentences).reshape(-1,)
         
         def dict_agg(df_concat):#groupbyでdfを集計するときに文字列も統一的に扱う
-            return  { c: ("first" if d == object else ("sum" if c == self.clm_freq else "mean"))\
-                        for c, d in zip(df_concat.columns, df_concat.dtypes) }
+            return  { c: ("first" if (d == object) else
+                          ("sum" if c == self.clm_freq else "mean"))\
+                            for c, d in zip(df_concat.columns, df_concat.dtypes)
+                            if (d != bool) | (c == self.clm_knowns)
+                    }
 
         df_concat = pd.DataFrame()
+
         for partial_sentences in self.gen_sentences(sentences):
+
             df_tmp = self.find_uniques(partial_sentences)
             df_concat = pd.concat([df_concat, df_tmp])
 
-            if len(df_concat) & self.verbose >= 1:
-                print("途中経過")#暫定平均で集計
+            if len(df_concat) > 0 & (self.verbose >= 1):
+            #   print("途中経過")#暫定平均で集計
                 df_toshow = df_concat\
                     .groupby(self.clm_seqchar, as_index =False).agg(dict_agg(df_concat))\
                     .sort_values(by=[self.clm_knowns, self.clm_sc], ascending=False)
                 display(df_toshow.iloc[:5,:5])#
+
 
         if not len(df_concat):
             if self.verbose >= 1:
@@ -408,7 +415,8 @@ class extracter():
 
         else:
             if self.verbose >= 1:
-                print("concat終了 -> ソーティング -> セレクション -> 重複除去")
+                print("走査終了 -> 並び変え -> 選別 -> 重複削除")
+
             #一括化とソート&選定(下記では groupbyで平均できない文字列の扱いを定義)
             df_uniques_all = df_concat.groupby(self.clm_seqchar, as_index=False).agg(dict_agg(df_concat))
             df_uniques_all = self.hold_higherrank(df_uniques_all)#ここ時間かかる
@@ -419,7 +427,7 @@ class extracter():
             
             df_phrase = self.select_phrase(df_uniques_all)
             df_phrase = df_phrase.drop(columns="index").reset_index(drop=True)
-            df_phrase = self.remove_similar(df_phrase)#時間かかる（最後の過程）
+            df_phrase = self.remove_similar(df_phrase)#サイズが大きいと時間かかる（最後の過程）
             return df_phrase
                         
 
