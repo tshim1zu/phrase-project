@@ -116,7 +116,6 @@ class extracter():
         self.negative_filter = negative
 
 
-
     def make_ngrampieces(self, sentences):
         
         max_length = self.max_length
@@ -138,7 +137,6 @@ class extracter():
                             phrases.append(phr)
         return phrases
 
-
     def count_characters(self, phrases):
         
         cnt_ = Counter(phrases)
@@ -148,9 +146,11 @@ class extracter():
                 seq_char = k
                 seqchars.append(seq_char)
                 lengths.append(len(seq_char))
-                freqs.append(v)
+                freqs.append(float(v))
 
-        df_ret = pd.DataFrame({ self.clm_seqchar:seqchars, self.clm_length:lengths, self.clm_freq:freqs,})
+        df_ret = pd.DataFrame({self.clm_seqchar:seqchars,
+                               self.clm_length:lengths,
+                               self.clm_freq:freqs,})
         return df_ret
 
     def count_knowns(self, sentences):#既知語は必ず数える
@@ -179,7 +179,8 @@ class extracter():
 
     def hold_higherrank(self, df):#情報量でソートして包含関係にある「下位」のフレーズは除外
         
-        df[self.clm_sc] = self.weight_freq * np.log( 1+ df[self.clm_freq] ) + self.weight_len * np.log( df[self.clm_length] )#sc_index
+        df[self.clm_sc] = self.weight_freq * np.log( 1+ df[self.clm_freq].astype(float) )\
+              + self.weight_len * np.log( df[self.clm_length].astype(float) )#sc_index
 
         df[self.clm_knowns] = df[self.clm_seqchar].astype(str).apply(lambda x: x in self.knowns)
         df = df.sort_values(by= [self.clm_knowns, self.clm_sc], ascending=False).reset_index()#既知語は上位表示
