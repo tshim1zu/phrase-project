@@ -316,8 +316,8 @@ class extracter():
         df_sorted = self.exclude_unnecessary(df_sorted)#不要語/不要文字　を含むseqcharを排除
         df_sorted.drop(columns="index", inplace=True)
 
-        #if self.selection > 0:
-        #   return self.select_phrase(df_sorted)        
+        if self.selection > 0:
+           return self.select_phrase(df_sorted)        
         
         return df_sorted
 
@@ -399,7 +399,7 @@ class extracter():
             df_concat = pd.concat([df_concat, df_tmp])
 
             if len(df_concat) > 0 & (self.verbose >= 1):
-            #   print("途中経過")#暫定平均で集計
+                print("途中経過")#暫定平均で集計
                 df_toshow = df_concat\
                     .groupby(self.clm_seqchar, as_index =False).agg(dict_agg(df_concat))\
                     .sort_values(by=[self.clm_knowns, self.clm_sc], ascending=False)
@@ -410,11 +410,9 @@ class extracter():
             if self.verbose >= 1:
                 print("フレーズが見つかりませんでした。")
             return df_concat
-
         else:
             if self.verbose >= 1:
                 print("走査終了 -> 並び変え -> 類似削除 ")
-
             #一括化とソート&選定(下記では groupbyで平均できない文字列の扱いを定義)
             df_uniques_all = df_concat.groupby(self.clm_seqchar, as_index=False).agg(dict_agg(df_concat))
             df_phrase = self.hold_higherrank(df_uniques_all)#ここ時間かかる
@@ -425,10 +423,8 @@ class extracter():
             if self.selection > 0:            
                 df_phrase = self.select_phrase(df_phrase)
 
-            #df_phrase = df_phrase.drop(columns="index").reset_index(drop=True)
             return df_phrase
                         
-
 
     def test_random(self, num_sent = 50, wnum_in_asent = 12,
                     words =["こんにちは", "はじめまして",
