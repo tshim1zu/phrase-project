@@ -57,7 +57,6 @@ dict_match = {
 }
 
 
-
 dict_negative = {
     "x_Gana" : re.compile("[ぁ-ゖ]+"),#ひらがなのみ #{0,} は * と、{1,} は + と同じ意味
     "x_smalla": re.compile("[a-z\* _.]+"),#ほぼノイズ
