@@ -1,1 +1,41 @@
-from jphrase.extracter_0220 import *
+# coding:utf-8
+"""
+jphrase - 日本語テキストから頻出フレーズを検出
+
+N-gramベースの頻度分析により、テキスト中で頻繁に出現するフレーズを検出します。
+SNSトレンド分析、ニュース話題抽出、頻出キーワード発見などに適しています。
+
+使用例:
+    >>> from jphrase import PhraseExtracter
+    >>> extractor = PhraseExtracter(min_count=6, max_length=16)
+    >>> df_result = extractor.get_dfphrase(sentences)
+
+詳細は POSITIONING.md を参照してください。
+"""
+
+__version__ = "0.1.0"
+__author__ = "Takeshi SHIMIZU"
+__copyright__ = "Copyright 2023"
+
+from .extracter import PhraseExtracter, extracter
+from .constants import FIRST_KANJI, DEFAULT_REMOVES, DEFAULT_UNNECESSARY
+from .patterns import get_positive_patterns, get_negative_patterns
+
+# 新機能
+from .evaluation import UnsupervisedEvaluator, SupervisedEvaluator
+from .optimization import UnsupervisedOptimizer, SupervisedOptimizer
+
+__all__ = [
+    'PhraseExtracter',
+    'extracter',  # 後方互換性のため
+    'FIRST_KANJI',
+    'DEFAULT_REMOVES',
+    'DEFAULT_UNNECESSARY',
+    'get_positive_patterns',
+    'get_negative_patterns',
+    # 評価・最適化
+    'UnsupervisedEvaluator',
+    'SupervisedEvaluator',
+    'UnsupervisedOptimizer',
+    'SupervisedOptimizer',
+]

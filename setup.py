@@ -8,7 +8,7 @@ setuptools.setup(
     author="Takeshi SHIMIZU",
     author_email="shim1zu@hotmail.com",
     license='MIT',
-    description="You can detect new phrases or unknown words for texts in Japanese",
+    description="Detect frequent phrases from Japanese texts",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/tshim1zu/phrase-project",
