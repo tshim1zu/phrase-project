@@ -152,14 +152,27 @@ class TestPhraseExtracterIntegration:
             assert 'freq' in df.columns
 
     def test_get_dfphrase_empty(self):
-        """空のテキストの場合"""
+        """空のテキストの場合はValueErrorを発生させる"""
         extractor = PhraseExtracter(verbose=0)
         sentences = []
 
-        df = extractor.get_dfphrase(sentences)
+        # 空のリストに対してはValueErrorが発生することを確認
+        with pytest.raises(ValueError) as exc_info:
+            extractor.get_dfphrase(sentences)
 
+        assert "入力テキストが空です" in str(exc_info.value)
+
+    def test_demo_method(self):
+        """demo()メソッドが正しく動作することを確認"""
+        df = PhraseExtracter.demo(verbose=0)
+
+        # 結果が返されることを確認
         assert isinstance(df, pd.DataFrame)
-        assert len(df) == 0
+        # サンプルデータから何かしらのフレーズが抽出されることを期待
+        assert len(df) > 0
+        # 必要なカラムが存在することを確認
+        assert 'seqchar' in df.columns
+        assert 'freq' in df.columns
 
     def test_get_dfphrase_with_knowns(self):
         """既知語を指定してフレーズ抽出"""

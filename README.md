@@ -30,7 +30,17 @@ pip install -e .
 
 ## クイックスタート
 
-### 最もシンプルな使い方
+### まずは試してみる（ファイル不要）
+
+```python
+from jphrase import PhraseExtracter
+
+# デモデータですぐに試せます
+df = PhraseExtracter.demo()
+print(df)
+```
+
+### ファイルから抽出
 
 ```python
 from jphrase import PhraseExtracter
