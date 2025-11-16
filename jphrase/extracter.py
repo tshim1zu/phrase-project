@@ -11,6 +11,7 @@ from collections import Counter
 from IPython.display import display
 import re
 import logging
+from typing import List, Dict, Any, Optional
 
 from .constants import DEFAULT_REMOVES, DEFAULT_UNNECESSARY
 from .patterns import get_positive_patterns, get_negative_patterns
@@ -90,7 +91,7 @@ class PhraseExtracter:
         self.positive_filter = positive if positive is not None else get_positive_patterns()
         self.negative_filter = negative if negative is not None else get_negative_patterns()
 
-    def make_ngrampieces(self, sentences):
+    def make_ngrampieces(self, sentences: List[str]) -> List[str]:
         """文章リストからN-gramフレーズを生成"""
         max_length = self.max_length
         if max_length == -1:
@@ -110,7 +111,7 @@ class PhraseExtracter:
                             phrases.append(phr)
         return phrases
 
-    def count_characters(self, phrases):
+    def count_characters(self, phrases: List[str]) -> pd.DataFrame:
         """フレーズの出現回数をカウント"""
         cnt_ = Counter(phrases)
         seqchars, lengths, freqs = [], [], []
@@ -128,7 +129,7 @@ class PhraseExtracter:
         })
         return df_ret
 
-    def count_knowns(self, sentences):
+    def count_knowns(self, sentences: List[str]) -> pd.DataFrame:
         """既知語を必ずカウント"""
         def count_all(sent, target):
             def find_all(a_str, sub):
@@ -154,7 +155,7 @@ class PhraseExtracter:
         })
         return df
 
-    def hold_higherrank(self, df):
+    def hold_higherrank(self, df: pd.DataFrame) -> pd.DataFrame:
         """情報量でソートして包含関係にある下位フレーズを除外"""
         df[self.clm_sc] = self.weight_freq * np.log(1 + df[self.clm_freq].astype(float)) \
               + self.weight_len * np.log(df[self.clm_length].astype(float))
@@ -239,7 +240,7 @@ class PhraseExtracter:
         ret.name = colname
         return ret
 
-    def select_phrase(self, df):
+    def select_phrase(self, df: pd.DataFrame) -> pd.DataFrame:
         """ポジティブ・ネガティブフィルターを適用してフレーズを選定"""
         df = df.reset_index(drop=True)
         sr = df[self.clm_seqchar]
@@ -309,7 +310,7 @@ class PhraseExtracter:
                     sentences = []
         yield sentences
 
-    def remove_similar(self, df_tmp):
+    def remove_similar(self, df_tmp: pd.DataFrame) -> pd.DataFrame:
         """類似度を計算して独自性のあるフレーズのみを残す"""
         def get_originality(i):
             phrase = df_tmp.loc[i, self.clm_seqchar]
@@ -324,14 +325,14 @@ class PhraseExtracter:
         mask_similar = df_tmp[self.clm_originality] > self.threshold_originality
         return df_tmp[mask_similar]
 
-    def similarity(self, seq_x, seq_y):
+    def similarity(self, seq_x: str, seq_y: str) -> float:
         """レーベンシュタイン距離から類似性を計算"""
         d = self.levenshtein(seq_x, seq_y)
         seq_length = (len(seq_x) + len(seq_y)) / 2
         d_ratio = d / seq_length
         return 1 - d_ratio
 
-    def levenshtein(self, seq_x, seq_y):
+    def levenshtein(self, seq_x: str, seq_y: str) -> float:
         """レーベンシュタイン距離を計算"""
         size_x = len(seq_x) + 1
         size_y = len(seq_y) + 1
@@ -349,7 +350,7 @@ class PhraseExtracter:
                     matrix[x, y] = min(matrix[x-1, y] + 1, matrix[x-1, y-1] + 1, matrix[x, y-1] + 1)
         return (matrix[size_x - 1, size_y - 1])
 
-    def get_dfphrase(self, sentences):
+    def get_dfphrase(self, sentences: List[str]) -> pd.DataFrame:
         """
         メイン処理：センテンスからフレーズを抽出
 
@@ -403,7 +404,7 @@ class PhraseExtracter:
     # ==================== ユーティリティメソッド ====================
 
     @classmethod
-    def from_file(cls, filepath: str, column: str = None, encoding: str = 'utf-8', **kwargs):
+    def from_file(cls, filepath: str, column: str = None, encoding: str = 'utf-8', **kwargs) -> pd.DataFrame:
         """
         ファイルから直接フレーズを抽出
 
@@ -427,7 +428,7 @@ class PhraseExtracter:
         return extractor.get_dfphrase(sentences)
 
     @classmethod
-    def from_files(cls, filepaths: list, column: str = None, encoding: str = 'utf-8', **kwargs):
+    def from_files(cls, filepaths: List[str], column: str = None, encoding: str = 'utf-8', **kwargs) -> pd.DataFrame:
         """
         複数のファイルから直接フレーズを抽出
 
@@ -449,7 +450,7 @@ class PhraseExtracter:
         extractor = cls(**kwargs)
         return extractor.get_dfphrase(sentences)
 
-    def extract(self, filepath: str, column: str = None, encoding: str = 'utf-8'):
+    def extract(self, filepath: str, column: str = None, encoding: str = 'utf-8') -> pd.DataFrame:
         """
         インスタンスメソッド版：ファイルからフレーズを抽出
 

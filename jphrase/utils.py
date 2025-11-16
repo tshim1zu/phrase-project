@@ -6,9 +6,12 @@ __author__ = "Takeshi SHIMIZU"
 __copyright__ = "Copyright 2023"
 
 import os
+import logging
 import pandas as pd
 from pathlib import Path
 from typing import List, Union
+
+logger = logging.getLogger(__name__)
 
 
 def read_text_file(filepath: str, encoding: str = 'utf-8') -> List[str]:
@@ -21,10 +24,25 @@ def read_text_file(filepath: str, encoding: str = 'utf-8') -> List[str]:
 
     Returns:
         List[str]: 行のリスト
+
+    Raises:
+        FileNotFoundError: ファイルが存在しない場合
+        PermissionError: ファイルの読み込み権限がない場合
+        UnicodeDecodeError: エンコーディングが正しくない場合
     """
-    with open(filepath, 'r', encoding=encoding) as f:
-        lines = [line.strip() for line in f if line.strip()]
-    return lines
+    try:
+        with open(filepath, 'r', encoding=encoding) as f:
+            lines = [line.strip() for line in f if line.strip()]
+        return lines
+    except FileNotFoundError:
+        logger.error(f"File not found: {filepath}")
+        raise
+    except PermissionError:
+        logger.error(f"Permission denied: {filepath}")
+        raise
+    except UnicodeDecodeError as e:
+        logger.error(f"Encoding error in {filepath}: {e}")
+        raise
 
 
 def read_csv_file(filepath: str, column: str = None, encoding: str = 'utf-8') -> List[str]:
@@ -38,11 +56,26 @@ def read_csv_file(filepath: str, column: str = None, encoding: str = 'utf-8') ->
 
     Returns:
         List[str]: テキストのリスト
+
+    Raises:
+        FileNotFoundError: ファイルが存在しない場合
+        pd.errors.EmptyDataError: ファイルが空の場合
+        KeyError: 指定した列が存在しない場合
     """
-    df = pd.read_csv(filepath, encoding=encoding)
-    if column is None:
-        column = df.columns[0]
-    return df[column].dropna().astype(str).tolist()
+    try:
+        df = pd.read_csv(filepath, encoding=encoding)
+        if column is None:
+            column = df.columns[0]
+        return df[column].dropna().astype(str).tolist()
+    except FileNotFoundError:
+        logger.error(f"CSV file not found: {filepath}")
+        raise
+    except pd.errors.EmptyDataError:
+        logger.error(f"CSV file is empty: {filepath}")
+        raise
+    except KeyError:
+        logger.error(f"Column '{column}' not found in {filepath}")
+        raise
 
 
 def read_tsv_file(filepath: str, column: str = None, encoding: str = 'utf-8') -> List[str]:
@@ -56,11 +89,26 @@ def read_tsv_file(filepath: str, column: str = None, encoding: str = 'utf-8') ->
 
     Returns:
         List[str]: テキストのリスト
+
+    Raises:
+        FileNotFoundError: ファイルが存在しない場合
+        pd.errors.EmptyDataError: ファイルが空の場合
+        KeyError: 指定した列が存在しない場合
     """
-    df = pd.read_csv(filepath, sep='\t', encoding=encoding)
-    if column is None:
-        column = df.columns[0]
-    return df[column].dropna().astype(str).tolist()
+    try:
+        df = pd.read_csv(filepath, sep='\t', encoding=encoding)
+        if column is None:
+            column = df.columns[0]
+        return df[column].dropna().astype(str).tolist()
+    except FileNotFoundError:
+        logger.error(f"TSV file not found: {filepath}")
+        raise
+    except pd.errors.EmptyDataError:
+        logger.error(f"TSV file is empty: {filepath}")
+        raise
+    except KeyError:
+        logger.error(f"Column '{column}' not found in {filepath}")
+        raise
 
 
 def read_file(filepath: str, column: str = None, encoding: str = 'utf-8') -> List[str]:
