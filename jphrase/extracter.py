@@ -1,4 +1,3 @@
-# coding:utf-8
 """
 日本語フレーズ抽出モジュール
 """
@@ -11,9 +10,12 @@ import pandas as pd
 from collections import Counter
 from IPython.display import display
 import re
+import logging
 
 from .constants import DEFAULT_REMOVES, DEFAULT_UNNECESSARY
 from .patterns import get_positive_patterns, get_negative_patterns
+
+logger = logging.getLogger(__name__)
 
 
 class PhraseExtracter:
@@ -47,7 +49,7 @@ class PhraseExtracter:
         weight_freq=1.0,
         weight_len=1.0,
         removes=DEFAULT_REMOVES,
-        unnecesary=DEFAULT_UNNECESSARY,
+        unnecessary=DEFAULT_UNNECESSARY,
         threshold_originality=0.5,
         size_sentence=5000,
         knowns=None,
@@ -64,7 +66,7 @@ class PhraseExtracter:
             weight_freq (float): 頻度への重み
             weight_len (float): 長さへの重み
             removes (str): 走査前に除去する文字
-            unnecesary (list): 走査後に除去する文字列
+            unnecessary (list): 走査後に除去する文字列
             threshold_originality (float): 類似フレーズの除去閾値
             size_sentence (int): 一度にスキャンする配列のサイズ
             knowns (list): 既知語のリスト
@@ -79,7 +81,7 @@ class PhraseExtracter:
         self.max_length = max_length + 1  # 指定された数よりも１つ多く数えて処理
         self.min_length = min_length
         self.removes = removes
-        self.unnecessary = unnecesary
+        self.unnecessary = unnecessary
         self.knowns = knowns if knowns is not None else []
         self.size_sentence = size_sentence
         self.threshold_originality = threshold_originality
@@ -373,8 +375,8 @@ class PhraseExtracter:
             df_tmp = self.find_uniques(partial_sentences)
             df_concat = pd.concat([df_concat, df_tmp])
 
-            if len(df_concat) > 0 & (self.verbose >= 1):
-                print("途中経過")
+            if len(df_concat) > 0 and (self.verbose >= 1):
+                logger.info("途中経過")
                 df_toshow = df_concat\
                     .groupby(self.clm_seqchar, as_index=False).agg(dict_agg(df_concat))\
                     .sort_values(by=[self.clm_knowns, self.clm_sc], ascending=False)
@@ -382,11 +384,11 @@ class PhraseExtracter:
 
         if not len(df_concat):
             if self.verbose >= 1:
-                print("フレーズが見つかりませんでした。")
+                logger.info("フレーズが見つかりませんでした。")
             return df_concat
         else:
             if self.verbose >= 1:
-                print("走査終了 -> 並び変え -> 類似削除 ")
+                logger.info("走査終了 -> 並び変え -> 類似削除 ")
 
             df_uniques_all = df_concat.groupby(self.clm_seqchar, as_index=False).agg(dict_agg(df_concat))
             df_phrase = self.hold_higherrank(df_uniques_all)
@@ -558,7 +560,7 @@ class PhraseExtracter:
         pi = np.ones(len(words))
         sentences = gen_sentences(num_sent, words, wnum_in_asent, pi)
 
-        print(sentences)
+        logger.debug(sentences)
 
         df = self.get_dfphrase(sentences)
         display(df)

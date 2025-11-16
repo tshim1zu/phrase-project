@@ -1,4 +1,3 @@
-# coding:utf-8
 """
 データソースモジュール
 様々なソースから日本語テキストを取得
@@ -11,7 +10,10 @@ from abc import ABC, abstractmethod
 from typing import List, Optional
 import requests
 import time
+import logging
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 class DataSource(ABC):
@@ -111,7 +113,7 @@ class AozoraBunkoSource(DataSource):
                     texts.append(text)
                 time.sleep(self.delay)
             except Exception as e:
-                print(f"Error fetching work {work_id}: {e}")
+                logger.error(f"Error fetching work {work_id}: {e}")
                 continue
 
         return texts
@@ -124,23 +126,19 @@ class AozoraBunkoSource(DataSource):
             work_id (str): 作品ID
 
         Returns:
-            Optional[str]: テキスト
+            Optional[str]: テキスト（現在は未実装のためNone）
+
+        Note:
+            この機能は現在実装中です。青空文庫からのZIPファイルダウンロード
+            および解凍処理が必要ですが、まだ実装されていません。
         """
-        # 青空文庫のテキストファイルURL
-        # 実際のURL構造に基づく（簡易版）
-        url = f"{self.BASE_URL}/cards/000{work_id[:-2]}/{work_id}/files/{work_id}_ruby_{work_id}.zip"
-
-        # 実装の簡易版: 実際はZIPを解凍してテキスト取得
-        # ここでは概念的な実装
-        try:
-            # 実際の実装では、zipファイルをダウンロードして解凍
-            # response = self.session.get(url)
-            # ... ZIP処理 ...
-
-            # プレースホルダー: 実装予定
-            return None
-        except Exception as e:
-            return None
+        # TODO: 青空文庫のZIPファイルダウンロードと解凍を実装
+        # 実装が必要な処理:
+        # 1. ZIPファイルのダウンロード
+        # 2. ZIPファイルの解凍
+        # 3. テキストファイルの抽出と読み込み
+        # 4. ルビ記号などの青空文庫形式の処理
+        return None
 
     def fetch_author(self, author_name: str, limit: int = 10) -> List[str]:
         """
@@ -223,7 +221,7 @@ class WikipediaSource(DataSource):
                 time.sleep(self.delay)
 
             except Exception as e:
-                print(f"Error fetching random pages: {e}")
+                logger.error(f"Error fetching random pages: {e}")
                 continue
 
         return texts
@@ -258,7 +256,7 @@ class WikipediaSource(DataSource):
             return None
 
         except Exception as e:
-            print(f"Error fetching page '{title}': {e}")
+            logger.error(f"Error fetching page '{title}': {e}")
             return None
 
     def fetch_pages(self, titles: List[str]) -> List[str]:
