@@ -359,8 +359,27 @@ class PhraseExtracter:
 
         Returns:
             pandas.DataFrame: 抽出されたフレーズのデータフレーム
+
+        Raises:
+            ValueError: 入力が空、またはすべての文が短すぎる場合
         """
+        # 入力バリデーション
+        if sentences is None or len(sentences) == 0:
+            raise ValueError(
+                "入力テキストが空です。少なくとも1つの文章を指定してください。\n"
+                "使用例: extractor.get_dfphrase(['サンプルテキスト1', 'サンプルテキスト2'])"
+            )
+
         sentences = np.array(sentences).reshape(-1,)
+
+        # テキストの長さチェック
+        total_chars = sum(len(str(s)) for s in sentences)
+        if total_chars < self.min_length:
+            raise ValueError(
+                f"入力テキストが短すぎます（合計{total_chars}文字）。\n"
+                f"最小フレーズ長が{self.min_length}文字に設定されているため、\n"
+                f"より長いテキストを入力するか、min_lengthを小さくしてください。"
+            )
 
         def dict_agg(df_concat):
             """groupbyでdfを集計するときに文字列も統一的に扱う"""
@@ -371,13 +390,19 @@ class PhraseExtracter:
                     }
 
         df_concat = pd.DataFrame()
+        batch_count = 0
+        total_sentences = len(sentences)
+
+        if self.verbose >= 1:
+            logger.info(f"処理開始: {total_sentences}件の文章を分析します")
 
         for partial_sentences in self.gen_sentences(sentences):
+            batch_count += 1
             df_tmp = self.find_uniques(partial_sentences)
             df_concat = pd.concat([df_concat, df_tmp])
 
             if len(df_concat) > 0 and (self.verbose >= 1):
-                logger.info("途中経過")
+                logger.info(f"バッチ{batch_count}処理完了 (ユニークフレーズ: {len(df_concat)}件)")
                 df_toshow = df_concat\
                     .groupby(self.clm_seqchar, as_index=False).agg(dict_agg(df_concat))\
                     .sort_values(by=[self.clm_knowns, self.clm_sc], ascending=False)
@@ -385,7 +410,14 @@ class PhraseExtracter:
 
         if not len(df_concat):
             if self.verbose >= 1:
-                logger.info("フレーズが見つかりませんでした。")
+                logger.warning(
+                    f"フレーズが見つかりませんでした。\n"
+                    f"  現在の設定: min_count={self.min_count}, min_length={self.min_length}\n"
+                    f"  対処法:\n"
+                    f"    - min_count を小さくする（現在: {self.min_count} → 推奨: 3-5）\n"
+                    f"    - min_length を小さくする（現在: {self.min_length} → 推奨: 2-3）\n"
+                    f"    - より多くのテキストを入力する"
+                )
             return df_concat
         else:
             if self.verbose >= 1:
@@ -399,9 +431,59 @@ class PhraseExtracter:
             if self.selection > 0:
                 df_phrase = self.select_phrase(df_phrase)
 
+            if self.verbose >= 1:
+                logger.info(f"抽出完了: {len(df_phrase)}個のフレーズを検出しました")
+                if len(df_phrase) > 0:
+                    top_phrase = df_phrase.iloc[0][self.clm_seqchar]
+                    logger.info(f"最頻出フレーズ: 「{top_phrase}」")
+
             return df_phrase
 
     # ==================== ユーティリティメソッド ====================
+
+    @classmethod
+    def demo(cls, **kwargs) -> pd.DataFrame:
+        """
+        デモ用サンプルデータでフレーズ抽出を試す
+
+        Parameters:
+            **kwargs: PhraseExtracterのコンストラクタ引数
+
+        Returns:
+            pandas.DataFrame: 抽出されたフレーズ
+
+        使用例:
+            >>> df = PhraseExtracter.demo()
+            >>> print(df)
+            >>> # カスタムパラメータで試す
+            >>> df = PhraseExtracter.demo(min_count=3, max_length=20)
+        """
+        sample_texts = [
+            "フォローありがとうございます。よろしくお願いします。",
+            "フォローしてください。お願いします。",
+            "プレゼントキャンペーン開催中です。応募してください。",
+            "プレゼントキャンペーンに応募しました。",
+            "よろしくお願いします。フォローありがとうございます。",
+            "キャンペーン開催中です。ぜひ応募してください。",
+            "応募してください。プレゼントがもらえます。",
+            "ありがとうございます。よろしくお願いします。",
+            "開催中です。プレゼントキャンペーンです。",
+            "フォローお願いします。よろしくお願いします。",
+        ]
+
+        logger.info("デモモードで実行中...")
+        logger.info(f"サンプルテキスト: {len(sample_texts)}件")
+
+        # デモ用にデフォルト設定を調整（ユーザー指定があればそちらを優先）
+        demo_defaults = {
+            'min_count': 2,  # サンプルデータが少ないので低めに設定
+            'min_length': 3,
+            'verbose': 0,
+        }
+        demo_defaults.update(kwargs)
+
+        extractor = cls(**demo_defaults)
+        return extractor.get_dfphrase(sample_texts)
 
     @classmethod
     def from_file(cls, filepath: str, column: str = None, encoding: str = 'utf-8', **kwargs) -> pd.DataFrame:
