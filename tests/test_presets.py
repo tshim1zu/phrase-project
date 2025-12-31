@@ -18,6 +18,8 @@ class TestPresets:
         """Test that required presets exist"""
         assert 'sns' in PRESETS
         assert 'news' in PRESETS
+        assert 'novel' in PRESETS
+        assert 'report' in PRESETS
         assert 'default' in PRESETS
 
     def test_preset_structure(self):
@@ -65,6 +67,22 @@ class TestPresets:
         assert extractor.max_length == 17  # +1 added internally
         assert extractor.min_length == 4
         assert extractor.threshold_originality == 0.5
+
+    def test_preset_method_novel(self):
+        """Test creating extractor with novel preset"""
+        extractor = PhraseExtracter.preset('novel')
+        assert extractor.min_count == 4
+        assert extractor.max_length == 17  # +1 added internally
+        assert extractor.min_length == 3
+        assert extractor.threshold_originality == 0.6
+
+    def test_preset_method_report(self):
+        """Test creating extractor with report preset"""
+        extractor = PhraseExtracter.preset('report')
+        assert extractor.min_count == 10
+        assert extractor.max_length == 25  # +1 added internally
+        assert extractor.min_length == 4
+        assert extractor.threshold_originality == 0.78
 
     def test_preset_with_override(self):
         """Test overriding preset parameters"""

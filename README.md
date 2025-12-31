@@ -69,6 +69,14 @@ df = extractor.extract("tweets.txt")
 extractor = PhraseExtracter.preset('news')
 df = extractor.extract("articles.txt")
 
+# 小説向けパラメータ
+extractor = PhraseExtracter.preset('novel')
+df = extractor.extract("novel.txt")
+
+# レポート採点向けパラメータ
+extractor = PhraseExtracter.preset('report')
+df = extractor.extract("reports.txt")
+
 # 利用可能なプリセット一覧を表示
 PhraseExtracter.list_presets()
 ```
@@ -260,6 +268,8 @@ Optunaによる最適化実験で得られたエビデンスベースのパラ�
 |-----------|------|-----------|
 | `sns` | SNS/Twitter向け | min_count=6, max_length=9, min_length=5, threshold_originality=0.52 |
 | `news` | ニュース/記事向け | min_count=5, max_length=10, min_length=3, threshold_originality=0.64 |
+| `novel` | 小説向け | min_count=4, max_length=16, min_length=3, threshold_originality=0.6 |
+| `report` | レポート/論文採点向け | min_count=10, max_length=24, min_length=4, threshold_originality=0.78 |
 | `default` | デフォルト設定 | min_count=6, max_length=16, min_length=4, threshold_originality=0.5 |
 
 ### プリセットの使い方
@@ -270,6 +280,14 @@ from japhrase import PhraseExtracter
 # SNS向けプリセット
 extractor = PhraseExtracter.preset('sns')
 df = extractor.extract("tweets.txt")
+
+# 小説向けプリセット（繰り返し表現の抽出）
+extractor = PhraseExtracter.preset('novel')
+df = extractor.extract("novel.txt")
+
+# レポート採点向けプリセット（定型表現・学術用語の検出）
+extractor = PhraseExtracter.preset('report')
+df = extractor.extract("reports.txt")
 
 # パラメータの一部を上書き
 extractor = PhraseExtracter.preset('sns', min_count=10)

@@ -35,6 +35,20 @@ PRESETS = {
         'threshold_originality': 0.64,
         'description': 'ニュース/記事向け最適化パラメータ（やや長文、専門用語）',
     },
+    'novel': {
+        'min_count': 4,
+        'max_length': 16,
+        'min_length': 3,
+        'threshold_originality': 0.6,
+        'description': '小説向けパラメータ（繰り返し表現、情緒的フレーズ）',
+    },
+    'report': {
+        'min_count': 10,
+        'max_length': 24,
+        'min_length': 4,
+        'threshold_originality': 0.78,
+        'description': 'レポート/論文採点向けパラメータ（定型表現、学術用語）',
+    },
     'default': {
         'min_count': 6,
         'max_length': 16,
