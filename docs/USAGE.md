@@ -5,7 +5,7 @@
 ### 1. 最もシンプルな使い方
 
 ```python
-from jphrase import PhraseExtracter
+from japhrase import PhraseExtracter
 
 # テキストのリストから抽出
 sentences = [
@@ -22,7 +22,7 @@ print(df)
 ### 2. ファイルから直接抽出（クラスメソッド）
 
 ```python
-from jphrase import PhraseExtracter
+from japhrase import PhraseExtracter
 
 # テキストファイルから直接抽出
 df = PhraseExtracter.from_file("input.txt")
@@ -37,7 +37,7 @@ df = PhraseExtracter.from_file("input.txt", min_count=10, max_length=20)
 ### 3. ファイルから直接抽出（インスタンスメソッド）
 
 ```python
-from jphrase import PhraseExtracter
+from japhrase import PhraseExtracter
 
 # インスタンスを作成してパラメータを設定
 extractor = PhraseExtracter(
@@ -53,7 +53,7 @@ df = extractor.extract("input.txt")
 ### 4. 複数ファイルから抽出
 
 ```python
-from jphrase import PhraseExtracter
+from japhrase import PhraseExtracter
 
 # 複数のファイルをまとめて処理
 files = ["file1.txt", "file2.txt", "file3.txt"]
@@ -63,7 +63,7 @@ df = PhraseExtracter.from_files(files, min_count=5)
 ### 5. 結果のエクスポート
 
 ```python
-from jphrase import PhraseExtracter
+from japhrase import PhraseExtracter
 
 extractor = PhraseExtracter()
 df = extractor.extract("input.txt")
@@ -84,7 +84,7 @@ extractor.export_csv(df, "results/2025/output.csv")
 ## ワンライナーで完結
 
 ```python
-from jphrase import PhraseExtracter
+from japhrase import PhraseExtracter
 
 # ファイル読み込み → 抽出 → CSV出力を一行で
 extractor = PhraseExtracter()
@@ -154,7 +154,7 @@ df = PhraseExtracter.from_file("data.tsv", column="content")
 ### SNSテキスト分析
 
 ```python
-from jphrase import PhraseExtracter
+from japhrase import PhraseExtracter
 
 # SNS投稿から頻出フレーズを抽出
 extractor = PhraseExtracter(
@@ -173,7 +173,7 @@ print(df.head(10))
 ### ニュース記事分析
 
 ```python
-from jphrase import PhraseExtracter
+from japhrase import PhraseExtracter
 
 # 複数の記事ファイルから専門用語を抽出
 extractor = PhraseExtracter(
@@ -191,7 +191,7 @@ extractor.export_csv(df, "news_terms.csv")
 ### 既知語を優先抽出
 
 ```python
-from jphrase import PhraseExtracter
+from japhrase import PhraseExtracter
 
 # 特定のキーワードを優先的に抽出
 extractor = PhraseExtracter(
@@ -206,7 +206,7 @@ df = extractor.extract("academic_papers.txt")
 
 ```python
 import re
-from jphrase import PhraseExtracter, get_positive_patterns, get_negative_patterns
+from japhrase import PhraseExtracter, get_positive_patterns, get_negative_patterns
 
 # デフォルトのパターンを取得して修正
 positive = get_positive_patterns()

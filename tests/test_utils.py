@@ -8,7 +8,7 @@ import pandas as pd
 import os
 import tempfile
 from pathlib import Path
-from jphrase.utils import (
+from japhrase.utils import (
     read_text_file,
     read_csv_file,
     read_tsv_file,
@@ -182,7 +182,7 @@ class TestIntegrationWithPhraseExtracter:
 
     def test_from_file_classmethod(self, temp_dir):
         """from_fileクラスメソッドのテスト"""
-        from jphrase import PhraseExtracter
+        from japhrase import PhraseExtracter
 
         # テストファイル作成
         filepath = os.path.join(temp_dir, "test.txt")
@@ -198,7 +198,7 @@ class TestIntegrationWithPhraseExtracter:
 
     def test_extract_method(self, temp_dir):
         """extractインスタンスメソッドのテスト"""
-        from jphrase import PhraseExtracter
+        from japhrase import PhraseExtracter
 
         # テストファイル作成
         filepath = os.path.join(temp_dir, "test.txt")
@@ -214,7 +214,7 @@ class TestIntegrationWithPhraseExtracter:
 
     def test_export_csv_method(self, temp_dir):
         """export_csvメソッドのテスト"""
-        from jphrase import PhraseExtracter
+        from japhrase import PhraseExtracter
 
         extractor = PhraseExtracter(verbose=0)
         df = pd.DataFrame({

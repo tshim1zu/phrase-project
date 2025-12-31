@@ -18,7 +18,7 @@ jphrase では、テキストに応じて最適なパラメータを自動的に
 ### 基本的な使い方
 
 ```python
-from jphrase import PhraseExtracter, UnsupervisedOptimizer
+from japhrase import PhraseExtracter, UnsupervisedOptimizer
 
 # テキストデータを用意
 texts = [
@@ -47,8 +47,8 @@ df = PhraseExtracter(**best_params).get_dfphrase(texts)
 ### データソースとの連携
 
 ```python
-from jphrase import UnsupervisedOptimizer
-from jphrase.datasource import WikipediaSource
+from japhrase import UnsupervisedOptimizer
+from japhrase.datasource import WikipediaSource
 
 # Wikipediaからデータ取得
 source = WikipediaSource()
@@ -66,7 +66,7 @@ best_params, results = optimizer.optimize(texts)
 正解データがある場合、より正確な最適化が可能です。
 
 ```python
-from jphrase import SupervisedOptimizer
+from japhrase import SupervisedOptimizer
 
 # 正解フレーズを用意
 gold_phrases = [
@@ -139,7 +139,7 @@ best_params, results = optimizer.optimize(
 ### 詳細スコアの取得
 
 ```python
-from jphrase.evaluation import UnsupervisedEvaluator
+from japhrase.evaluation import UnsupervisedEvaluator
 
 evaluator = UnsupervisedEvaluator()
 scores = evaluator.get_detailed_scores(phrases, texts, df)
@@ -168,7 +168,7 @@ optimizer = UnsupervisedOptimizer(
 ### 評価器のカスタマイズ
 
 ```python
-from jphrase.evaluation import UnsupervisedEvaluator
+from japhrase.evaluation import UnsupervisedEvaluator
 
 # 評価指標の重みを調整
 evaluator = UnsupervisedEvaluator(
@@ -206,7 +206,7 @@ with open('optimization_results.json', 'w') as f:
 
 ```python
 import json
-from jphrase import PhraseExtracter
+from japhrase import PhraseExtracter
 
 # パラメータ読み込み
 with open('optimal_params.json', 'r') as f:
@@ -224,8 +224,8 @@ df = extractor.extract("new_data.txt")
 ### 例1: SNSテキスト向け最適化
 
 ```python
-from jphrase import UnsupervisedOptimizer
-from jphrase.datasource import TextFileSource
+from japhrase import UnsupervisedOptimizer
+from japhrase.datasource import TextFileSource
 
 # SNS投稿データ取得
 source = TextFileSource(["tweets.txt"])

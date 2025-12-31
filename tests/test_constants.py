@@ -4,7 +4,7 @@ constants.pyのテスト
 """
 
 import pytest
-from jphrase.constants import FIRST_KANJI, DEFAULT_REMOVES, DEFAULT_UNNECESSARY
+from japhrase.constants import FIRST_KANJI, DEFAULT_REMOVES, DEFAULT_UNNECESSARY
 
 
 class TestConstants:

@@ -9,7 +9,7 @@
 **概要：** 著作権が切れた日本の文学作品
 
 ```python
-from jphrase.datasource import AozoraBunkoSource
+from japhrase.datasource import AozoraBunkoSource
 
 source = AozoraBunkoSource()
 
@@ -44,7 +44,7 @@ texts = source.fetch_category("小説")
 **概要：** 百科事典的な最新情報
 
 ```python
-from jphrase.datasource import WikipediaSource
+from japhrase.datasource import WikipediaSource
 
 source = WikipediaSource(language='ja')
 
@@ -94,7 +94,7 @@ def fetch_wikipedia_page(title):
 **概要：** 機械学習用に公開されたニュース記事
 
 ```python
-from jphrase.datasource import LivedoorNewsSource
+from japhrase.datasource import LivedoorNewsSource
 
 source = LivedoorNewsSource()
 
@@ -139,7 +139,7 @@ wget https://dumps.wikimedia.org/jawiki/latest/jawiki-latest-pages-articles.xml.
 
 **処理:**
 ```python
-from jphrase.datasource import WikiDumpSource
+from japhrase.datasource import WikiDumpSource
 
 source = WikiDumpSource("jawiki-latest-pages-articles.xml.bz2")
 texts = source.fetch(limit=10000)
@@ -161,7 +161,7 @@ texts = source.fetch(limit=10000)
 **概要：** 世界中のニュースをAPI経由で取得
 
 ```python
-from jphrase.datasource import NewsAPISource
+from japhrase.datasource import NewsAPISource
 
 source = NewsAPISource(
     api_key="YOUR_API_KEY",
@@ -192,7 +192,7 @@ texts = source.fetch(sources="nhk-news,asahi-shimbun")
 **概要：** SNS投稿を取得
 
 ```python
-from jphrase.datasource import TwitterSource
+from japhrase.datasource import TwitterSource
 
 source = TwitterSource(bearer_token="YOUR_TOKEN")
 
@@ -227,7 +227,7 @@ texts = source.fetch_user_tweets(user_id="123456789")
 5. User-Agentを設定
 
 ```python
-from jphrase.datasource import WebScraperSource
+from japhrase.datasource import WebScraperSource
 
 source = WebScraperSource(
     urls=["https://example.com/article1"],
@@ -260,7 +260,7 @@ check_robots_txt("https://example.com")
 ### PDF文書
 
 ```python
-from jphrase.datasource import PDFSource
+from japhrase.datasource import PDFSource
 
 source = PDFSource("documents/*.pdf")
 texts = source.fetch()
@@ -280,7 +280,7 @@ pip install PyPDF2 pdfplumber
 ### Word文書
 
 ```python
-from jphrase.datasource import WordSource
+from japhrase.datasource import WordSource
 
 source = WordSource("documents/*.docx")
 texts = source.fetch()
@@ -296,7 +296,7 @@ pip install python-docx
 ### テキストファイル
 
 ```python
-from jphrase.datasource import TextFileSource
+from japhrase.datasource import TextFileSource
 
 source = TextFileSource(["file1.txt", "file2.txt"])
 texts = source.fetch()
@@ -313,7 +313,7 @@ texts = source.fetch()
 ### PostgreSQL
 
 ```python
-from jphrase.datasource import DatabaseSource
+from japhrase.datasource import DatabaseSource
 
 source = DatabaseSource(
     connection_string="postgresql://user:password@localhost/mydb",
@@ -352,7 +352,7 @@ texts = source.fetch()
 ### CiNii（日本の学術論文）
 
 ```python
-from jphrase.datasource import CiNiiSource
+from japhrase.datasource import CiNiiSource
 
 source = CiNiiSource(app_id="YOUR_APP_ID")
 

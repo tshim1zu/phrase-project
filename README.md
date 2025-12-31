@@ -19,7 +19,7 @@ Detect frequent phrases from Japanese texts
 ## インストール
 
 ```bash
-pip install -r requirements.txt
+pip install japhrase
 ```
 
 または開発モードでインストール：
@@ -33,7 +33,7 @@ pip install -e .
 ### まずは試してみる（ファイル不要）
 
 ```python
-from jphrase import PhraseExtracter
+from japhrase import PhraseExtracter
 
 # デモデータですぐに試せます
 df = PhraseExtracter.demo()
@@ -43,7 +43,7 @@ print(df)
 ### ファイルから抽出
 
 ```python
-from jphrase import PhraseExtracter
+from japhrase import PhraseExtracter
 
 # ファイルから直接抽出
 df = PhraseExtracter.from_file("input.txt")
@@ -53,7 +53,7 @@ print(df)
 ### テキストリストから抽出
 
 ```python
-from jphrase import PhraseExtracter
+from japhrase import PhraseExtracter
 
 sentences = [
     "フォローありがとうございます",
@@ -69,7 +69,7 @@ print(df)
 ### パラメータをカスタマイズ
 
 ```python
-from jphrase import PhraseExtracter
+from japhrase import PhraseExtracter
 
 # パラメータを指定
 df = PhraseExtracter.from_file(
@@ -83,7 +83,7 @@ df = PhraseExtracter.from_file(
 ### 複数ファイルから抽出
 
 ```python
-from jphrase import PhraseExtracter
+from japhrase import PhraseExtracter
 
 # 複数ファイルをまとめて処理
 files = ["file1.txt", "file2.txt", "file3.txt"]
@@ -93,7 +93,7 @@ df = PhraseExtracter.from_files(files, min_count=5)
 ### 結果をエクスポート
 
 ```python
-from jphrase import PhraseExtracter
+from japhrase import PhraseExtracter
 
 extractor = PhraseExtracter()
 df = extractor.extract("input.txt")
@@ -145,7 +145,7 @@ extractor.export_excel(df, "output.xlsx")   # Excel
 ### SNSテキスト分析
 
 ```python
-from jphrase import PhraseExtracter
+from japhrase import PhraseExtracter
 
 extractor = PhraseExtracter(min_count=10, max_length=20)
 df = extractor.extract("tweets.csv")
@@ -155,7 +155,7 @@ extractor.export_excel(df, "sns_phrases.xlsx")
 ### 複数ファイルからの専門用語抽出
 
 ```python
-from jphrase import PhraseExtracter
+from japhrase import PhraseExtracter
 
 files = ["article1.txt", "article2.txt", "article3.txt"]
 df = PhraseExtracter.from_files(
@@ -169,7 +169,7 @@ df = PhraseExtracter.from_files(
 ### ワンライナー
 
 ```python
-from jphrase import PhraseExtracter
+from japhrase import PhraseExtracter
 
 # 抽出して即座にCSV出力
 extractor = PhraseExtracter()

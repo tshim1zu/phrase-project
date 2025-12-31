@@ -6,7 +6,7 @@ extracter.pyのテスト
 import pytest
 import pandas as pd
 import numpy as np
-from jphrase import PhraseExtracter, extracter
+from japhrase import PhraseExtracter, extracter
 
 
 class TestPhraseExtracterInit:

@@ -3,8 +3,8 @@
 パラメータ最適化のデモ
 """
 
-from jphrase import PhraseExtracter, UnsupervisedOptimizer
-from jphrase.datasource import WikipediaSource, TextFileSource
+from japhrase import PhraseExtracter, UnsupervisedOptimizer
+from japhrase.datasource import WikipediaSource, TextFileSource
 
 def demo_optimization_with_wikipedia():
     """Wikipedia データで最適化デモ"""
@@ -100,7 +100,7 @@ def demo_evaluator():
     print("評価器デモ")
     print("=" * 60)
 
-    from jphrase.evaluation import UnsupervisedEvaluator
+    from japhrase.evaluation import UnsupervisedEvaluator
 
     # サンプルデータ
     texts = ["機械学習はAIの一分野です"] * 10

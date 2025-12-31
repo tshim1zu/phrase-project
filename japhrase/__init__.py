@@ -1,18 +1,18 @@
 """
-jphrase - 日本語テキストから頻出フレーズを検出
+japhrase - 日本語テキストから頻出フレーズを検出
 
 N-gramベースの頻度分析により、テキスト中で頻繁に出現するフレーズを検出します。
 SNSトレンド分析、ニュース話題抽出、頻出キーワード発見などに適しています。
 
 使用例:
-    >>> from jphrase import PhraseExtracter
+    >>> from japhrase import PhraseExtracter
     >>> extractor = PhraseExtracter(min_count=6, max_length=16)
     >>> df_result = extractor.get_dfphrase(sentences)
 
 詳細は POSITIONING.md を参照してください。
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 __author__ = "Takeshi SHIMIZU"
 __copyright__ = "Copyright 2023"
 

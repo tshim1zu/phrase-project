@@ -5,7 +5,7 @@ patterns.pyのテスト
 
 import pytest
 import re
-from jphrase.patterns import get_positive_patterns, get_negative_patterns
+from japhrase.patterns import get_positive_patterns, get_negative_patterns
 
 
 class TestPatterns:
