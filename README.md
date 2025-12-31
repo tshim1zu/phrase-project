@@ -128,7 +128,7 @@ extractor.export_excel(df, "output.xlsx")   # Excel
 | `verbose` | 1 | 進捗表示（0:非表示, 1:表示） |
 | `knowns` | [] | 優先的に抽出したい既知語 |
 
-詳細は [USAGE.md](USAGE.md) を参照してください。
+詳細は [USAGE.md](docs/USAGE.md) を参照してください。
 
 ## 使用例
 
@@ -197,8 +197,8 @@ phrase-project/
 ### テストの実行
 
 ```bash
-# 依存パッケージのインストール
-pip install -r requirements-dev.txt
+# 開発依存関係のインストール
+pip install -e ".[dev]"
 
 # テストの実行
 pytest
@@ -207,17 +207,17 @@ pytest
 pytest --cov=jphrase --cov-report=html
 ```
 
-詳細は [TESTING.md](TESTING.md) を参照してください。
+詳細は [TESTING.md](docs/TESTING.md) を参照してください。
 
 ## ドキュメント
 
-- **[POSITIONING.md](POSITIONING.md)** - ⭐ このツールの位置づけと設計思想（必読）
-- [USAGE.md](USAGE.md) - 詳細な使用ガイド
-- [OPTIMIZATION.md](OPTIMIZATION.md) - パラメータ最適化ガイド
-- [DATA_SOURCES.md](DATA_SOURCES.md) - データ取得方法
-- [THEORY.md](THEORY.md) - 理論的考察と限界
-- [TESTING.md](TESTING.md) - テスト実行方法
-- [example.ipynb](jphrase/example.ipynb) - Jupyter Notebookサンプル
+- **[POSITIONING.md](docs/POSITIONING.md)** - ⭐ このツールの位置づけと設計思想（必読）
+- [USAGE.md](docs/USAGE.md) - 詳細な使用ガイド
+- [OPTIMIZATION.md](docs/OPTIMIZATION.md) - パラメータ最適化ガイド
+- [DATA_SOURCES.md](docs/DATA_SOURCES.md) - データ取得方法
+- [THEORY.md](docs/THEORY.md) - 理論的考察と限界
+- [TESTING.md](docs/TESTING.md) - テスト実行方法
+- [example.ipynb](examples/example.ipynb) - Jupyter Notebookサンプル
 
 ## ライセンス
 

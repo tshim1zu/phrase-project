@@ -47,7 +47,7 @@ class PhraseExtracter:
         weight_freq=1.0,
         weight_len=1.0,
         removes=DEFAULT_REMOVES,
-        unnecesary=DEFAULT_UNNECESSARY,
+        unnecessary=DEFAULT_UNNECESSARY,
         threshold_originality=0.5,
         size_sentence=5000,
         knowns=None,
@@ -64,7 +64,7 @@ class PhraseExtracter:
             weight_freq (float): 頻度への重み
             weight_len (float): 長さへの重み
             removes (str): 走査前に除去する文字
-            unnecesary (list): 走査後に除去する文字列
+            unnecessary (list): 走査後に除去する文字列
             threshold_originality (float): 類似フレーズの除去閾値
             size_sentence (int): 一度にスキャンする配列のサイズ
             knowns (list): 既知語のリスト
@@ -79,7 +79,7 @@ class PhraseExtracter:
         self.max_length = max_length + 1  # 指定された数よりも１つ多く数えて処理
         self.min_length = min_length
         self.removes = removes
-        self.unnecessary = unnecesary
+        self.unnecessary = unnecessary
         self.knowns = knowns if knowns is not None else []
         self.size_sentence = size_sentence
         self.threshold_originality = threshold_originality
