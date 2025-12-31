@@ -3,7 +3,7 @@ requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "jphrase"
+name = "japhrase"
 version = "0.1.0"
 description = "Detect frequent phrases from Japanese texts"
 readme = "README.md"
