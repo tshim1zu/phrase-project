@@ -7,7 +7,7 @@ Detect frequent phrases from Japanese texts
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.7+](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
 
-![jphrase](https://lh3.googleusercontent.com/notebooklm/AG60hOqVypHk6IGd2qVtgj1OTiuEjGlLmeZvzVefWVElui0xYA3sW8Wuo9o-Y4goK96PrBv1cheLk1R2H-DXSo--QkxPZHzOzmtzAasnm8TIH6TnrePxVJQ4kafyHm_1apeaOnx1zgpJQfdIoAHKlVtkbedHn1rygKA=m22?authuser=0)
+![jphrase](https://youtu.be/Kifc1gX9ceQ)
 
 ## 特徴
 
