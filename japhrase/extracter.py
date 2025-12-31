@@ -19,6 +19,32 @@ from .patterns import get_positive_patterns, get_negative_patterns
 logger = logging.getLogger(__name__)
 
 
+# Evidence-based presets from Optuna optimization experiments
+PRESETS = {
+    'sns': {
+        'min_count': 6,
+        'max_length': 9,
+        'min_length': 5,
+        'threshold_originality': 0.52,
+        'description': 'SNS/Twitter向け最適化パラメータ（短文、頻出フレーズ）',
+    },
+    'news': {
+        'min_count': 5,
+        'max_length': 10,
+        'min_length': 3,
+        'threshold_originality': 0.64,
+        'description': 'ニュース/記事向け最適化パラメータ（やや長文、専門用語）',
+    },
+    'default': {
+        'min_count': 6,
+        'max_length': 16,
+        'min_length': 4,
+        'threshold_originality': 0.5,
+        'description': 'デフォルト設定（汎用的なバランス型）',
+    },
+}
+
+
 class PhraseExtracter:
     """
     日本語テキストから頻出フレーズを抽出するクラス
@@ -440,6 +466,73 @@ class PhraseExtracter:
             return df_phrase
 
     # ==================== ユーティリティメソッド ====================
+
+    @classmethod
+    def preset(cls, preset_name: str, **kwargs):
+        """
+        プリセットパラメータでPhraseExtracterを初期化
+
+        Optunaによる最適化実験で得られたエビデンスベースのパラメータを使用します。
+
+        Parameters:
+            preset_name (str): プリセット名 ('sns', 'news', 'default')
+            **kwargs: プリセットを上書きする追加パラメータ
+
+        Returns:
+            PhraseExtracter: プリセットで初期化されたインスタンス
+
+        使用例:
+            >>> # SNS向けプリセットを使用
+            >>> extractor = PhraseExtracter.preset('sns')
+            >>> df = extractor.extract("tweets.txt")
+
+            >>> # ニュース向けプリセットを使用
+            >>> extractor = PhraseExtracter.preset('news')
+            >>>
+            >>> # プリセットを一部上書き
+            >>> extractor = PhraseExtracter.preset('sns', min_count=10)
+
+        利用可能なプリセット:
+            - 'sns': SNS/Twitter向け（短文、頻出フレーズ）
+            - 'news': ニュース/記事向け（やや長文、専門用語）
+            - 'default': デフォルト設定（汎用的なバランス型）
+        """
+        if preset_name not in PRESETS:
+            available = ', '.join(PRESETS.keys())
+            raise ValueError(
+                f"Unknown preset: '{preset_name}'. "
+                f"Available presets: {available}"
+            )
+
+        preset_params = PRESETS[preset_name].copy()
+        preset_params.pop('description', None)  # description は除外
+        preset_params.update(kwargs)  # ユーザー指定で上書き
+
+        logger.info(f"Using preset: '{preset_name}' - {PRESETS[preset_name]['description']}")
+
+        return cls(**preset_params)
+
+    @classmethod
+    def list_presets(cls) -> None:
+        """
+        利用可能なプリセット一覧を表示
+
+        使用例:
+            >>> PhraseExtracter.list_presets()
+        """
+        print("利用可能なプリセット:")
+        print("=" * 70)
+        for name, config in PRESETS.items():
+            print(f"\n[{name}]")
+            print(f"  {config['description']}")
+            print(f"  パラメータ:")
+            for key, value in config.items():
+                if key != 'description':
+                    print(f"    {key}: {value}")
+        print("\n" + "=" * 70)
+        print("\n使用方法:")
+        print("  extractor = PhraseExtracter.preset('sns')")
+        print("  df = extractor.extract('input.txt')")
 
     @classmethod
     def demo(cls, **kwargs) -> pd.DataFrame:

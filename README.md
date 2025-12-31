@@ -12,16 +12,30 @@ Detect frequent phrases from Japanese texts
 - 📝 **簡単に使える**: シンプルなAPIで、数行のコードで実行可能
 - 🚀 **高速**: N-gramベースの効率的なアルゴリズム
 - 🎯 **柔軟**: 豊富なパラメータでカスタマイズ可能
+- ⚙️ **エビデンスベースのプリセット**: Optunaで最適化された用途別パラメータ（NEW!）
 - 📊 **多様な形式**: CSV/TSV/TXT/Excel対応
 - 🔤 **エンコーディング自動検出**: UTF-8、Shift-JIS、EUC-JPなど自動判別
 - 💬 **文字列リスト対応**: ファイルだけでなく、テキストデータを直接処理可能
-- 🧪 **テスト済み**: 包括的なテストスイート
-- 🔍 **用途**: SNSトレンド分析、ニュース話題抽出、頻出キーワード発見
+- 🔍 **類似度分析**: 複数ファイル間のコピペ検出・重複分析
+- 🧪 **テスト済み**: 包括的なテストスイート（85テスト）
+- 🎯 **用途**: SNSトレンド分析、ニュース話題抽出、頻出キーワード発見、コピペ検出
 
 ## インストール
 
 ```bash
 pip install japhrase
+```
+
+類似度分析機能を使う場合（オプション）：
+
+```bash
+pip install japhrase[similarity]
+```
+
+全ての機能をインストール：
+
+```bash
+pip install japhrase[all]
 ```
 
 または開発モードでインストール：
@@ -40,6 +54,23 @@ from japhrase import PhraseExtracter
 # デモデータですぐに試せます
 df = PhraseExtracter.demo()
 print(df)
+```
+
+### エビデンスベースのプリセットを使う（NEW!）
+
+```python
+from japhrase import PhraseExtracter
+
+# SNS向け最適化パラメータ
+extractor = PhraseExtracter.preset('sns')
+df = extractor.extract("tweets.txt")
+
+# ニュース向け最適化パラメータ
+extractor = PhraseExtracter.preset('news')
+df = extractor.extract("articles.txt")
+
+# 利用可能なプリセット一覧を表示
+PhraseExtracter.list_presets()
 ```
 
 ### ファイルから抽出
@@ -110,6 +141,53 @@ texts = [
 df = extractor.extract(texts)  # ファイル不要！
 ```
 
+### 複数ファイル間の類似度分析・コピペ検出（NEW!）
+
+```python
+from japhrase import SimilarityAnalyzer
+
+# 複数ファイルの類似度を分析
+analyzer = SimilarityAnalyzer(method='auto')  # 自動選択（実用性重視）
+matrix = analyzer.compare_files([
+    "doc1.txt",
+    "doc2.txt",
+    "doc3.txt"
+])
+
+# 類似度行列を表示
+print(matrix)
+#           doc1.txt  doc2.txt  doc3.txt
+# doc1.txt      1.00      0.85      0.32
+# doc2.txt      0.85      1.00      0.28
+# doc3.txt      0.32      0.28      1.00
+
+# 類似ペアを抽出（閾値70%以上）
+pairs = analyzer.find_similar_pairs(matrix, threshold=0.7)
+print(pairs)
+# [{'item1': 'doc1.txt', 'item2': 'doc2.txt', 'similarity': 0.85}]
+
+# 相関行列をCSVでエクスポート
+analyzer.export_matrix(matrix, "similarity.csv")
+
+# ヒートマップを生成（要: matplotlib, seaborn）
+analyzer.export_heatmap(matrix, "heatmap.png")
+```
+
+#### 類似度計算手法の選択
+
+```python
+# 手法を明示指定
+analyzer = SimilarityAnalyzer(method='levenshtein')  # 正確だが遅い
+analyzer = SimilarityAnalyzer(method='jaccard')      # 高速
+analyzer = SimilarityAnalyzer(method='cosine')       # 長文向け
+analyzer = SimilarityAnalyzer(method='auto')         # 自動選択（推奨）
+```
+
+- **`levenshtein`**: レーベンシュタイン距離（正確、短文向け）
+- **`jaccard`**: N-gram Jaccard係数（高速、バランス型）
+- **`cosine`**: TF-IDFコサイン類似度（長文向け）
+- **`auto`**: テキスト長に応じて自動選択（デフォルト、実用性重視）
+
 ### 複数ファイルから抽出
 
 ```python
@@ -138,6 +216,8 @@ extractor.export_excel(df, "output.xlsx")   # Excel
 
 ### 便利なクラスメソッド
 
+- `PhraseExtracter.preset()` - エビデンスベースのプリセットで初期化（NEW!）
+- `PhraseExtracter.list_presets()` - 利用可能なプリセット一覧を表示（NEW!）
 - `PhraseExtracter.from_file()` - ファイルから直接抽出
 - `PhraseExtracter.from_files()` - 複数ファイルから抽出
 
@@ -169,6 +249,34 @@ extractor.export_excel(df, "output.xlsx")   # Excel
 | `knowns` | [] | 優先的に抽出したい既知語 |
 
 詳細は [USAGE.md](docs/USAGE.md) を参照してください。
+
+## プリセット（NEW!）
+
+Optunaによる最適化実験で得られたエビデンスベースのパラメータセットを提供しています。
+
+### 利用可能なプリセット
+
+| プリセット | 用途 | パラメータ |
+|-----------|------|-----------|
+| `sns` | SNS/Twitter向け | min_count=6, max_length=9, min_length=5, threshold_originality=0.52 |
+| `news` | ニュース/記事向け | min_count=5, max_length=10, min_length=3, threshold_originality=0.64 |
+| `default` | デフォルト設定 | min_count=6, max_length=16, min_length=4, threshold_originality=0.5 |
+
+### プリセットの使い方
+
+```python
+from japhrase import PhraseExtracter
+
+# SNS向けプリセット
+extractor = PhraseExtracter.preset('sns')
+df = extractor.extract("tweets.txt")
+
+# パラメータの一部を上書き
+extractor = PhraseExtracter.preset('sns', min_count=10)
+
+# 利用可能なプリセット一覧を表示
+PhraseExtracter.list_presets()
+```
 
 ## 使用例
 
@@ -272,6 +380,32 @@ Takeshi SHIMIZU
 Issue や Pull Request は大歓迎です！
 
 ## 変更履歴
+
+### v0.1.3
+- **エビデンスベースのプリセット機能**: Optunaで最適化された用途別パラメータ
+  - `PhraseExtracter.preset('sns')` でSNS向け最適パラメータを使用
+  - `PhraseExtracter.preset('news')` でニュース向け最適パラメータを使用
+  - `PhraseExtracter.list_presets()` でプリセット一覧を表示
+  - 30試行のベイズ最適化によるエビデンスベースのパラメータ設定
+- **類似度分析機能**: 複数ファイル/テキスト間の類似度分析・コピペ検出
+  - `SimilarityAnalyzer`クラスを追加
+  - 3種類の類似度計算手法を実装：
+    - レーベンシュタイン距離（正確、短文向け）
+    - N-gram Jaccard係数（高速、バランス型）
+    - TF-IDFコサイン類似度（長文向け）
+  - 自動選択モード（テキスト長に応じて最適な手法を選択）
+  - 類似度行列の生成と可視化（ヒートマップ）
+  - 類似ペアの自動抽出（閾値指定可能）
+  - CSV/Excel/JSON出力対応
+- **開発ツール**: Optunaによるハイパーパラメータ最適化（開発用）
+  - `OptunaOptimizer`クラスを追加（dev依存関係）
+  - ベイズ最適化（TPEサンプラー）による効率的な探索
+  - 実験結果の保存と可視化機能
+- オプション依存関係を追加：
+  - `pip install japhrase[similarity]` で類似度分析機能をインストール
+  - `pip install japhrase[dev]` で開発ツール（Optuna含む）をインストール
+  - `python-Levenshtein`, `scikit-learn`, `matplotlib`, `seaborn`, `optuna`
+- テストスイートを拡充（85テスト、全てパス）
 
 ### v0.1.2
 - **エンコーディング自動検出**: chardetライブラリを使用した自動検出機能

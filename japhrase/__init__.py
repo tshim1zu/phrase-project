@@ -12,21 +12,23 @@ SNSトレンド分析、ニュース話題抽出、頻出キーワード発見�
 詳細は POSITIONING.md を参照してください。
 """
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 __author__ = "Takeshi SHIMIZU"
 __copyright__ = "Copyright 2023"
 
-from .extracter import PhraseExtracter, extracter
+from .extracter import PhraseExtracter, extracter, PRESETS
 from .constants import FIRST_KANJI, DEFAULT_REMOVES, DEFAULT_UNNECESSARY
 from .patterns import get_positive_patterns, get_negative_patterns
 
 # 新機能
 from .evaluation import UnsupervisedEvaluator, SupervisedEvaluator
 from .optimization import UnsupervisedOptimizer, SupervisedOptimizer
+from .similarity import SimilarityAnalyzer
 
 __all__ = [
     'PhraseExtracter',
     'extracter',  # 後方互換性のため
+    'PRESETS',
     'FIRST_KANJI',
     'DEFAULT_REMOVES',
     'DEFAULT_UNNECESSARY',
@@ -37,4 +39,6 @@ __all__ = [
     'SupervisedEvaluator',
     'UnsupervisedOptimizer',
     'SupervisedOptimizer',
+    # 類似度分析
+    'SimilarityAnalyzer',
 ]

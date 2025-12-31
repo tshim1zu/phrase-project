@@ -344,3 +344,173 @@ class SupervisedOptimizer:
             combinations.append(param_dict)
 
         return combinations
+
+
+class OptunaOptimizer:
+    """
+    Optunaベースのハイパーパラメータ最適化器
+
+    ベイズ最適化（TPE）を使用して効率的にパラメータを探索します。
+    開発・実験用の機能で、配布パッケージには含まれません。
+
+    使用例:
+        >>> optimizer = OptunaOptimizer(n_trials=100)
+        >>> best_params, study = optimizer.optimize(texts)
+        >>> print(f"Best params: {best_params}")
+        >>> print(f"Best score: {study.best_value}")
+    """
+
+    def __init__(
+        self,
+        n_trials: int = 50,
+        param_ranges: Optional[Dict[str, Tuple]] = None,
+        evaluator: Optional['UnsupervisedEvaluator'] = None,
+        verbose: int = 1
+    ):
+        """
+        Parameters:
+            n_trials (int): 試行回数
+            param_ranges (Dict[str, Tuple]): パラメータの探索範囲
+            evaluator (UnsupervisedEvaluator): 評価器
+            verbose (int): 進捗表示レベル
+        """
+        try:
+            import optuna
+            self.optuna = optuna
+        except ImportError:
+            raise ImportError(
+                "Optunaが見つかりません。開発モードでインストールしてください:\n"
+                "pip install -e '.[dev]'"
+            )
+
+        self.n_trials = n_trials
+        self.param_ranges = param_ranges or self._get_default_param_ranges()
+        self.evaluator = evaluator or UnsupervisedEvaluator()
+        self.verbose = verbose
+
+    def _get_default_param_ranges(self) -> Dict[str, Tuple]:
+        """デフォルトのパラメータ探索範囲"""
+        return {
+            'min_count': (2, 20),
+            'max_length': (10, 30),
+            'min_length': (2, 8),
+            'threshold_originality': (0.1, 0.9),
+        }
+
+    def optimize(
+        self,
+        texts: List[str],
+        study_name: Optional[str] = None,
+        storage: Optional[str] = None
+    ) -> Tuple[Dict[str, Any], Any]:
+        """
+        ハイパーパラメータ最適化を実行
+
+        Parameters:
+            texts (List[str]): テキストのリスト
+            study_name (str, optional): 実験名
+            storage (str, optional): データベースURL
+
+        Returns:
+            Tuple[Dict[str, Any], optuna.Study]: (最適パラメータ, Studyオブジェクト)
+        """
+        import os
+
+        def objective(trial):
+            """Optunaの目的関数"""
+            params = {}
+            for param_name, (low, high) in self.param_ranges.items():
+                if param_name == 'threshold_originality':
+                    params[param_name] = trial.suggest_float(param_name, low, high)
+                else:
+                    params[param_name] = trial.suggest_int(param_name, low, high)
+
+            try:
+                extractor = PhraseExtracter(verbose=0, **params)
+                df = extractor.get_dfphrase(texts)
+
+                if len(df) == 0:
+                    return 0.0
+
+                phrases = df['seqchar'].tolist()
+                score = self.evaluator.evaluate(phrases, texts, df)
+                trial.set_user_attr('n_phrases', len(df))
+
+                return score
+
+            except Exception as e:
+                if self.verbose >= 2:
+                    logger.error(f"Trial failed: {e}")
+                return 0.0
+
+        study = self.optuna.create_study(
+            study_name=study_name,
+            storage=storage,
+            direction='maximize',
+            sampler=self.optuna.samplers.TPESampler(seed=42),
+            load_if_exists=True
+        )
+
+        if self.verbose >= 1:
+            logger.info(f"Starting Optuna optimization: {self.n_trials} trials")
+
+        study.optimize(
+            objective,
+            n_trials=self.n_trials,
+            show_progress_bar=self.verbose >= 1,
+            n_jobs=1
+        )
+
+        if self.verbose >= 1:
+            logger.info(f"\nOptimization completed!")
+            logger.info(f"Best value: {study.best_value:.4f}")
+            logger.info(f"Best params: {study.best_params}")
+
+        return study.best_params, study
+
+    def save_results(self, study: Any, output_dir: str = 'experiments/results'):
+        """最適化結果を保存"""
+        import os
+        import json
+        from pathlib import Path
+
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+        best_params_file = os.path.join(output_dir, f'{study.study_name}_best_params.json')
+        with open(best_params_file, 'w', encoding='utf-8') as f:
+            json.dump({
+                'best_params': study.best_params,
+                'best_value': study.best_value,
+                'n_trials': len(study.trials)
+            }, f, indent=2, ensure_ascii=False)
+
+        logger.info(f"Best parameters saved to: {best_params_file}")
+
+        df_trials = study.trials_dataframe()
+        trials_file = os.path.join(output_dir, f'{study.study_name}_trials.csv')
+        df_trials.to_csv(trials_file, index=False, encoding='utf-8-sig')
+
+        logger.info(f"Trial history saved to: {trials_file}")
+
+    def visualize(self, study: Any, output_dir: str = 'experiments/results'):
+        """最適化結果を可視化"""
+        try:
+            from optuna import visualization as vis
+            import plotly.io as pio
+            from pathlib import Path
+
+            Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+            fig = vis.plot_optimization_history(study)
+            pio.write_html(fig, os.path.join(output_dir, f'{study.study_name}_history.html'))
+
+            fig = vis.plot_param_importances(study)
+            pio.write_html(fig, os.path.join(output_dir, f'{study.study_name}_importances.html'))
+
+            fig = vis.plot_parallel_coordinate(study)
+            pio.write_html(fig, os.path.join(output_dir, f'{study.study_name}_parallel.html'))
+
+            logger.info(f"Visualizations saved to: {output_dir}")
+
+        except ImportError:
+            logger.warning("可視化にはplotlyが必要です: pip install plotly")
