@@ -7,7 +7,9 @@ Detect frequent phrases from Japanese texts
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.7+](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
 
-![jphrase](https://youtu.be/Kifc1gX9ceQ)
+## 📺 解説動画
+
+**[▶️ このプロジェクトの解説動画を見る](https://youtu.be/Kifc1gX9ceQ)**
 
 ## 特徴
 
