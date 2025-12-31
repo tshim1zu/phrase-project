@@ -11,7 +11,7 @@ from collections import Counter
 from IPython.display import display
 import re
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 
 from .constants import DEFAULT_REMOVES, DEFAULT_UNNECESSARY
 from .patterns import get_positive_patterns, get_negative_patterns
@@ -486,14 +486,14 @@ class PhraseExtracter:
         return extractor.get_dfphrase(sample_texts)
 
     @classmethod
-    def from_file(cls, filepath: str, column: str = None, encoding: str = 'utf-8', **kwargs) -> pd.DataFrame:
+    def from_file(cls, filepath: str, column: str = None, encoding: str = 'auto', **kwargs) -> pd.DataFrame:
         """
         ファイルから直接フレーズを抽出
 
         Parameters:
             filepath (str): 入力ファイルパス (.txt, .csv, .tsv)
             column (str): CSV/TSVの場合の列名
-            encoding (str): 文字エンコーディング
+            encoding (str): 文字エンコーディング ('auto'で自動検出、デフォルト: 'auto')
             **kwargs: PhraseExtracterのコンストラクタ引数
 
         Returns:
@@ -502,6 +502,8 @@ class PhraseExtracter:
         使用例:
             >>> df = PhraseExtracter.from_file("input.txt")
             >>> df = PhraseExtracter.from_file("data.csv", column="text", min_count=10)
+            >>> # エンコーディングを明示指定
+            >>> df = PhraseExtracter.from_file("shift_jis.txt", encoding="shift_jis")
         """
         from .utils import read_file
 
@@ -510,14 +512,14 @@ class PhraseExtracter:
         return extractor.get_dfphrase(sentences)
 
     @classmethod
-    def from_files(cls, filepaths: List[str], column: str = None, encoding: str = 'utf-8', **kwargs) -> pd.DataFrame:
+    def from_files(cls, filepaths: List[str], column: str = None, encoding: str = 'auto', **kwargs) -> pd.DataFrame:
         """
         複数のファイルから直接フレーズを抽出
 
         Parameters:
             filepaths (list): 入力ファイルパスのリスト
             column (str): CSV/TSVの場合の列名
-            encoding (str): 文字エンコーディング
+            encoding (str): 文字エンコーディング ('auto'で自動検出、デフォルト: 'auto')
             **kwargs: PhraseExtracterのコンストラクタ引数
 
         Returns:
@@ -532,25 +534,42 @@ class PhraseExtracter:
         extractor = cls(**kwargs)
         return extractor.get_dfphrase(sentences)
 
-    def extract(self, filepath: str, column: str = None, encoding: str = 'utf-8') -> pd.DataFrame:
+    def extract(self, input_data: Union[str, List[str]], column: str = None, encoding: str = 'auto') -> pd.DataFrame:
         """
-        インスタンスメソッド版：ファイルからフレーズを抽出
+        ファイルパスまたは文字列リストからフレーズを抽出
 
         Parameters:
-            filepath (str): 入力ファイルパス
-            column (str): CSV/TSVの場合の列名
-            encoding (str): 文字エンコーディング
+            input_data (str or List[str]): 入力ファイルパスまたはテキストのリスト
+            column (str): CSV/TSVの場合の列名（input_dataがファイルパスの場合のみ有効）
+            encoding (str): 文字エンコーディング ('auto'で自動検出、デフォルト: 'auto')
 
         Returns:
             pandas.DataFrame: 抽出されたフレーズ
 
         使用例:
             >>> extractor = PhraseExtracter(min_count=10)
+            >>> # ファイルから抽出
             >>> df = extractor.extract("input.txt")
+            >>> # 文字列リストから直接抽出
+            >>> texts = ["テキスト1", "テキスト2", "テキスト3"]
+            >>> df = extractor.extract(texts)
         """
         from .utils import read_file
+        from pathlib import Path
 
-        sentences = read_file(filepath, column, encoding)
+        # 入力がファイルパスか文字列リストかを判定
+        if isinstance(input_data, str):
+            # ファイルパスとして扱う
+            sentences = read_file(input_data, column, encoding)
+        elif isinstance(input_data, (list, tuple, pd.Series)):
+            # 文字列リストとして扱う
+            sentences = input_data
+        else:
+            raise TypeError(
+                f"input_dataは文字列（ファイルパス）またはリスト/タプルである必要があります。"
+                f"実際の型: {type(input_data)}"
+            )
+
         return self.get_dfphrase(sentences)
 
     def export_csv(self, df, filepath: str, encoding: str = 'utf-8-sig'):

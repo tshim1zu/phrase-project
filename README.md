@@ -13,6 +13,8 @@ Detect frequent phrases from Japanese texts
 - 🚀 **高速**: N-gramベースの効率的なアルゴリズム
 - 🎯 **柔軟**: 豊富なパラメータでカスタマイズ可能
 - 📊 **多様な形式**: CSV/TSV/TXT/Excel対応
+- 🔤 **エンコーディング自動検出**: UTF-8、Shift-JIS、EUC-JPなど自動判別
+- 💬 **文字列リスト対応**: ファイルだけでなく、テキストデータを直接処理可能
 - 🧪 **テスト済み**: 包括的なテストスイート
 - 🔍 **用途**: SNSトレンド分析、ニュース話題抽出、頻出キーワード発見
 
@@ -78,6 +80,34 @@ df = PhraseExtracter.from_file(
     max_length=20,     # 最大20文字
     verbose=1          # 進捗表示
 )
+```
+
+### エンコーディング自動検出
+
+```python
+from japhrase import PhraseExtracter
+
+# encoding='auto'で自動検出（デフォルト）
+df = PhraseExtracter.from_file("shift_jis_file.txt")  # 自動でShift-JISを検出
+
+# エンコーディングを明示指定も可能
+df = PhraseExtracter.from_file("input.txt", encoding="utf-8")
+```
+
+### 文字列リストから直接抽出
+
+```python
+from japhrase import PhraseExtracter
+
+extractor = PhraseExtracter(min_count=2)
+
+# ファイルパスではなく、文字列リストを直接渡せる
+texts = [
+    "フォローありがとうございます",
+    "フォローしてください",
+    "プレゼントキャンペーン開催中"
+]
+df = extractor.extract(texts)  # ファイル不要！
 ```
 
 ### 複数ファイルから抽出
@@ -242,6 +272,21 @@ Takeshi SHIMIZU
 Issue や Pull Request は大歓迎です！
 
 ## 変更履歴
+
+### v0.1.2
+- **エンコーディング自動検出**: chardetライブラリを使用した自動検出機能
+  - UTF-8、Shift-JIS、EUC-JP、CP932などを自動判別
+  - `encoding='auto'`がデフォルト（明示指定も可能）
+- **文字列リスト入力対応**: `extract()`メソッドが文字列リストを直接受け取れるように
+  - ファイルパスまたはリスト/タプルを自動判別
+  - ファイルを作成せずに直接テキストデータを処理可能
+- 依存関係に`chardet>=4.0.0`を追加
+- 包括的なテスト追加（エンコーディング検出、文字列入力対応）
+
+### v0.1.1
+- パッケージ名とモジュール名の不一致を修正
+  - モジュール名を`jphrase`から`japhrase`に変更
+  - `pip install japhrase` → `from japhrase import` で統一
 
 ### v0.1.0
 - 初回リリース

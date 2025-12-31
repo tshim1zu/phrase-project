@@ -10,17 +10,57 @@ import logging
 import pandas as pd
 from pathlib import Path
 from typing import List, Union
+import chardet
 
 logger = logging.getLogger(__name__)
 
 
-def read_text_file(filepath: str, encoding: str = 'utf-8') -> List[str]:
+def detect_encoding(filepath: str) -> str:
+    """
+    ファイルのエンコーディングを自動検出
+
+    Parameters:
+        filepath (str): ファイルパス
+
+    Returns:
+        str: 検出されたエンコーディング名
+
+    Note:
+        検出に失敗した場合はデフォルトで 'utf-8' を返す
+    """
+    try:
+        with open(filepath, 'rb') as f:
+            raw_data = f.read()
+            result = chardet.detect(raw_data)
+            encoding = result['encoding']
+            confidence = result['confidence']
+
+            if encoding is None or confidence < 0.7:
+                logger.warning(
+                    f"エンコーディング検出の信頼度が低い ({confidence:.2f})。"
+                    f"UTF-8として読み込みます。"
+                )
+                return 'utf-8'
+
+            # Shift-JISの別名を統一
+            if encoding.lower() in ['shift_jis', 'shift-jis', 'sjis', 'cp932']:
+                encoding = 'cp932'  # Windowsの拡張Shift-JIS
+
+            logger.info(f"検出されたエンコーディング: {encoding} (信頼度: {confidence:.2f})")
+            return encoding
+
+    except Exception as e:
+        logger.warning(f"エンコーディング検出失敗: {e}。UTF-8として読み込みます。")
+        return 'utf-8'
+
+
+def read_text_file(filepath: str, encoding: str = 'auto') -> List[str]:
     """
     テキストファイルを読み込んで行のリストを返す
 
     Parameters:
         filepath (str): ファイルパス
-        encoding (str): 文字エンコーディング
+        encoding (str): 文字エンコーディング ('auto'で自動検出、デフォルト: 'auto')
 
     Returns:
         List[str]: 行のリスト
@@ -30,6 +70,10 @@ def read_text_file(filepath: str, encoding: str = 'utf-8') -> List[str]:
         PermissionError: ファイルの読み込み権限がない場合
         UnicodeDecodeError: エンコーディングが正しくない場合
     """
+    # エンコーディング自動検出
+    if encoding == 'auto':
+        encoding = detect_encoding(filepath)
+
     try:
         with open(filepath, 'r', encoding=encoding) as f:
             lines = [line.strip() for line in f if line.strip()]
@@ -42,17 +86,22 @@ def read_text_file(filepath: str, encoding: str = 'utf-8') -> List[str]:
         raise
     except UnicodeDecodeError as e:
         logger.error(f"Encoding error in {filepath}: {e}")
-        raise
+        logger.info("エンコーディング自動検出を試みます...")
+        # 自動検出で再試行
+        detected_encoding = detect_encoding(filepath)
+        with open(filepath, 'r', encoding=detected_encoding) as f:
+            lines = [line.strip() for line in f if line.strip()]
+        return lines
 
 
-def read_csv_file(filepath: str, column: str = None, encoding: str = 'utf-8') -> List[str]:
+def read_csv_file(filepath: str, column: str = None, encoding: str = 'auto') -> List[str]:
     """
     CSVファイルを読み込んでテキストのリストを返す
 
     Parameters:
         filepath (str): ファイルパス
         column (str): 抽出する列名（Noneの場合は最初の列）
-        encoding (str): 文字エンコーディング
+        encoding (str): 文字エンコーディング ('auto'で自動検出、デフォルト: 'auto')
 
     Returns:
         List[str]: テキストのリスト
@@ -62,6 +111,10 @@ def read_csv_file(filepath: str, column: str = None, encoding: str = 'utf-8') ->
         pd.errors.EmptyDataError: ファイルが空の場合
         KeyError: 指定した列が存在しない場合
     """
+    # エンコーディング自動検出
+    if encoding == 'auto':
+        encoding = detect_encoding(filepath)
+
     try:
         df = pd.read_csv(filepath, encoding=encoding)
         if column is None:
@@ -76,16 +129,25 @@ def read_csv_file(filepath: str, column: str = None, encoding: str = 'utf-8') ->
     except KeyError:
         logger.error(f"Column '{column}' not found in {filepath}")
         raise
+    except UnicodeDecodeError as e:
+        logger.error(f"Encoding error in {filepath}: {e}")
+        logger.info("エンコーディング自動検出を試みます...")
+        # 自動検出で再試行
+        detected_encoding = detect_encoding(filepath)
+        df = pd.read_csv(filepath, encoding=detected_encoding)
+        if column is None:
+            column = df.columns[0]
+        return df[column].dropna().astype(str).tolist()
 
 
-def read_tsv_file(filepath: str, column: str = None, encoding: str = 'utf-8') -> List[str]:
+def read_tsv_file(filepath: str, column: str = None, encoding: str = 'auto') -> List[str]:
     """
     TSVファイルを読み込んでテキストのリストを返す
 
     Parameters:
         filepath (str): ファイルパス
         column (str): 抽出する列名（Noneの場合は最初の列）
-        encoding (str): 文字エンコーディング
+        encoding (str): 文字エンコーディング ('auto'で自動検出、デフォルト: 'auto')
 
     Returns:
         List[str]: テキストのリスト
@@ -95,6 +157,10 @@ def read_tsv_file(filepath: str, column: str = None, encoding: str = 'utf-8') ->
         pd.errors.EmptyDataError: ファイルが空の場合
         KeyError: 指定した列が存在しない場合
     """
+    # エンコーディング自動検出
+    if encoding == 'auto':
+        encoding = detect_encoding(filepath)
+
     try:
         df = pd.read_csv(filepath, sep='\t', encoding=encoding)
         if column is None:
@@ -109,9 +175,18 @@ def read_tsv_file(filepath: str, column: str = None, encoding: str = 'utf-8') ->
     except KeyError:
         logger.error(f"Column '{column}' not found in {filepath}")
         raise
+    except UnicodeDecodeError as e:
+        logger.error(f"Encoding error in {filepath}: {e}")
+        logger.info("エンコーディング自動検出を試みます...")
+        # 自動検出で再試行
+        detected_encoding = detect_encoding(filepath)
+        df = pd.read_csv(filepath, sep='\t', encoding=detected_encoding)
+        if column is None:
+            column = df.columns[0]
+        return df[column].dropna().astype(str).tolist()
 
 
-def read_file(filepath: str, column: str = None, encoding: str = 'utf-8') -> List[str]:
+def read_file(filepath: str, column: str = None, encoding: str = 'auto') -> List[str]:
     """
     ファイルを読み込んでテキストのリストを返す
     拡張子に応じて適切な読み込み方法を選択
@@ -119,7 +194,7 @@ def read_file(filepath: str, column: str = None, encoding: str = 'utf-8') -> Lis
     Parameters:
         filepath (str): ファイルパス
         column (str): CSV/TSVの場合の列名
-        encoding (str): 文字エンコーディング
+        encoding (str): 文字エンコーディング ('auto'で自動検出、デフォルト: 'auto')
 
     Returns:
         List[str]: テキストのリスト
@@ -137,14 +212,14 @@ def read_file(filepath: str, column: str = None, encoding: str = 'utf-8') -> Lis
         return read_text_file(filepath, encoding)
 
 
-def read_files(filepaths: List[str], column: str = None, encoding: str = 'utf-8') -> List[str]:
+def read_files(filepaths: List[str], column: str = None, encoding: str = 'auto') -> List[str]:
     """
     複数のファイルを読み込んでテキストのリストを返す
 
     Parameters:
         filepaths (List[str]): ファイルパスのリスト
         column (str): CSV/TSVの場合の列名
-        encoding (str): 文字エンコーディング
+        encoding (str): 文字エンコーディング ('auto'で自動検出、デフォルト: 'auto')
 
     Returns:
         List[str]: テキストのリスト

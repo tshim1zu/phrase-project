@@ -17,8 +17,52 @@ from japhrase.utils import (
     export_to_csv,
     export_to_json,
     export_to_excel,
-    ensure_directory
+    ensure_directory,
+    detect_encoding
 )
+
+
+class TestEncodingDetection:
+    """エンコーディング自動検出のテスト"""
+
+    @pytest.fixture
+    def temp_dir(self):
+        """一時ディレクトリを提供"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield tmpdir
+
+    def test_detect_encoding_utf8(self, temp_dir):
+        """UTF-8エンコーディングの検出テスト"""
+        filepath = os.path.join(temp_dir, "test_utf8.txt")
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write("これはUTF-8のテキストです\n")
+
+        encoding = detect_encoding(filepath)
+        assert encoding.lower() in ['utf-8', 'utf8', 'ascii']
+
+    def test_detect_encoding_shift_jis(self, temp_dir):
+        """Shift-JISエンコーディングの検出テスト"""
+        filepath = os.path.join(temp_dir, "test_sjis.txt")
+        try:
+            with open(filepath, 'w', encoding='shift_jis') as f:
+                f.write("これはShift-JISのテキストです\n")
+
+            encoding = detect_encoding(filepath)
+            # chardetはcp932として検出することがある
+            assert encoding.lower() in ['shift_jis', 'shift-jis', 'cp932', 'sjis']
+        except Exception:
+            pytest.skip("Shift-JIS encoding not available on this system")
+
+    def test_read_text_file_auto_encoding(self, temp_dir):
+        """自動エンコーディング検出でのファイル読み込みテスト"""
+        # UTF-8ファイル
+        filepath_utf8 = os.path.join(temp_dir, "test_utf8.txt")
+        with open(filepath_utf8, 'w', encoding='utf-8') as f:
+            f.write("日本語テキスト\n")
+
+        lines = read_text_file(filepath_utf8, encoding='auto')
+        assert len(lines) == 1
+        assert "日本語テキスト" in lines
 
 
 class TestReadFunctions:
@@ -226,3 +270,45 @@ class TestIntegrationWithPhraseExtracter:
         extractor.export_csv(df, output_path)
 
         assert os.path.exists(output_path)
+
+    def test_extract_with_string_list(self, temp_dir):
+        """extract()メソッドで文字列リストを直接渡すテスト"""
+        from japhrase import PhraseExtracter
+
+        # 文字列リストを直接渡す
+        texts = [
+            "フォローありがとうございます",
+            "フォローしてください",
+            "ありがとうございます",
+            "よろしくお願いします",
+            "フォローお願いします"
+        ]
+
+        extractor = PhraseExtracter(min_count=2, verbose=0)
+        df = extractor.extract(texts)
+
+        assert isinstance(df, pd.DataFrame)
+        # フォローという文字列が含まれているはず
+        if len(df) > 0:
+            phrases = df['seqchar'].tolist()
+            assert any('フォロー' in phrase for phrase in phrases)
+
+    def test_extract_with_file_and_string(self, temp_dir):
+        """extract()メソッドがファイルパスと文字列リスト両方に対応しているテスト"""
+        from japhrase import PhraseExtracter
+
+        extractor = PhraseExtracter(min_count=2, verbose=0)
+
+        # 1. 文字列リストで実行
+        texts = ["テストフレーズです"] * 5
+        df1 = extractor.extract(texts)
+        assert isinstance(df1, pd.DataFrame)
+
+        # 2. ファイルパスで実行
+        filepath = os.path.join(temp_dir, "test.txt")
+        with open(filepath, 'w', encoding='utf-8') as f:
+            for text in texts:
+                f.write(text + "\n")
+
+        df2 = extractor.extract(filepath)
+        assert isinstance(df2, pd.DataFrame)

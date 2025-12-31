@@ -12,7 +12,7 @@ SNSトレンド分析、ニュース話題抽出、頻出キーワード発見�
 詳細は POSITIONING.md を参照してください。
 """
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 __author__ = "Takeshi SHIMIZU"
 __copyright__ = "Copyright 2023"
 
