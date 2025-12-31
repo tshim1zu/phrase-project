@@ -1,4 +1,3 @@
-# coding:utf-8
 """
 日本語フレーズ抽出モジュール
 """
@@ -11,9 +10,13 @@ import pandas as pd
 from collections import Counter
 from IPython.display import display
 import re
+import logging
+from typing import List, Dict, Any, Optional
 
 from .constants import DEFAULT_REMOVES, DEFAULT_UNNECESSARY
 from .patterns import get_positive_patterns, get_negative_patterns
+
+logger = logging.getLogger(__name__)
 
 
 class PhraseExtracter:
@@ -88,7 +91,7 @@ class PhraseExtracter:
         self.positive_filter = positive if positive is not None else get_positive_patterns()
         self.negative_filter = negative if negative is not None else get_negative_patterns()
 
-    def make_ngrampieces(self, sentences):
+    def make_ngrampieces(self, sentences: List[str]) -> List[str]:
         """文章リストからN-gramフレーズを生成"""
         max_length = self.max_length
         if max_length == -1:
@@ -108,7 +111,7 @@ class PhraseExtracter:
                             phrases.append(phr)
         return phrases
 
-    def count_characters(self, phrases):
+    def count_characters(self, phrases: List[str]) -> pd.DataFrame:
         """フレーズの出現回数をカウント"""
         cnt_ = Counter(phrases)
         seqchars, lengths, freqs = [], [], []
@@ -126,7 +129,7 @@ class PhraseExtracter:
         })
         return df_ret
 
-    def count_knowns(self, sentences):
+    def count_knowns(self, sentences: List[str]) -> pd.DataFrame:
         """既知語を必ずカウント"""
         def count_all(sent, target):
             def find_all(a_str, sub):
@@ -152,7 +155,7 @@ class PhraseExtracter:
         })
         return df
 
-    def hold_higherrank(self, df):
+    def hold_higherrank(self, df: pd.DataFrame) -> pd.DataFrame:
         """情報量でソートして包含関係にある下位フレーズを除外"""
         df[self.clm_sc] = self.weight_freq * np.log(1 + df[self.clm_freq].astype(float)) \
               + self.weight_len * np.log(df[self.clm_length].astype(float))
@@ -237,7 +240,7 @@ class PhraseExtracter:
         ret.name = colname
         return ret
 
-    def select_phrase(self, df):
+    def select_phrase(self, df: pd.DataFrame) -> pd.DataFrame:
         """ポジティブ・ネガティブフィルターを適用してフレーズを選定"""
         df = df.reset_index(drop=True)
         sr = df[self.clm_seqchar]
@@ -307,7 +310,7 @@ class PhraseExtracter:
                     sentences = []
         yield sentences
 
-    def remove_similar(self, df_tmp):
+    def remove_similar(self, df_tmp: pd.DataFrame) -> pd.DataFrame:
         """類似度を計算して独自性のあるフレーズのみを残す"""
         def get_originality(i):
             phrase = df_tmp.loc[i, self.clm_seqchar]
@@ -322,14 +325,14 @@ class PhraseExtracter:
         mask_similar = df_tmp[self.clm_originality] > self.threshold_originality
         return df_tmp[mask_similar]
 
-    def similarity(self, seq_x, seq_y):
+    def similarity(self, seq_x: str, seq_y: str) -> float:
         """レーベンシュタイン距離から類似性を計算"""
         d = self.levenshtein(seq_x, seq_y)
         seq_length = (len(seq_x) + len(seq_y)) / 2
         d_ratio = d / seq_length
         return 1 - d_ratio
 
-    def levenshtein(self, seq_x, seq_y):
+    def levenshtein(self, seq_x: str, seq_y: str) -> float:
         """レーベンシュタイン距離を計算"""
         size_x = len(seq_x) + 1
         size_y = len(seq_y) + 1
@@ -347,7 +350,7 @@ class PhraseExtracter:
                     matrix[x, y] = min(matrix[x-1, y] + 1, matrix[x-1, y-1] + 1, matrix[x, y-1] + 1)
         return (matrix[size_x - 1, size_y - 1])
 
-    def get_dfphrase(self, sentences):
+    def get_dfphrase(self, sentences: List[str]) -> pd.DataFrame:
         """
         メイン処理：センテンスからフレーズを抽出
 
@@ -356,8 +359,27 @@ class PhraseExtracter:
 
         Returns:
             pandas.DataFrame: 抽出されたフレーズのデータフレーム
+
+        Raises:
+            ValueError: 入力が空、またはすべての文が短すぎる場合
         """
+        # 入力バリデーション
+        if sentences is None or len(sentences) == 0:
+            raise ValueError(
+                "入力テキストが空です。少なくとも1つの文章を指定してください。\n"
+                "使用例: extractor.get_dfphrase(['サンプルテキスト1', 'サンプルテキスト2'])"
+            )
+
         sentences = np.array(sentences).reshape(-1,)
+
+        # テキストの長さチェック
+        total_chars = sum(len(str(s)) for s in sentences)
+        if total_chars < self.min_length:
+            raise ValueError(
+                f"入力テキストが短すぎます（合計{total_chars}文字）。\n"
+                f"最小フレーズ長が{self.min_length}文字に設定されているため、\n"
+                f"より長いテキストを入力するか、min_lengthを小さくしてください。"
+            )
 
         def dict_agg(df_concat):
             """groupbyでdfを集計するときに文字列も統一的に扱う"""
@@ -368,13 +390,19 @@ class PhraseExtracter:
                     }
 
         df_concat = pd.DataFrame()
+        batch_count = 0
+        total_sentences = len(sentences)
+
+        if self.verbose >= 1:
+            logger.info(f"処理開始: {total_sentences}件の文章を分析します")
 
         for partial_sentences in self.gen_sentences(sentences):
+            batch_count += 1
             df_tmp = self.find_uniques(partial_sentences)
             df_concat = pd.concat([df_concat, df_tmp])
 
-            if len(df_concat) > 0 & (self.verbose >= 1):
-                print("途中経過")
+            if len(df_concat) > 0 and (self.verbose >= 1):
+                logger.info(f"バッチ{batch_count}処理完了 (ユニークフレーズ: {len(df_concat)}件)")
                 df_toshow = df_concat\
                     .groupby(self.clm_seqchar, as_index=False).agg(dict_agg(df_concat))\
                     .sort_values(by=[self.clm_knowns, self.clm_sc], ascending=False)
@@ -382,11 +410,18 @@ class PhraseExtracter:
 
         if not len(df_concat):
             if self.verbose >= 1:
-                print("フレーズが見つかりませんでした。")
+                logger.warning(
+                    f"フレーズが見つかりませんでした。\n"
+                    f"  現在の設定: min_count={self.min_count}, min_length={self.min_length}\n"
+                    f"  対処法:\n"
+                    f"    - min_count を小さくする（現在: {self.min_count} → 推奨: 3-5）\n"
+                    f"    - min_length を小さくする（現在: {self.min_length} → 推奨: 2-3）\n"
+                    f"    - より多くのテキストを入力する"
+                )
             return df_concat
         else:
             if self.verbose >= 1:
-                print("走査終了 -> 並び変え -> 類似削除 ")
+                logger.info("走査終了 -> 並び変え -> 類似削除 ")
 
             df_uniques_all = df_concat.groupby(self.clm_seqchar, as_index=False).agg(dict_agg(df_concat))
             df_phrase = self.hold_higherrank(df_uniques_all)
@@ -396,12 +431,62 @@ class PhraseExtracter:
             if self.selection > 0:
                 df_phrase = self.select_phrase(df_phrase)
 
+            if self.verbose >= 1:
+                logger.info(f"抽出完了: {len(df_phrase)}個のフレーズを検出しました")
+                if len(df_phrase) > 0:
+                    top_phrase = df_phrase.iloc[0][self.clm_seqchar]
+                    logger.info(f"最頻出フレーズ: 「{top_phrase}」")
+
             return df_phrase
 
     # ==================== ユーティリティメソッド ====================
 
     @classmethod
-    def from_file(cls, filepath: str, column: str = None, encoding: str = 'utf-8', **kwargs):
+    def demo(cls, **kwargs) -> pd.DataFrame:
+        """
+        デモ用サンプルデータでフレーズ抽出を試す
+
+        Parameters:
+            **kwargs: PhraseExtracterのコンストラクタ引数
+
+        Returns:
+            pandas.DataFrame: 抽出されたフレーズ
+
+        使用例:
+            >>> df = PhraseExtracter.demo()
+            >>> print(df)
+            >>> # カスタムパラメータで試す
+            >>> df = PhraseExtracter.demo(min_count=3, max_length=20)
+        """
+        sample_texts = [
+            "フォローありがとうございます。よろしくお願いします。",
+            "フォローしてください。お願いします。",
+            "プレゼントキャンペーン開催中です。応募してください。",
+            "プレゼントキャンペーンに応募しました。",
+            "よろしくお願いします。フォローありがとうございます。",
+            "キャンペーン開催中です。ぜひ応募してください。",
+            "応募してください。プレゼントがもらえます。",
+            "ありがとうございます。よろしくお願いします。",
+            "開催中です。プレゼントキャンペーンです。",
+            "フォローお願いします。よろしくお願いします。",
+        ]
+
+        logger.info("デモモードで実行中...")
+        logger.info(f"サンプルテキスト: {len(sample_texts)}件")
+
+        # デモ用にデフォルト設定を調整（ユーザー指定があればそちらを優先）
+        demo_defaults = {
+            'min_count': 2,  # サンプルデータが少ないので低めに設定
+            'min_length': 3,
+            'verbose': 0,
+        }
+        demo_defaults.update(kwargs)
+
+        extractor = cls(**demo_defaults)
+        return extractor.get_dfphrase(sample_texts)
+
+    @classmethod
+    def from_file(cls, filepath: str, column: str = None, encoding: str = 'utf-8', **kwargs) -> pd.DataFrame:
         """
         ファイルから直接フレーズを抽出
 
@@ -425,7 +510,7 @@ class PhraseExtracter:
         return extractor.get_dfphrase(sentences)
 
     @classmethod
-    def from_files(cls, filepaths: list, column: str = None, encoding: str = 'utf-8', **kwargs):
+    def from_files(cls, filepaths: List[str], column: str = None, encoding: str = 'utf-8', **kwargs) -> pd.DataFrame:
         """
         複数のファイルから直接フレーズを抽出
 
@@ -447,7 +532,7 @@ class PhraseExtracter:
         extractor = cls(**kwargs)
         return extractor.get_dfphrase(sentences)
 
-    def extract(self, filepath: str, column: str = None, encoding: str = 'utf-8'):
+    def extract(self, filepath: str, column: str = None, encoding: str = 'utf-8') -> pd.DataFrame:
         """
         インスタンスメソッド版：ファイルからフレーズを抽出
 
@@ -558,7 +643,7 @@ class PhraseExtracter:
         pi = np.ones(len(words))
         sentences = gen_sentences(num_sent, words, wnum_in_asent, pi)
 
-        print(sentences)
+        logger.debug(sentences)
 
         df = self.get_dfphrase(sentences)
         display(df)

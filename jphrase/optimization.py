@@ -1,4 +1,3 @@
-# coding:utf-8
 """
 最適化モジュール
 パラメータの自動最適化
@@ -9,10 +8,13 @@ __copyright__ = "Copyright 2023"
 
 import itertools
 import random
+import logging
 from typing import List, Dict, Any, Optional, Tuple
 import pandas as pd
 from .extracter import PhraseExtracter
 from .evaluation import UnsupervisedEvaluator, SupervisedEvaluator
+
+logger = logging.getLogger(__name__)
 
 
 class UnsupervisedOptimizer:
@@ -89,11 +91,11 @@ class UnsupervisedOptimizer:
         total = len(param_combinations)
 
         if self.verbose >= 1:
-            print(f"Grid Search: {total} combinations to try")
+            logger.info(f"Grid Search: {total} combinations to try")
 
         for idx, params in enumerate(param_combinations):
             if self.verbose >= 1:
-                print(f"[{idx+1}/{total}] Testing: {params}")
+                logger.info(f"[{idx+1}/{total}] Testing: {params}")
 
             try:
                 # フレーズ抽出
@@ -119,11 +121,11 @@ class UnsupervisedOptimizer:
                 results.append(result)
 
                 if self.verbose >= 1:
-                    print(f"  Score: {score:.4f}, Phrases: {len(df)}")
+                    logger.info(f"  Score: {score:.4f}, Phrases: {len(df)}")
 
             except Exception as e:
                 if self.verbose >= 1:
-                    print(f"  Error: {e}")
+                    logger.error(f"  Error: {e}")
                 continue
 
         # 最良結果を選択
@@ -133,8 +135,8 @@ class UnsupervisedOptimizer:
         best_result = max(results, key=lambda x: x['score'])
 
         if self.verbose >= 1:
-            print(f"\nBest params: {best_result['params']}")
-            print(f"Best score: {best_result['score']:.4f}")
+            logger.info(f"\nBest params: {best_result['params']}")
+            logger.info(f"Best score: {best_result['score']:.4f}")
 
         return best_result['params'], results
 
@@ -156,14 +158,14 @@ class UnsupervisedOptimizer:
         results = []
 
         if self.verbose >= 1:
-            print(f"Random Search: {n_iterations} iterations")
+            logger.info(f"Random Search: {n_iterations} iterations")
 
         for i in range(n_iterations):
             # ランダムにパラメータを選択
             params = self._sample_random_params()
 
             if self.verbose >= 1:
-                print(f"[{i+1}/{n_iterations}] Testing: {params}")
+                logger.info(f"[{i+1}/{n_iterations}] Testing: {params}")
 
             try:
                 # フレーズ抽出
@@ -189,11 +191,11 @@ class UnsupervisedOptimizer:
                 results.append(result)
 
                 if self.verbose >= 1:
-                    print(f"  Score: {score:.4f}, Phrases: {len(df)}")
+                    logger.info(f"  Score: {score:.4f}, Phrases: {len(df)}")
 
             except Exception as e:
                 if self.verbose >= 1:
-                    print(f"  Error: {e}")
+                    logger.error(f"  Error: {e}")
                 continue
 
         # 最良結果を選択
@@ -203,8 +205,8 @@ class UnsupervisedOptimizer:
         best_result = max(results, key=lambda x: x['score'])
 
         if self.verbose >= 1:
-            print(f"\nBest params: {best_result['params']}")
-            print(f"Best score: {best_result['score']:.4f}")
+            logger.info(f"\nBest params: {best_result['params']}")
+            logger.info(f"Best score: {best_result['score']:.4f}")
 
         return best_result['params'], results
 
@@ -284,11 +286,11 @@ class SupervisedOptimizer:
         total = len(param_combinations)
 
         if self.verbose >= 1:
-            print(f"Supervised Grid Search: {total} combinations to try")
+            logger.info(f"Supervised Grid Search: {total} combinations to try")
 
         for idx, params in enumerate(param_combinations):
             if self.verbose >= 1:
-                print(f"[{idx+1}/{total}] Testing: {params}")
+                logger.info(f"[{idx+1}/{total}] Testing: {params}")
 
             try:
                 # フレーズ抽出
@@ -312,11 +314,11 @@ class SupervisedOptimizer:
                 results.append(result)
 
                 if self.verbose >= 1:
-                    print(f"  {self.metric}: {scores[self.metric]:.4f}, Phrases: {len(df)}")
+                    logger.info(f"  {self.metric}: {scores[self.metric]:.4f}, Phrases: {len(df)}")
 
             except Exception as e:
                 if self.verbose >= 1:
-                    print(f"  Error: {e}")
+                    logger.error(f"  Error: {e}")
                 continue
 
         # 最良結果を選択
@@ -327,7 +329,7 @@ class SupervisedOptimizer:
 
         if self.verbose >= 1:
             print(f"\nBest params: {best_result['params']}")
-            print(f"Best {self.metric}: {best_result['score']:.4f}")
+            logger.info(f"Best {self.metric}: {best_result['score']:.4f}")
 
         return best_result['params'], results
 

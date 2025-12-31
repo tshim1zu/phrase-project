@@ -1,4 +1,3 @@
-# coding:utf-8
 """
 評価モジュール
 フレーズ抽出結果の品質を評価
@@ -11,6 +10,11 @@ import pandas as pd
 import numpy as np
 from typing import List, Dict, Optional
 from collections import Counter
+
+# 定数定義
+MAX_UNIQUE_CHARS_NORMALIZATION = 1000  # 文字多様性の正規化用
+IDEAL_PHRASE_LENGTH = 6  # 理想的なフレーズ長
+MAX_LENGTH_DEVIATION = 10  # 長さスコア計算用の最大偏差
 
 
 class UnsupervisedEvaluator:
@@ -110,7 +114,7 @@ class UnsupervisedEvaluator:
         total_chars = len(all_chars)
 
         # 正規化: 日本語は数千文字あるので、適度にスケーリング
-        diversity = unique_chars / min(total_chars, 1000)
+        diversity = unique_chars / min(total_chars, MAX_UNIQUE_CHARS_NORMALIZATION)
 
         return min(diversity, 1.0)
 
@@ -203,11 +207,8 @@ class UnsupervisedEvaluator:
         avg_length = np.mean([len(p) for p in phrases])
 
         # 理想的な長さを6文字として、それに近いほど高スコア
-        ideal_length = 6
-        max_deviation = 10
-
-        deviation = abs(avg_length - ideal_length)
-        score = max(0, 1 - deviation / max_deviation)
+        deviation = abs(avg_length - IDEAL_PHRASE_LENGTH)
+        score = max(0, 1 - deviation / MAX_LENGTH_DEVIATION)
 
         return score
 

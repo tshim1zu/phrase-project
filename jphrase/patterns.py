@@ -1,4 +1,3 @@
-# coding:utf-8
 """
 正規表現パターン定義モジュール
 """
@@ -43,9 +42,9 @@ def get_negative_patterns():
         "x_Gana": re.compile("[ぁ-ゖ]+"),  # ひらがなのみ
         "x_smalla": re.compile("[a-z* _.]+"),  # ほぼノイズ
         "x_start": re.compile("^[ンッー、んっ～。](.*)+"),
-        "x_Yen": re.compile(r"^\d+[千|万|億|兆]?円$"),
-        "x_Dollar": re.compile(r"^\d+[千|万|億|兆]?ドル$"),
-        "x_Euro": re.compile(r"^\d+[千|万|億|兆]?ユーロ$"),
+        "x_Yen": re.compile(r"^\d+(千|万|億|兆)?円$"),
+        "x_Dollar": re.compile(r"^\d+(千|万|億|兆)?ドル$"),
+        "x_Euro": re.compile(r"^\d+(千|万|億|兆)?ユーロ$"),
         "x_Phone": re.compile(r'((\d{2,4}|\(\d{2,4}\))(\s|-)(\d{3,4})(\s|-)(\d{4}))'),
         "x_Tel": re.compile(r'[(]?\d{2,4}[-)]?\d{2,4}-\d{3,4}'),
         "x_mobile": re.compile("0[789]0-[0-9]{4}-[0-9]{4}$"),
@@ -53,7 +52,7 @@ def get_negative_patterns():
         "x_url": re.compile(r'https?://[\w/:%#\$&\?\(\)~\.=\+\-]+'),
         "x_Num": re.compile(r"[\d,，]+"),  # 全半角数字
         "x_ymd": re.compile(r'\d{4}[-年/]\d{1,2}[-月/]\d{1,2}日?'),
-        "x_Num_ymd": re.compile(r"[\d]{1,4}[日|月|年]"),  # 全角数字の日付
+        "x_Num_ymd": re.compile(r"[\d]{1,4}(日|月|年)"),  # 全角数字の日付
     }
 
 
