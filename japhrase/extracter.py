@@ -8,7 +8,6 @@ __copyright__ = "Copyright 2023"
 import numpy as np
 import pandas as pd
 from collections import Counter
-from IPython.display import display
 import re
 import logging
 from typing import List, Dict, Any, Optional, Union
@@ -17,6 +16,17 @@ from .constants import DEFAULT_REMOVES, DEFAULT_UNNECESSARY
 from .patterns import get_positive_patterns, get_negative_patterns
 
 logger = logging.getLogger(__name__)
+
+# Lazy import to avoid circular dependency
+_similarity_analyzer = None
+
+def _get_similarity_analyzer():
+    """Get or create SimilarityAnalyzer instance (lazy initialization)"""
+    global _similarity_analyzer
+    if _similarity_analyzer is None:
+        from .similarity import SimilarityAnalyzer
+        _similarity_analyzer = SimilarityAnalyzer(method='levenshtein')
+    return _similarity_analyzer
 
 
 # Evidence-based presets from Optuna optimization experiments
@@ -366,29 +376,31 @@ class PhraseExtracter:
         return df_tmp[mask_similar]
 
     def similarity(self, seq_x: str, seq_y: str) -> float:
-        """レーベンシュタイン距離から類似性を計算"""
-        d = self.levenshtein(seq_x, seq_y)
-        seq_length = (len(seq_x) + len(seq_y)) / 2
-        d_ratio = d / seq_length
-        return 1 - d_ratio
+        """
+        レーベンシュタイン距離から類似性を計算
+
+        Note: This method delegates to SimilarityAnalyzer for optimized computation
+        """
+        analyzer = _get_similarity_analyzer()
+        return analyzer.similarity_levenshtein(seq_x, seq_y)
 
     def levenshtein(self, seq_x: str, seq_y: str) -> float:
-        """レーベンシュタイン距離を計算"""
-        size_x = len(seq_x) + 1
-        size_y = len(seq_y) + 1
-        matrix = np.zeros((size_x, size_y))
-        for x in range(size_x):
-            matrix[x, 0] = x
-        for y in range(size_y):
-            matrix[0, y] = y
+        """
+        レーベンシュタイン距離を計算
 
-        for x in range(1, size_x):
-            for y in range(1, size_y):
-                if seq_x[x-1] == seq_y[y-1]:
-                    matrix[x, y] = min(matrix[x-1, y] + 1, matrix[x-1, y-1], matrix[x, y-1] + 1)
-                else:
-                    matrix[x, y] = min(matrix[x-1, y] + 1, matrix[x-1, y-1] + 1, matrix[x, y-1] + 1)
-        return (matrix[size_x - 1, size_y - 1])
+        Note: This method delegates to SimilarityAnalyzer for optimized computation
+        """
+        try:
+            # Try to use python-Levenshtein if available
+            import Levenshtein
+            return float(Levenshtein.distance(seq_x, seq_y))
+        except ImportError:
+            # Fallback to pure Python implementation
+            analyzer = _get_similarity_analyzer()
+            # Calculate distance from similarity
+            similarity = analyzer.similarity_levenshtein(seq_x, seq_y)
+            seq_length = (len(seq_x) + len(seq_y)) / 2
+            return (1 - similarity) * seq_length
 
     def get_dfphrase(self, sentences: List[str]) -> pd.DataFrame:
         """
@@ -446,7 +458,8 @@ class PhraseExtracter:
                 df_toshow = df_concat\
                     .groupby(self.clm_seqchar, as_index=False).agg(dict_agg(df_concat))\
                     .sort_values(by=[self.clm_knowns, self.clm_sc], ascending=False)
-                display(df_toshow.iloc[:5, :5])
+                if self.verbose >= 1:
+                    logger.info(f"抽出されたフレーズ（上位5件）:\n{df_toshow.iloc[:5, :5].to_string()}")
 
         if not len(df_concat):
             if self.verbose >= 1:
@@ -772,8 +785,8 @@ class PhraseExtracter:
         logger.debug(sentences)
 
         df = self.get_dfphrase(sentences)
-        display(df)
-        return
+        logger.info(f"Test extraction completed:\n{df.head().to_string()}")
+        return df
 
 
 # 後方互換性のためのエイリアス
