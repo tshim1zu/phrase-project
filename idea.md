@@ -42,67 +42,57 @@
 
 ---
 
-## 新規アイデア（未実装）
+## 実装完了した追加機能 ✅
 
-「出尽くした」なんてことはありません。まだ**「執筆環境（エディタ）へのフィードバック」**や**「自動化（CI/CD）」**といった、よりエンジニアリング寄りの強力な活用法が残っています。
+さらに2つの強力な機能を実装しました：
 
-さらに4つの「ちょっとマニアックだが効果的なアイデア」を提案します。
-
-### 1. エディタ用「表記ゆれ修正辞書」の自動生成
-
-原稿を書いている最中にリアルタイムで表記ゆれを直したい場合、`japhrase` の出力結果を使って、VS Code などのエディタ用設定ファイルを自動生成してしまうのが手っ取り早いです。
-
-* **アイデア**: `SimilarityAnalyzer` で検出した「類似しているが異なるフレーズ（例: ユーザー / ユーザ）」のペアを、VS Code の「Code Spell Checker」や「置換辞書」の形式（JSONなど）に変換して出力する。
-* **メリット**:
-  * いちいち手動で検索置換しなくても、エディタが「これ、"ユーザー" じゃなくて "ユーザ" ですか？」と波線を出してくれるようになる。
-  * プロジェクトごとの「用語統一ルール」を、原稿から逆生成できる。
+### 1. ✅ エディタ用「表記ゆれ修正辞書」の自動生成
+**`EditorConfigGenerator` クラス**
+- SimilarityAnalyzerで類似フレーズペアを検出
+- VS Code用のJSON設定に自動変換
+- 置換ルールの自動生成機能
+- エディタ連携で表記ゆれを効率的に修正
 
 ```python
-# 概念コード: 類似ペアを見つけて VS Code 用の設定を吐き出す
-from japhrase import SimilarityAnalyzer
-import json
+from japhrase import PhraseExtracter, EditorConfigGenerator
 
-analyzer = SimilarityAnalyzer(method='levenshtein')
-# 原稿内の全フレーズ同士を比較して、表記ゆれっぽいペアを抽出
-pairs = analyzer.find_similar_pairs(phrase_list, threshold=0.8)
-
-# VS Code の settings.json 向けに整形（例: cSpell.words）
-vscode_settings = {
-    "cSpell.words": [p['item1'] for p in pairs]  # 辞書に追加すべき単語
-}
-print(json.dumps(vscode_settings, indent=2, ensure_ascii=False))
+extractor = PhraseExtracter()
+phrases_df = extractor.get_dfphrase(texts)
+generator = EditorConfigGenerator(phrases_df)
+generator.export_vscode_config("settings.json")
 ```
 
-### 2. GitHub Actions で「用語の新人検査」を自動化
+### 2. ✅ 過去原稿からの「セルフ・リコメンデーション」
+**`SelfRecommender` クラス**
+- 今の原稿から過去のコーパスを検索
+- 関連度が高い過去記事を自動発見
+- 共通フレーズを検出（重複回避、再利用支援）
+- 関連記事レポート自動生成
 
-もし原稿を GitHub/GitLab で管理しているなら、プルリクエスト（PR）を出した瞬間に、ボットが**「今回新しく登場した専門用語」**をコメントしてくれると便利です。
+```python
+from japhrase import SelfRecommender
 
-* **アイデア**: CI（GitHub Actions）で `japhrase` を走らせる。
-  1. `main` ブランチ（旧版）のフレーズリストを取得。
-  2. 今のPR（新版）のフレーズリストを取得。
-  3. **「新版にしか存在しないフレーズ（差分）」**を抽出し、PRに自動コメントする。
+recommender = SelfRecommender("past_articles/")
+related = recommender.find_related_articles(current_text, top_n=5)
+overlaps = recommender.find_overlapping_phrases(current_text)
+report = recommender.generate_recommendation_report(current_text)
+```
 
-* **メリット**:
-  * レビュアー（編集者や共著者）が、「お、今回は『量子コンピュータ』について加筆したんだな」と一瞬で把握できる。
-  * 意図しない造語や誤字が「新出単語」としてリストアップされるため、マージ前に気づける。
+---
 
-### 3. 「文体の指紋」をバージョン管理（最適化機能の逆利用）
+## 没にしたアイデア ❌
 
-`OPTIMIZATION.md` にある「パラメータ最適化機能」 を、本来の用途とは逆の使い方で利用します。
+### 1. ❌ GitHub Actions で「用語の新人検査」を自動化
+**判定理由**: japhrase の範疇外
+- japhraseがサポートするのはフレーズ比較までで十分
+- Git/GitHub API操作やCI/CDワークフローは、ユーザー側でカスタマイズ必要
+- 外部ツール化すべき（例: GitHub Actionsの別スクリプト）
 
-* **アイデア**: 自分の「理想の原稿」を使って `UnsupervisedOptimizer`（教師なし最適化）を定期的に走らせ、**「その時の自分に最適なパラメータ（min_count や max_length）」**を記録し続ける。
-* **何が分かるか**:
-  * パラメータの推移を見ることで、自分の文体が**「短文・単語重視（SNS的）」**になっているか、**「長文・文脈重視（論文的）」**になっているかが数値で可視化される。
-  * 「最近、文章がくどくなってきたな（最適な `max_length` が伸びている）」といった客観的な振り返りができる。
-
-### 4. 過去原稿からの「セルフ・リコメンデーション」
-
-過去に書いた膨大な原稿（ストック）を死蔵させないための仕組みです。
-
-* **アイデア**: 今書いている原稿から `japhrase` でキーワードを抽出し、それをクエリにして**過去の原稿フォルダ全体を検索**するスクリプトを作る。
-* **メリット**:
-  * 「あれ、この『依存性の注入』って話、3年前の記事でも書かなかったっけ？」という重複を回避できる。
-  * 逆に「あそこで書いたあの比喩、今回も使えるな」という再発見（自己引用）が捗る。
+### 2. ❌ 「文体の指紋」をバージョン管理（最適化機能の逆利用）
+**判定理由**: ドメイン特化的で一般性が低い
+- `UnsupervisedOptimizer`があればユーザー側で実装可能
+- パラメータ記録は簡単なスクリプトで十分
+- 「文体診断」としての実用性が限定的
 
 ---
 

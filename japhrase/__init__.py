@@ -31,6 +31,10 @@ from .writing_assistant import (
     RevisionHeatmap,
     RankingTrajectory
 )
+from .writing_tools import (
+    EditorConfigGenerator,
+    SelfRecommender
+)
 
 __all__ = [
     'PhraseExtracter',
@@ -54,4 +58,7 @@ __all__ = [
     'HabitDetector',
     'RevisionHeatmap',
     'RankingTrajectory',
+    # 執筆補助ツール
+    'EditorConfigGenerator',
+    'SelfRecommender',
 ]
