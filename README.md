@@ -397,11 +397,212 @@ MIT License
 
 Takeshi SHIMIZU
 
-## 貢献
-
-Issue や Pull Request は大歓迎です！
-
 ## 変更履歴
+
+### v0.1.4 - UX/DX大幅改善版 🚀
+
+**「エンジンから完成車へ」** - エンジン性能は変わらず、インターフェースを完全に刷新
+
+#### 📌 Phase 1: CLIツール化（スクリプト不要）
+
+インストール直後からターミナルで完結。Pythonコード不要。
+
+```bash
+# 基本分析
+japhrase extract input.txt
+japhrase analyze manuscript.txt --abstract abstract.txt
+
+# ユースケース駆動（最もシンプル）
+japhrase use-case academic_writing --body paper.txt --abstract abstract.txt
+japhrase use-case novel_revision --v1 draft1.txt --v2 draft2.txt
+
+# ワークフロー実行（複雑な処理）
+japhrase workflow workflow.yaml --parallel --max-workers 8
+
+# 品質チェック（Linter）
+japhrase check document.txt --config .japhrase.toml
+```
+
+**実装コマンド:**
+- `extract` - フレーズ抽出
+- `kwic` - KWIC逆引き検索
+- `check-divergence` - あらすじ vs 本文チェック
+- `detect-habits` - 個人の口癖検出
+- `analyze` - 統合分析レポート
+- `use-case` - ユースケース別ワークフロー
+- `use-case-list` - ユースケース一覧
+- `workflow` - YAMLワークフロー実行
+- `config` - 設定ファイル表示
+- `check` - 品質チェック（Linter）
+
+#### 📌 Phase 2: ワークフロー/パイプラインエンジン
+
+複数タスクを依存関係で管理。DAG検証、並列実行対応。
+
+```yaml
+# workflow.yaml
+name: "Complete Manuscript Check"
+tasks:
+  - id: extract_phrases
+    type: extract
+    input: manuscript.txt
+    output: results/phrases.csv
+
+  - id: check_divergence
+    type: check_divergence
+    inputs: [abstract.txt, manuscript.txt]
+    depends_on: [extract_phrases]
+
+  - id: detect_habits
+    type: detect_habits
+    input: manuscript.txt
+    depends_on: [extract_phrases]
+```
+
+```bash
+japhrase workflow workflow.yaml --parallel --max-workers 8
+```
+
+**実装クラス:**
+- `WorkflowDefinition` - YAML定義解析・検証
+- `WorkflowEngine` - DAG実行エンジン
+- `TaskRegistry` - タスク関数レジストリ
+- 循環依存検出、トポロジカルソート対応
+
+#### 📌 Phase 3: ユースケース駆動インターフェース
+
+「何をしたいか」を指定するだけ。プリセット自動適用。
+
+```bash
+# 学位論文の品質チェック
+japhrase use-case academic_writing --body thesis.txt --abstract abstract.txt --corpus past_papers/
+
+# 小説原稿の推敲分析
+japhrase use-case novel_revision --v1 draft1.txt --v2 draft2.txt --v3 draft3.txt
+
+# ブログ記事の最適化
+japhrase use-case blog_writing --body article.txt --corpus past_articles/
+
+# SNS投稿の表記統一
+japhrase use-case sns_content --body tweet.txt -o report.txt
+
+# 編集者向けチェック
+japhrase use-case editing --body manuscript.txt
+```
+
+**利用可能なユースケース:**
+- `academic_writing` - 学位論文・学術論文
+- `novel_revision` - 小説原稿推敲
+- `blog_writing` - ブログ記事執筆
+- `sns_content` - SNS投稿
+- `editing` - 編集者向けチェック
+
+#### 📌 Phase 4: 設定ファイル対応
+
+`.japhrase.toml` または `.japhrase.yml` をプロジェクトルートに配置。パラメータ毎回指定不要。
+
+```toml
+# .japhrase.toml
+[global]
+preset = "novel"
+
+[analysis]
+min_count = 5
+max_length = 20
+threshold_originality = 0.6
+
+[filter]
+ignore = ["zutto", "teki", "http"]
+knowns = ["character_name"]
+
+[check]
+forbidden_phrases = ["bad_word"]
+required_keywords = {"important" = 2}
+spelling_rules = {"standard" = ["variant"]}
+min_length = 100
+```
+
+```bash
+# 自動で .japhrase.toml を読み込む
+japhrase extract input.txt
+
+# CLIオプションで上書き（優先順位: CLI > ファイル）
+japhrase extract input.txt --min-count 20
+
+# 設定を表示
+japhrase config
+```
+
+**対応形式:**
+- `.japhrase.toml` (推奨)
+- `.japhrase.yml`
+- `japhrase.toml`
+- `japhrase.yml`
+- 自動探索: 現在ディレクトリから5階層上まで
+
+#### 📌 Phase 5: Linterモード（品質チェック）
+
+品質をテストとして検証。CI/CD統合対応。
+
+```bash
+japhrase check document.txt --config .japhrase.toml -o report.txt
+# Exit code: 0（成功）or 1（エラー検出）
+```
+
+**チェック機能:**
+- **禁止ワード検出** - 指定したワードの出現を検出
+- **必須キーワード確認** - 重要キーワードの不足を警告
+- **表記ゆれ検出** - 標準表記への統一を提案
+- **文書長チェック** - 最小/最大文字数の検証
+- **段落構成チェック** - 最小段落数の確認
+
+**設定例:**
+```toml
+[check]
+forbidden_phrases = ["古い表現", "非推奨"]
+required_keywords = {"必須" = 2, "キーワード" = 1}
+spelling_rules = {"ユーザー" = ["ユーザ"]}
+min_length = 100
+max_length = 5000
+min_paragraphs = 3
+```
+
+**メリット:**
+- GitHub Actions などの CI/CD に統合可能
+- プルリクエストで表記ゆれを防止
+- ドキュメント品質を自動保証
+
+#### 📊 テスト統計
+
+- **全テスト: 182個（100% 成功）**
+- Phase 1: 10個
+- Phase 2: 16個
+- Phase 3: 12個
+- Phase 4: 10個
+- Phase 5: 16個
+
+#### 📚 ドキュメント追加
+
+- [REVIEW_RESPONSE.md](docs/REVIEW_RESPONSE.md) - review.md への対応報告
+- [ARCHITECTURE_IMPROVEMENTS.md](docs/ARCHITECTURE_IMPROVEMENTS.md) - アーキテクチャ改善ガイド
+- [examples/workflows/README.md](examples/workflows/README.md) - ワークフロー使用ガイド
+
+#### 💾 新しいモジュール
+
+- `japhrase/cli.py` - CLIコマンド実装（Click）
+- `japhrase/workflow.py` - ワークフロー/DAGエンジン（networkx）
+- `japhrase/use_cases.py` - ユースケース駆動インターフェース
+- `japhrase/config.py` - 設定ファイル管理
+- `japhrase/checker.py` - 品質チェック（Linter）
+
+#### 📦 新しい依存関係
+
+- `click>=8.0.0` - CLI
+- `networkx>=2.6` - DAG
+- `PyYAML>=6.0` - YAML設定ファイル
+- `tomli` (Python <3.11) - TOML設定ファイル
+
+---
 
 ### v0.1.3
 - **エビデンスベースのプリセット機能**: Optunaで最適化された用途別パラメータ
