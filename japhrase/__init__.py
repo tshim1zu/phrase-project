@@ -43,6 +43,7 @@ from .workflow import (
     TaskResult,
     TaskStatus
 )
+from .use_cases import WritingWorkflow
 
 __all__ = [
     'PhraseExtracter',
@@ -76,4 +77,6 @@ __all__ = [
     'TaskDefinition',
     'TaskResult',
     'TaskStatus',
+    # ユースケース駆動インターフェース
+    'WritingWorkflow',
 ]

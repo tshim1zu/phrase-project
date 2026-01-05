@@ -20,6 +20,7 @@ from .writing_assistant import (
 )
 from .writing_tools import EditorConfigGenerator, SelfRecommender
 from .workflow import WorkflowDefinition, WorkflowEngine
+from .use_cases import WritingWorkflow
 from .utils import read_file, export_to_csv, export_to_json
 
 logger = logging.getLogger(__name__)
@@ -419,6 +420,89 @@ def version():
     """
     from . import __version__
     click.echo(f"japhrase version {__version__}")
+
+
+# ===== コマンド: use-case =====
+@cli.command(name='use-case')
+@click.argument('use_case', type=click.Choice([
+    'academic_writing', 'novel_revision', 'blog_writing', 'sns_content', 'editing'
+]))
+@click.option('--body', type=click.Path(exists=True), help='本文ファイル')
+@click.option('--abstract', type=click.Path(exists=True), help='あらすじファイル')
+@click.option('--v1', type=click.Path(exists=True), help='バージョン1（小説推敲用）')
+@click.option('--v2', type=click.Path(exists=True), help='バージョン2（小説推敲用）')
+@click.option('--v3', type=click.Path(exists=True), help='バージョン3（小説推敲用）')
+@click.option('--corpus', type=click.Path(exists=True), help='過去原稿ディレクトリ')
+@click.option('-o', '--output', type=click.Path(), help='レポート出力先')
+def use_case(use_case, body, abstract, v1, v2, v3, corpus, output):
+    """
+    ユースケース別ワークフローを実行
+
+    特定の執筆シナリオに最適化されたワークフローを実行します。
+
+    利用可能なユースケース:
+    \b
+    - academic_writing: 学位論文・学術論文の品質チェック
+    - novel_revision: 小説原稿の推敲
+    - blog_writing: ブログ記事の最適化
+    - sns_content: SNS投稿の表記統一
+    - editing: 編集者向けチェック
+
+    使用例:
+    \b
+        japhrase use-case academic_writing --body paper.txt --abstract abstract.txt
+        japhrase use-case novel_revision --v1 draft1.txt --v2 draft2.txt
+        japhrase use-case blog_writing --body article.txt --corpus past_articles/
+        japhrase use-case sns_content --body tweet.txt -o report.txt
+    """
+    try:
+        click.echo(f"📋 ユースケース: {use_case}", err=True)
+
+        # ワークフローを生成
+        workflow = WritingWorkflow.for_use_case(use_case)
+
+        # ワークフローを実行
+        report = workflow.run(
+            body_file=body,
+            abstract_file=abstract,
+            v1=v1,
+            v2=v2,
+            v3=v3,
+            past_corpus_dir=corpus,
+            output_dir='results'
+        )
+
+        # レポートを表示
+        click.echo(report)
+
+        # ファイル出力
+        if output:
+            with open(output, 'w', encoding='utf-8') as f:
+                f.write(report)
+            click.echo(f"\n💾 {output} に保存しました", err=True)
+
+        click.echo("\n✅ 分析完了", err=True)
+
+    except ValueError as e:
+        click.echo(f"❌ エラー: {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"❌ エラー: {e}", err=True)
+        sys.exit(1)
+
+
+@cli.command(name='use-case-list')
+def use_case_list():
+    """
+    利用可能なユースケース一覧を表示
+    """
+    click.echo("利用可能なユースケース:")
+    click.echo("=" * 70)
+
+    usecases = WritingWorkflow.list_usecases()
+    for use_case_id, description in usecases.items():
+        click.echo(f"\n[{use_case_id}]")
+        click.echo(f"  {description}")
 
 
 def main():
