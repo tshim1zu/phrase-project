@@ -45,6 +45,7 @@ from .workflow import (
 )
 from .use_cases import WritingWorkflow
 from .config import JaphraseConfig
+from .checker import QualityChecker
 
 __all__ = [
     'PhraseExtracter',
@@ -82,4 +83,6 @@ __all__ = [
     'WritingWorkflow',
     # 設定ファイル管理
     'JaphraseConfig',
+    # 品質チェック
+    'QualityChecker',
 ]

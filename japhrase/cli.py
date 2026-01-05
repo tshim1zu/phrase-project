@@ -22,6 +22,7 @@ from .writing_tools import EditorConfigGenerator, SelfRecommender
 from .workflow import WorkflowDefinition, WorkflowEngine
 from .use_cases import WritingWorkflow
 from .config import JaphraseConfig
+from .checker import QualityChecker
 from .utils import read_file, export_to_csv, export_to_json
 
 logger = logging.getLogger(__name__)
@@ -557,6 +558,65 @@ def config(file, show_defaults):
                 click.echo("min_count: 6")
                 click.echo("max_length: 16")
                 click.echo("threshold_originality: 0.5")
+
+    except Exception as e:
+        click.echo(f"❌ エラー: {e}", err=True)
+        sys.exit(1)
+
+
+# ===== コマンド: check =====
+@cli.command()
+@click.argument('input_file', type=click.Path(exists=True))
+@click.option('--config', type=click.Path(exists=True), help='設定ファイルパス (.toml/.yml)')
+@click.option('-o', '--output', type=click.Path(), help='レポート出力先')
+def check(input_file, config, output):
+    """
+    文書品質チェック（Linter モード）
+
+    設定ファイルのルールに基づいて文書品質をチェック。
+    - 禁止ワード検出
+    - 必須キーワード確認
+    - 表記ゆれ検出
+    - 文書長チェック
+    - 段落構成チェック
+
+    使用例:
+    \b
+        japhrase check document.txt --config .japhrase.toml
+        japhrase check document.txt --config .japhrase.toml -o report.txt
+    """
+    try:
+        # テキスト読み込み
+        texts = read_file(input_file, encoding='auto')
+        text = '\\n'.join(texts)
+        click.echo(f"📖 {len(texts)}行を読み込みました", err=True)
+
+        # 設定ファイル読み込み
+        cfg = JaphraseConfig(config)
+        if not cfg.config:
+            click.echo("❌ 設定ファイルが見つかりません", err=True)
+            sys.exit(1)
+
+        # チェッカー実行
+        click.echo("🔍 品質チェックを実行中...", err=True)
+        checker = QualityChecker(text, cfg.config)
+        success, errors, warnings = checker.run_all_checks()
+
+        # レポート表示
+        report = checker.get_report()
+        click.echo(report)
+
+        # ファイル出力
+        if output:
+            with open(output, 'w', encoding='utf-8') as f:
+                f.write(report)
+            click.echo(f"💾 {output} に保存しました", err=True)
+
+        # 結果に応じて終了コードを設定
+        if not success:
+            sys.exit(1)
+
+        click.echo("✅ チェック完了", err=True)
 
     except Exception as e:
         click.echo(f"❌ エラー: {e}", err=True)
