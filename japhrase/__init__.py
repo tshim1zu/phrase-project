@@ -24,6 +24,13 @@ from .patterns import get_positive_patterns, get_negative_patterns
 from .evaluation import UnsupervisedEvaluator, SupervisedEvaluator
 from .optimization import UnsupervisedOptimizer, SupervisedOptimizer
 from .similarity import SimilarityAnalyzer
+from .writing_assistant import (
+    KWICAnalyzer,
+    AbstractBodyChecker,
+    HabitDetector,
+    RevisionHeatmap,
+    RankingTrajectory
+)
 
 __all__ = [
     'PhraseExtracter',
@@ -41,4 +48,10 @@ __all__ = [
     'SupervisedOptimizer',
     # 類似度分析
     'SimilarityAnalyzer',
+    # 執筆支援ツール
+    'KWICAnalyzer',
+    'AbstractBodyChecker',
+    'HabitDetector',
+    'RevisionHeatmap',
+    'RankingTrajectory',
 ]
