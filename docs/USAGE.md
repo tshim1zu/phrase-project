@@ -253,6 +253,6 @@ extractor = PhraseExtracter(min_count=20)
 
 ## より詳しい情報
 
-- [README.md](README.md) - プロジェクト概要
+- [README.md](../README.md) - プロジェクト概要
 - [TESTING.md](TESTING.md) - テスト実行方法
-- [example.ipynb](jphrase/example.ipynb) - Jupyter Notebookサンプル
+- [example.ipynb](../examples/example.ipynb) - Jupyter Notebookサンプル

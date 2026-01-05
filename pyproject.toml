@@ -81,7 +81,7 @@ Documentation = "https://github.com/tshim1zu/phrase-project#readme"
 packages = ["japhrase"]
 
 [tool.setuptools.package-data]
-jphrase = ["py.typed"]
+japhrase = ["py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
