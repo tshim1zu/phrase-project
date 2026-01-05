@@ -44,6 +44,7 @@ from .workflow import (
     TaskStatus
 )
 from .use_cases import WritingWorkflow
+from .config import JaphraseConfig
 
 __all__ = [
     'PhraseExtracter',
@@ -79,4 +80,6 @@ __all__ = [
     'TaskStatus',
     # ユースケース駆動インターフェース
     'WritingWorkflow',
+    # 設定ファイル管理
+    'JaphraseConfig',
 ]

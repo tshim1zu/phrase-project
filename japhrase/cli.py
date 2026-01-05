@@ -21,6 +21,7 @@ from .writing_assistant import (
 from .writing_tools import EditorConfigGenerator, SelfRecommender
 from .workflow import WorkflowDefinition, WorkflowEngine
 from .use_cases import WritingWorkflow
+from .config import JaphraseConfig
 from .utils import read_file, export_to_csv, export_to_json
 
 logger = logging.getLogger(__name__)
@@ -45,37 +46,62 @@ def cli(ctx):
 @cli.command()
 @click.argument('input_file', type=click.Path(exists=True))
 @click.option('-o', '--output', type=click.Path(), help='出力ファイルパス (CSV/JSON)')
-@click.option('--preset', type=click.Choice(list(PRESETS.keys())), default='default',
-              help='フレーズ抽出プリセット')
+@click.option('--config', type=click.Path(exists=True), help='設定ファイルパス (.toml/.yml)')
+@click.option('--preset', type=click.Choice(list(PRESETS.keys())), help='フレーズ抽出プリセット')
 @click.option('--min-count', type=int, help='最小出現回数')
 @click.option('--max-length', type=int, help='最大フレーズ長')
 @click.option('--format', type=click.Choice(['csv', 'json', 'table']), default='table',
               help='出力形式')
 @click.option('-v', '--verbose', is_flag=True, help='詳細出力')
-def extract(input_file, output, preset, min_count, max_length, format, verbose):
+def extract(input_file, output, config, preset, min_count, max_length, format, verbose):
     """
     テキストファイルからフレーズを抽出
+
+    設定ファイルから自動読み込み対応。
+    コマンドラインオプションが設定ファイルの値を上書きします。
 
     使用例:
     \b
         japhrase extract input.txt --preset news
         japhrase extract input.txt -o output.csv --format csv
+        japhrase extract input.txt --config .japhrase.toml
     """
     try:
+        # 設定ファイルを読み込む
+        cfg = JaphraseConfig(config)
+        config_params = cfg.get_extractor_params()
+
         # ファイル読込
         texts = read_file(input_file, encoding='auto')
         click.echo(f"📖 {len(texts)}行を読み込みました", err=True)
 
+        # パラメータをマージ（CLIオプション > 設定ファイル）
+        final_params = config_params.copy()
+
+        if preset is not None:
+            final_params['preset'] = preset
+        if min_count is not None:
+            final_params['min_count'] = min_count
+        if max_length is not None:
+            final_params['max_length'] = max_length
+
         # PhraseExtracter 初期化
-        kwargs = {'preset': preset} if not min_count and not max_length else {}
-        if min_count or max_length:
-            extractor = PhraseExtracter(
-                min_count=min_count or 6,
-                max_length=max_length or 16,
-                verbose=1 if verbose else 0
-            )
+        if 'preset' in final_params and not min_count and not max_length:
+            extractor = PhraseExtracter.preset(final_params['preset'], verbose=1 if verbose else 0)
         else:
-            extractor = PhraseExtracter.preset(preset, verbose=1 if verbose else 0)
+            # デフォルト値を設定
+            if 'min_count' not in final_params:
+                final_params['min_count'] = 6
+            if 'max_length' not in final_params:
+                final_params['max_length'] = 16
+
+            extractor = PhraseExtracter(
+                verbose=1 if verbose else 0,
+                **{k: v for k, v in final_params.items() if k in [
+                    'min_count', 'max_length', 'min_length', 'threshold_originality',
+                    'weight_freq', 'weight_len', 'removes', 'knowns', 'unnecesary'
+                ]}
+            )
 
         # 抽出実行
         click.echo("🔍 フレーズを抽出中...", err=True)
@@ -503,6 +529,38 @@ def use_case_list():
     for use_case_id, description in usecases.items():
         click.echo(f"\n[{use_case_id}]")
         click.echo(f"  {description}")
+
+
+# ===== コマンド: config =====
+@cli.command()
+@click.option('--file', type=click.Path(exists=True), help='設定ファイルパス')
+@click.option('--show-defaults', is_flag=True, help='デフォルト値も表示')
+def config(file, show_defaults):
+    """
+    設定ファイルの内容を表示
+
+    使用例:
+    \b
+        japhrase config
+        japhrase config --file .japhrase.toml
+        japhrase config --show-defaults
+    """
+    try:
+        cfg = JaphraseConfig(file)
+
+        if cfg.config:
+            click.echo(cfg.display_config())
+        else:
+            click.echo("アクティブな設定ファイルが見つかりません", err=True)
+            if show_defaults:
+                click.echo("\n=== デフォルト設定 ===")
+                click.echo("min_count: 6")
+                click.echo("max_length: 16")
+                click.echo("threshold_originality: 0.5")
+
+    except Exception as e:
+        click.echo(f"❌ エラー: {e}", err=True)
+        sys.exit(1)
 
 
 def main():
