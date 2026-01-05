@@ -19,6 +19,7 @@ from .writing_assistant import (
     RankingTrajectory
 )
 from .writing_tools import EditorConfigGenerator, SelfRecommender
+from .workflow import WorkflowDefinition, WorkflowEngine
 from .utils import read_file, export_to_csv, export_to_json
 
 logger = logging.getLogger(__name__)
@@ -312,6 +313,87 @@ def analyze(input_file, abstract, corpus_dir, output, preset):
 
     except Exception as e:
         click.echo(f"❌ エラー: {e}", err=True)
+        sys.exit(1)
+
+
+# ===== コマンド: workflow =====
+@cli.command()
+@click.argument('workflow_file', type=click.Path(exists=True))
+@click.option('--parallel', is_flag=True, help='タスクを並列実行')
+@click.option('--max-workers', type=int, default=4, help='並列実行時のワーカー数')
+@click.option('-o', '--output', type=click.Path(), help='レポート出力先')
+@click.option('-v', '--verbose', is_flag=True, help='詳細出力')
+def workflow(workflow_file, parallel, max_workers, output, verbose):
+    """
+    YAMLで定義されたワークフローを実行
+
+    ワークフロー定義ファイルに複数のタスクを記述し、
+    依存関係を自動的に解決しながら順序実行または並列実行します。
+
+    使用例:
+    \b
+        japhrase workflow manuscript.yaml
+        japhrase workflow manuscript.yaml --parallel --max-workers 8
+        japhrase workflow manuscript.yaml -o report.txt
+    """
+    try:
+        click.echo(f"📋 ワークフローを読込中: {workflow_file}", err=True)
+
+        # ワークフロー定義を読込
+        wf = WorkflowDefinition.from_yaml(workflow_file)
+
+        click.echo(f"✅ ワークフロー「{wf.name}」をロードしました", err=True)
+        click.echo(f"   タスク数: {len(wf.tasks)}個", err=True)
+
+        # ワークフロー検証
+        valid, errors = wf.validate()
+        if not valid:
+            click.echo(f"❌ ワークフロー検証エラー:", err=True)
+            for error in errors:
+                click.echo(f"   - {error}", err=True)
+            sys.exit(1)
+
+        # 実行順序を表示
+        execution_order = wf.get_execution_order()
+        click.echo(f"📊 実行順序: {' → '.join(execution_order)}", err=True)
+
+        # ワークフロー実行
+        if parallel:
+            click.echo(f"🚀 並列実行を開始します (ワーカー数: {max_workers})...", err=True)
+        else:
+            click.echo("🚀 順序実行を開始します...", err=True)
+
+        engine = WorkflowEngine()
+        results = engine.execute(wf, parallel=parallel, max_workers=max_workers)
+
+        # レポート生成
+        report = engine.get_report()
+        click.echo(report)
+
+        # ファイル出力
+        if output:
+            with open(output, 'w', encoding='utf-8') as f:
+                f.write(report)
+            click.echo(f"\n💾 {output} に保存しました", err=True)
+
+        # 完了状況をチェック
+        completed = sum(1 for r in results.values() if r.status.value == 'completed')
+        failed = sum(1 for r in results.values() if r.status.value == 'failed')
+
+        if failed > 0:
+            click.echo(f"\n⚠️ {completed}/{len(results)}個のタスクが完了しました", err=True)
+            sys.exit(1)
+        else:
+            click.echo(f"\n✅ すべてのタスクが正常に完了しました", err=True)
+
+    except FileNotFoundError as e:
+        click.echo(f"❌ ファイルが見つかりません: {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"❌ エラー: {e}", err=True)
+        if verbose:
+            import traceback
+            traceback.print_exc()
         sys.exit(1)
 
 

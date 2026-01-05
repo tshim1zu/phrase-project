@@ -35,6 +35,14 @@ from .writing_tools import (
     EditorConfigGenerator,
     SelfRecommender
 )
+from .workflow import (
+    WorkflowDefinition,
+    WorkflowEngine,
+    TaskRegistry,
+    TaskDefinition,
+    TaskResult,
+    TaskStatus
+)
 
 __all__ = [
     'PhraseExtracter',
@@ -61,4 +69,11 @@ __all__ = [
     # 執筆補助ツール
     'EditorConfigGenerator',
     'SelfRecommender',
+    # ワークフロー/パイプライン
+    'WorkflowDefinition',
+    'WorkflowEngine',
+    'TaskRegistry',
+    'TaskDefinition',
+    'TaskResult',
+    'TaskStatus',
 ]
