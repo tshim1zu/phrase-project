@@ -108,6 +108,10 @@ class PhraseExtracter:
         verbose=1,
         positive=None,
         negative=None,
+        use_pmi=False,
+        use_branching_entropy=False,
+        pmi_weight=1.0,
+        entropy_weight=1.0,
     ):
         """
         Parameters:
@@ -125,6 +129,10 @@ class PhraseExtracter:
             verbose (int): 進捗表示レベル
             positive (dict): ポジティブフィルター（Noneの場合はデフォルト使用）
             negative (dict): ネガティブフィルター（Noneの場合はデフォルト使用）
+            use_pmi (bool): PMI（自己相互情報量）を使用するかどうか
+            use_branching_entropy (bool): 分岐エントロピーを使用するかどうか
+            pmi_weight (float): PMIの重み係数
+            entropy_weight (float): エントロピーの重み係数
         """
         self.min_count = min_count
         self.weight_freq = weight_freq
@@ -140,6 +148,10 @@ class PhraseExtracter:
         self.verbose = verbose
         self.positive_filter = positive if positive is not None else get_positive_patterns()
         self.negative_filter = negative if negative is not None else get_negative_patterns()
+        self.use_pmi = use_pmi
+        self.use_branching_entropy = use_branching_entropy
+        self.pmi_weight = pmi_weight
+        self.entropy_weight = entropy_weight
 
     def make_ngrampieces(self, sentences: List[str]) -> List[str]:
         """文章リストからN-gramフレーズを生成"""
@@ -205,10 +217,148 @@ class PhraseExtracter:
         })
         return df
 
+    def calculate_pmi(self, phrases: List[str], all_text: str) -> Dict[str, float]:
+        """
+        PMI (Pointwise Mutual Information) を計算
+
+        PMI(phrase) = log(P(phrase) / product(P(char_i)))
+
+        高いPMI = 文字の結合度が強い (例: "機械学習")
+        低いPMI = 単なる組み合わせ (例: "ていう")
+
+        Parameters:
+            phrases: フレーズのリスト
+            all_text: 全テキスト（文字確率計算用）
+
+        Returns:
+            Dict[phrase: pmi_score]
+        """
+        if not phrases or not all_text:
+            return {}
+
+        # 全文字の出現頻度をカウント
+        char_counter = Counter(all_text)
+        total_chars = len(all_text)
+
+        pmi_scores = {}
+
+        for phrase in phrases:
+            # フレーズの出現回数（大まかな推定）
+            phrase_count = all_text.count(phrase)
+            if phrase_count == 0:
+                pmi_scores[phrase] = 0.0
+                continue
+
+            # フレーズの確率
+            p_phrase = phrase_count / (total_chars - len(phrase) + 1)
+
+            # 各文字の確率の積を計算
+            p_chars_product = 1.0
+            for char in phrase:
+                p_char = char_counter.get(char, 1) / total_chars
+                p_chars_product *= p_char
+
+            # PMI = log(P(phrase) / product(P(char)))
+            if p_chars_product > 0:
+                pmi = np.log(p_phrase / p_chars_product) if p_phrase > 0 else 0.0
+                pmi_scores[phrase] = float(np.clip(pmi, -10, 10))  # 数値安定性のためクリップ
+            else:
+                pmi_scores[phrase] = 0.0
+
+        return pmi_scores
+
+    def calculate_branching_entropy(self, sentences: List[str], phrases: List[str]) -> Dict[str, tuple]:
+        """
+        分岐エントロピー (Branching Entropy) を計算
+
+        BE = -sum(p(x) * log(p(x)))
+
+        高いBE = 多様な文字が続く = 単語境界の可能性大
+        低いBE = 特定文字しか来ない = 単語の途中
+
+        Parameters:
+            sentences: センテンスのリスト
+            phrases: フレーズのリスト
+
+        Returns:
+            Dict[phrase: (left_entropy, right_entropy, boundary_score)]
+        """
+        if not phrases or not sentences:
+            return {}
+
+        # テキストを結合
+        all_text = "".join(sentences)
+
+        entropy_scores = {}
+
+        for phrase in phrases:
+            if len(phrase) == 0:
+                entropy_scores[phrase] = (0.0, 0.0, 0.0)
+                continue
+
+            # フレーズの前後の文字を収集
+            left_chars = []
+            right_chars = []
+
+            for i, char in enumerate(all_text):
+                if all_text[i:i+len(phrase)] == phrase:
+                    # 左側の文字
+                    if i > 0:
+                        left_chars.append(all_text[i - 1])
+                    # 右側の文字
+                    if i + len(phrase) < len(all_text):
+                        right_chars.append(all_text[i + len(phrase)])
+
+            # 左側のエントロピーを計算
+            left_entropy = 0.0
+            if left_chars:
+                left_counter = Counter(left_chars)
+                left_total = len(left_chars)
+                for count in left_counter.values():
+                    p = count / left_total
+                    if p > 0:
+                        left_entropy -= p * np.log(p)
+
+            # 右側のエントロピーを計算
+            right_entropy = 0.0
+            if right_chars:
+                right_counter = Counter(right_chars)
+                right_total = len(right_chars)
+                for count in right_counter.values():
+                    p = count / right_total
+                    if p > 0:
+                        right_entropy -= p * np.log(p)
+
+            # 境界スコア = min(left_entropy, right_entropy)
+            # エントロピーが高いほど、異なる文字が続く = 単語境界
+            # スコアを0-1の範囲に正規化（最大エントロピーは log(26) ≈ 3.26）
+            max_entropy = np.log(256)  # 最大256個の異なる文字
+            boundary_score = (min(left_entropy, right_entropy) if (left_entropy > 0 or right_entropy > 0) else 0.0) / max_entropy
+            boundary_score = np.clip(boundary_score, 0.0, 1.0)
+
+            entropy_scores[phrase] = (
+                float(left_entropy),
+                float(right_entropy),
+                float(boundary_score)
+            )
+
+        return entropy_scores
+
     def hold_higherrank(self, df: pd.DataFrame) -> pd.DataFrame:
         """情報量でソートして包含関係にある下位フレーズを除外"""
-        df[self.clm_sc] = self.weight_freq * np.log(1 + df[self.clm_freq].astype(float)) \
+        # 基本スコアを計算
+        base_score = self.weight_freq * np.log(1 + df[self.clm_freq].astype(float)) \
               + self.weight_len * np.log(df[self.clm_length].astype(float))
+
+        # PMIを適用
+        if self.use_pmi and "pmi" in df.columns:
+            base_score = base_score * (1 + self.pmi_weight * df["pmi"])
+
+        # 分岐エントロピーを適用
+        if self.use_branching_entropy and "boundary_score" in df.columns:
+            base_score = base_score * (1 + self.entropy_weight * df["boundary_score"])
+
+        df[self.clm_sc] = base_score
 
         df[self.clm_knowns] = df[self.clm_seqchar].astype(str).apply(lambda x: x in self.knowns)
         df = df.sort_values(by=[self.clm_knowns, self.clm_sc], ascending=False).reset_index()
@@ -334,6 +484,20 @@ class PhraseExtracter:
 
         if not len(df_concat):
             return df_concat
+
+        # PMI計算を追加
+        if self.use_pmi:
+            all_text = "".join(sentences)
+            pmi_scores = self.calculate_pmi(df_concat[self.clm_seqchar].tolist(), all_text)
+            df_concat["pmi"] = df_concat[self.clm_seqchar].map(pmi_scores).fillna(0.0)
+
+        # 分岐エントロピー計算を追加
+        if self.use_branching_entropy:
+            entropy_scores = self.calculate_branching_entropy(sentences, df_concat[self.clm_seqchar].tolist())
+            df_concat[["left_entropy", "right_entropy", "boundary_score"]] = pd.DataFrame(
+                [entropy_scores.get(phrase, (0.0, 0.0, 0.0)) for phrase in df_concat[self.clm_seqchar]],
+                index=df_concat.index
+            )
 
         df_sorted = self.hold_higherrank(df_concat)
         df_sorted = self.exclude_unnecessary(df_sorted)

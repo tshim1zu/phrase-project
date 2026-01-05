@@ -604,6 +604,108 @@ min_paragraphs = 3
 
 ---
 
+### v0.1.5 - 統計的スコアリング強化版 📊
+
+**統計的手法でスコアリングを極限まで強化** - ideas.mdの提案を実装
+
+#### 🎯 新機能: PMI（自己相互情報量）
+
+PMI（Pointwise Mutual Information）を導入し、文字の結合度を統計的に評価
+
+```python
+from japhrase import PhraseExtracter
+
+# PMIを有効化
+extractor = PhraseExtracter(
+    min_count=5,
+    use_pmi=True,     # ← PMI有効
+    pmi_weight=1.0    # PMI重み係数
+)
+
+df = extractor.extract("input.txt")
+```
+
+**効果:**
+- ✅ 「機械学習」「ニューラルネットワーク」など結合度が高い専門用語を上位に
+- ❌ 「ていう」「みたいな」など単なる組み合わせを下位に
+- **PMI計算**: `log(P(phrase) / product(P(char_i)))`
+
+#### 🎯 新機能: 分岐エントロピー（Branching Entropy）
+
+単語境界を統計的に推定し、フレーズの信頼度を判定
+
+```python
+# 分岐エントロピーを有効化
+extractor = PhraseExtracter(
+    min_count=5,
+    use_branching_entropy=True,  # ← BE有効
+    entropy_weight=1.0           # エントロピー重み係数
+)
+
+df = extractor.extract("input.txt")
+```
+
+**効果:**
+- ✅ 「機械学習」のように前後で異なる文字が来る（高エントロピー）→ 単語境界と判定
+- ❌ 「機械学」のように後ろに「習」しか来ない（低エントロピー）→ 単語途中と判定
+- **エントロピー計算**: `-sum(p(x) * log(p(x)))`
+
+#### 💡 両方を組み合わせた「最強」設定
+
+```python
+# PMI + 分岐エントロピー両方有効（統計ガチ勢向け）
+extractor = PhraseExtracter(
+    min_count=5,
+    max_length=16,
+    use_pmi=True,
+    use_branching_entropy=True,
+    pmi_weight=1.0,
+    entropy_weight=1.0
+)
+
+df = extractor.extract("input.txt")
+# スコア計算: 基本スコア × (1 + pmi) × (1 + boundary_score)
+```
+
+#### 📈 実装統計
+
+- **新テストファイル**: `tests/test_statistical_scoring.py` (21テスト)
+- **新メソッド**: `calculate_pmi()`, `calculate_branching_entropy()`
+- **拡張メソッド**: `hold_higherrank()` (PMI/BE統合スコアリング)
+- **全テスト**: 203個（182 既存 + 21 新規）
+
+#### ⚙️ パラメータ説明
+
+```python
+PhraseExtracter(
+    use_pmi=False,              # PMI使用（デフォルト: False）
+    use_branching_entropy=False, # 分岐エントロピー使用（デフォルト: False）
+    pmi_weight=1.0,             # PMI重み係数（デフォルト: 1.0）
+    entropy_weight=1.0,         # エントロピー重み係数（デフォルト: 1.0）
+    # その他既存パラメータは変更なし
+)
+```
+
+**後方互換性**: デフォルトではPMI/BEを使用しないため、既存コードへの影響なし
+
+#### 🧪 テスト内容
+
+- **PMI計算テスト**: 結合度の高低、数値安定性
+- **エントロピー計算テスト**: 単語境界、単語途中、正規化
+- **統合テスト**: PMI/BE両方有効時のスコアリング
+- **互換性テスト**: 既存機能との干渉なし
+- **エッジケース**: 空入力、長文、特殊文字、Unicode
+
+#### 📖 理論背景
+
+ideas.md の以下の提案を実装：
+- 「隣接種類数」と「分岐エントロピー」の導入 (精度強化)
+- スコアリング関数の統計的刷新 (PMI導入)
+
+詳細は [docs/ideas.md](docs/ideas.md) を参照してください。
+
+---
+
 ### v0.1.3
 - **エビデンスベースのプリセット機能**: Optunaで最適化された用途別パラメータ
   - `PhraseExtracter.preset('sns')` でSNS向け最適パラメータを使用
