@@ -12,9 +12,11 @@ SNSトレンド分析、ニュース話題抽出、頻出キーワード発見�
 詳細は POSITIONING.md を参照してください。
 """
 
-__version__ = "0.1.5"
+__version__ = "0.1.3"
 __author__ = "Takeshi SHIMIZU"
-__copyright__ = "Copyright 2023"
+__copyright__ = "Copyright 2023-2026"
+__license__ = "MIT"
+__email__ = "shim1zu@hotmail.com"
 
 from .extracter import PhraseExtracter, extracter, PRESETS
 from .constants import FIRST_KANJI, DEFAULT_REMOVES, DEFAULT_UNNECESSARY
@@ -24,6 +26,8 @@ from .patterns import get_positive_patterns, get_negative_patterns
 from .evaluation import UnsupervisedEvaluator, SupervisedEvaluator
 from .optimization import UnsupervisedOptimizer, SupervisedOptimizer
 from .similarity import SimilarityAnalyzer
+from .segmenter import TextSegmenter, segment_text
+from .comparison_analyzer import ComparisonAnalyzer
 from .writing_assistant import (
     KWICAnalyzer,
     AbstractBodyChecker,
@@ -63,6 +67,11 @@ __all__ = [
     'SupervisedOptimizer',
     # 類似度分析
     'SimilarityAnalyzer',
+    # テキストセグメンテーション
+    'TextSegmenter',
+    'segment_text',
+    # 差分分析（ComfyUI最適化用）
+    'ComparisonAnalyzer',
     # 執筆支援ツール
     'KWICAnalyzer',
     'AbstractBodyChecker',

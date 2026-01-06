@@ -292,3 +292,4 @@ jphrase は頻出フレーズ検出ツールです
 - [THEORY.md](THEORY.md) - 理論的考察と限界
 - [USAGE.md](USAGE.md) - 使い方ガイド
 - [OPTIMIZATION.md](OPTIMIZATION.md) - パラメータ最適化
+- [SEGMENTER.md](SEGMENTER.md) - テキストセグメンテーション機能ガイド（新機能）

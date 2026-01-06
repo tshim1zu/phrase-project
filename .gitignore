@@ -16,21 +16,33 @@ parts/
 sdist/
 var/
 wheels/
+pip-wheel-metadata/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
 # Virtual environments
 venv/
 env/
 ENV/
 .venv
+.test-venv/
 
 # Testing
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
 .tox/
+.nox/
+nosetests.xml
+coverage.xml
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
 
 # IDEs
 .vscode/
@@ -44,17 +56,31 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Data files
-*.csv
-*.tsv
-*.txt
+# Build/Distribution
+*.whl
+*.tar.gz
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Project specific
+.experiments/
+results/
 !requirements*.txt
 !LICENSE.txt
+
+# Data files (CSV, Excel)
+*.csv
 *.xls
 *.xlsx
+
+# JSON (but keep config files)
 *.json
 !package.json
 !pyproject.toml
+
+# Test files (temporary/sample data)
+test_phrases.csv
+test_workflow_sample.txt
 
 # Jupyter
 .ipynb_checkpoints/

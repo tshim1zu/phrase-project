@@ -1,9 +1,11 @@
 """
-setup.py - Kept for backward compatibility
-Modern configuration is in pyproject.toml
-"""
-from setuptools import setup
+This file is no longer used.
+All configuration is in pyproject.toml
 
-# Configuration is now in pyproject.toml
-# This file is kept for backward compatibility
-setup()
+To install in development mode:
+    pip install -e .
+
+To build:
+    pip install build
+    python -m build
+"""
