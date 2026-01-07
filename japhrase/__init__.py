@@ -50,6 +50,7 @@ from .workflow import (
 from .use_cases import WritingWorkflow
 from .config import JaphraseConfig
 from .checker import QualityChecker
+from .summarizer import Summarizer
 
 __all__ = [
     'PhraseExtracter',
@@ -94,4 +95,6 @@ __all__ = [
     'JaphraseConfig',
     # 品質チェック
     'QualityChecker',
+    # 統計的要約
+    'Summarizer',
 ]

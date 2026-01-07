@@ -24,7 +24,7 @@ df = PhraseExtracter().extract(texts)
 
 - 📊 **統計的スコアリング**: PMI（自己相互情報量）と分岐エントロピーで精度向上
 - 🎯 **エビデンスベースプリセット**: Optunaで最適化された用途別設定
-- 🔍 **ComfyUI プロンプト最適化** ⭐ NEW: Good/Bad の比較から最適要素を自動抽出
+- 🔍 **プロンプト比較分析** ⭐ NEW: Good/Bad の比較から成功テンプレート・失敗パターンを自動抽出
 - 📁 **複数形式対応**: TXT、CSV、TSV、Excel
 - 🔤 **エンコーディング自動検出**: UTF-8、Shift-JIS など自動判別
 - ⚡ **高速処理**: N-gramベースの効率的アルゴリズム
@@ -36,10 +36,7 @@ df = PhraseExtracter().extract(texts)
 # 基本機能
 pip install japhrase
 
-# ComfyUI プロンプト最適化機能も使う場合
-pip install japhrase[comfy]
-
-# 全機能（類似度分析含む）
+# 全機能（プロンプト分析含む）
 pip install japhrase[all]
 
 # 開発環境
@@ -50,29 +47,26 @@ pip install -e ".[dev]"
 
 | ドキュメント | 内容 |
 |-----------|------|
-| **[COMFY_OPTIMIZATION.md](docs/COMFY_OPTIMIZATION.md)** | **ComfyUI プロンプト最適化ガイド（NEW!）** |
-| [USAGE.md](docs/USAGE.md) | 詳細な使用ガイド |
+| **[USAGE.md](docs/USAGE.md)** | **詳細な使用ガイド** |
 | [API_REFERENCE.md](docs/API_REFERENCE.md) | API リファレンス |
 | [POSITIONING.md](docs/POSITIONING.md) | 設計思想と位置づけ |
+| [CHANGELOG.md](docs/CHANGELOG.md) | 変更履歴 |
 | [DEVELOPMENT.md](docs/DEVELOPMENT.md) | 開発者ガイド |
 
 ## 🎯 用途別ガイド
 
-### ComfyUI プロンプト最適化（NEW!）
+### プロンプト比較分析
 
-Good と Bad のプロンプトを比較して、最適な要素を自動抽出：
+Good と Bad のプロンプトを比較して、成功テンプレートと失敗パターンを抽出：
 
 ```bash
 python scripts/run_comfy_analysis.py \
   --good good_prompts.txt \
   --bad bad_prompts.txt \
-  --comfy-format \
   --top-n 10
 ```
 
-**出力:** Must Use / Must Avoid タグ
-
-詳細は [COMFY_OPTIMIZATION.md](docs/COMFY_OPTIMIZATION.md) を参照
+詳細は [USAGE.md](docs/USAGE.md) を参照
 
 ### テキスト分析
 
@@ -113,7 +107,7 @@ pytest --cov=japhrase
 japhrase/
 ├── __init__.py
 ├── extracter.py           # メインのフレーズ抽出クラス
-├── comparison_analyzer.py  # ComfyUI 分析（NEW!）
+├── comparison_analyzer.py  # プロンプト比較分析
 ├── similarity.py          # 類似度分析
 ├── patterns.py            # 正規表現パターン
 ├── config.py              # 設定管理
@@ -122,14 +116,13 @@ japhrase/
 └── ...
 
 docs/
-├── COMFY_OPTIMIZATION.md  # ComfyUI ガイド（NEW!）
 ├── API_REFERENCE.md       # API リファレンス
 ├── USAGE.md               # 詳細ガイド
 ├── POSITIONING.md         # 設計思想
 └── ...
 
 scripts/
-├── run_comfy_analysis.py  # ComfyUI 分析実行スクリプト
+├── run_comfy_analysis.py  # プロンプト比較実行スクリプト
 ├── generate_comfy_toy_dataset.py
 └── ...
 ```
@@ -151,6 +144,6 @@ Takeshi SHIMIZU
 ---
 
 **📍 次に読むドキュメント:**
-- ComfyUI を使う方: [COMFY_OPTIMIZATION.md](docs/COMFY_OPTIMIZATION.md)
 - 詳細な使い方: [USAGE.md](docs/USAGE.md)
 - 設計思想を知りたい: [POSITIONING.md](docs/POSITIONING.md)
+- 開発に参加したい: [DEVELOPMENT.md](docs/DEVELOPMENT.md)

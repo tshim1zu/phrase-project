@@ -1,8 +1,7 @@
 """
-ComfyUI プロンプト最適化実行スクリプト
+プロンプト最適化実行スクリプト
 
-Good/Bad プロンプト群を比較して、成功要因・失敗要因を分析します。
-実際のプロンプト最適化に使用できます。
+Good/Bad プロンプト群を比較して、成功テンプレート・失敗パターンを分析します。
 """
 
 import argparse
@@ -39,7 +38,7 @@ def analyze_prompt_quality(good_file: Path, bad_file: Path, output_dir: Path = N
     output_dir.mkdir(parents=True, exist_ok=True)
     
     logger.info("=" * 60)
-    logger.info("ComfyUI プロンプト最適化分析")
+    logger.info("プロンプト最適化分析")
     logger.info("=" * 60)
     logger.info(f"Good: {good_file}")
     logger.info(f"Bad: {bad_file}")

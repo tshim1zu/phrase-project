@@ -88,7 +88,7 @@ japhrase/
 ├── __init__.py                 # パッケージ初期化
 ├── extracter.py                # PhraseExtracter メインクラス
 ├── checker.py                  # テキスト処理（分かち書き等）
-├── comparison_analyzer.py       # ComfyUI 用プロンプト比較分析（NEW）
+├── comparison_analyzer.py       # プロンプト比較分析
 ├── similarity.py               # 類似度分析（SimilarityAnalyzer）
 ├── patterns.py                 # 正規表現パターン定義
 ├── config.py                   # 設定管理
@@ -114,12 +114,11 @@ tests/
 └── ... (その他テスト)
 
 scripts/
-├── run_comfy_analysis.py       # ComfyUI プロンプト比較実行スクリプト
+├── run_comfy_analysis.py       # プロンプト比較実行スクリプト
 ├── generate_comfy_toy_dataset.py  # テストデータセット生成
 └── ... (その他スクリプト)
 
 docs/
-├── README.md                   # メインドキュメント
 ├── COMFY_OPTIMIZATION.md       # ComfyUI ガイド（NEW!）
 ├── API_REFERENCE.md            # API リファレンス
 ├── USAGE.md                    # 詳細な使用ガイド
@@ -152,7 +151,7 @@ docs/
    - スコアでランキング
    - 複数フォーマットで出力（CSV、JSON、Excel、DataFrameなど）
 
-### ComfyUI プロンプト最適化（NEW!）
+### プロンプト比較分析
 
 Good と Bad のテキストコーパスを比較し、最適化要素を抽出：
 
