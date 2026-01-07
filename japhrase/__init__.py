@@ -12,7 +12,7 @@ SNSトレンド分析、ニュース話題抽出、頻出キーワード発見�
 詳細は POSITIONING.md を参照してください。
 """
 
-__version__ = "0.1.3"
+__version__ = "0.2.0"
 __author__ = "Takeshi SHIMIZU"
 __copyright__ = "Copyright 2023-2026"
 __license__ = "MIT"
@@ -51,6 +51,7 @@ from .use_cases import WritingWorkflow
 from .config import JaphraseConfig
 from .checker import QualityChecker
 from .summarizer import Summarizer
+from .cooccurrence import CooccurrenceAnalyzer
 
 __all__ = [
     'PhraseExtracter',
@@ -97,4 +98,6 @@ __all__ = [
     'QualityChecker',
     # 統計的要約
     'Summarizer',
+    # 共起語分析
+    'CooccurrenceAnalyzer',
 ]

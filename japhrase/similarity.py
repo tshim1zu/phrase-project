@@ -90,16 +90,8 @@ class SimilarityAnalyzer:
         Returns:
             float: 類似度（0.0-1.0）
         """
-        try:
-            import Levenshtein
-            distance = Levenshtein.distance(text1, text2)
-        except ImportError:
-            # python-Levenshteinがない場合は自前実装を使用
-            logger.warning(
-                "python-Levenshtein が見つかりません。純粋Python実装を使用します（遅い）。"
-                "高速化のため 'pip install python-Levenshtein' を推奨します。"
-            )
-            distance = self._levenshtein_pure_python(text1, text2)
+        import Levenshtein
+        distance = Levenshtein.distance(text1, text2)
 
         max_len = max(len(text1), len(text2))
         if max_len == 0:
