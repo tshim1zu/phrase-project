@@ -250,9 +250,16 @@ def export_to_json(df: pd.DataFrame, filepath: str, encoding: str = 'utf-8'):
     Parameters:
         df (pd.DataFrame): 出力するDataFrame
         filepath (str): 出力先ファイルパス
-        encoding (str): 文字エンコーディング
+        encoding (str): 文字エンコーディング（デフォルト: utf-8、JSONはBOM非対応）
+
+    Note:
+        JSONフォーマットはUTF-8 BOMに対応していないため、
+        utf-8を使用します。CSVなどの他の形式ではutf-8-sigが使用されます。
     """
-    df.to_json(filepath, orient='records', force_ascii=False, indent=2)
+    # JSONをテキストとして取得し、指定エンコーディングで書き込み
+    json_str = df.to_json(orient='records', force_ascii=False, indent=2)
+    with open(filepath, 'w', encoding=encoding) as f:
+        f.write(json_str)
 
 
 def export_to_excel(df: pd.DataFrame, filepath: str):
