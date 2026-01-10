@@ -64,6 +64,11 @@ pip-delete-this-directory.txt
 
 # Project specific
 .experiments/
+experiments/results/
+experiments/data/
+examples/data/
+examples/workflows/
+scripts/generated_data/
 results/
 !requirements*.txt
 !LICENSE.txt
