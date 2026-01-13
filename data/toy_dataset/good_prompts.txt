@@ -1,0 +1,40 @@
+=== Good #1 ===
+Positive: masterpiece, best quality, ultra detailed, 8k resolution, cinematic lighting, anime style, cel shading, 1girl, witch, blue hair, twin tails, holding magic staff, library background, looking at viewer
+Negative: low quality, worst quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, jpeg artifacts, signature, watermark, username, blurry
+
+=== Good #2 ===
+Positive: masterpiece, best quality, ultra detailed, 8k resolution, cinematic lighting, anime style, cel shading, 1girl, witch, red hair, long hair, casting fire magic, forest background, dynamic pose
+Negative: low quality, worst quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, jpeg artifacts, signature, watermark, username, blurry
+
+=== Good #3 ===
+Positive: masterpiece, best quality, ultra detailed, 8k resolution, cinematic lighting, anime style, cel shading, 1girl, witch, silver hair, short hair, reading spell book, magic tower background, sitting
+Negative: low quality, worst quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, jpeg artifacts, signature, watermark, username, blurry
+
+=== Good #4 ===
+Positive: masterpiece, best quality, ultra detailed, 8k resolution, cinematic lighting, anime style, cel shading, 1girl, witch, blonde hair, braided hair, flying on broom, night sky background, full moon
+Negative: low quality, worst quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, jpeg artifacts, signature, watermark, username, blurry
+
+=== Good #5 ===
+Positive: masterpiece, best quality, ultra detailed, 8k resolution, cinematic lighting, anime style, cel shading, 1girl, witch, pink hair, ponytail, mixing potion, alchemy lab background, smile
+Negative: low quality, worst quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, jpeg artifacts, signature, watermark, username, blurry
+
+=== Good #6 ===
+Positive: masterpiece, best quality, ultra detailed, 8k resolution, cinematic lighting, anime style, cel shading, 1girl, witch, black hair, hime cut, summoning familiar, magic circle background, serious face
+Negative: low quality, worst quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, jpeg artifacts, signature, watermark, username, blurry
+
+=== Good #7 ===
+Positive: masterpiece, best quality, ultra detailed, 8k resolution, cinematic lighting, anime style, cel shading, 1girl, witch, white hair, messy hair, sleeping on desk, classroom background, closed eyes
+Negative: low quality, worst quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, jpeg artifacts, signature, watermark, username, blurry
+
+=== Good #8 ===
+Positive: masterpiece, best quality, ultra detailed, 8k resolution, cinematic lighting, anime style, cel shading, 1girl, witch, green hair, bob cut, gardening with magic, greenhouse background, sunlight
+Negative: low quality, worst quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, jpeg artifacts, signature, watermark, username, blurry
+
+=== Good #9 ===
+Positive: masterpiece, best quality, ultra detailed, 8k resolution, cinematic lighting, anime style, cel shading, 1girl, witch, purple hair, drill hair, duel with rival, ruins background, fighting stance
+Negative: low quality, worst quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, jpeg artifacts, signature, watermark, username, blurry
+
+=== Good #10 ===
+Positive: masterpiece, best quality, ultra detailed, 8k resolution, cinematic lighting, anime style, cel shading, 1girl, witch, orange hair, side ponytail, shopping in town, fantasy street background, waving hand
+Negative: low quality, worst quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, jpeg artifacts, signature, watermark, username, blurry
+

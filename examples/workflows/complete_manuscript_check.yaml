@@ -1,0 +1,47 @@
+name: "Complete Manuscript Quality Assurance Pipeline"
+description: |
+  完全な原稿品質検査パイプライン
+  複数段階の検査を自動化：
+  1. フレーズ抽出と頻度分析
+  2. あらすじとの一貫性確認
+  3. 個人の口癖検出
+  4. 過去原稿との関連性分析
+
+tasks:
+  # ステップ1: フレーズ抽出
+  - id: extract_core_phrases
+    type: extract
+    input: manuscript.txt
+    output: results/01_core_phrases.csv
+    params:
+      min_count: 4
+      max_length: 25
+      selection: 1
+      verbose: 1
+
+  # ステップ2: あらすじチェック（extract完了後）
+  - id: check_abstract_body_consistency
+    type: check_divergence
+    inputs:
+      - abstract.txt
+      - manuscript.txt
+    depends_on: [extract_core_phrases]
+    output: results/02_divergence_analysis.json
+
+  # ステップ3: 口癖検出（extract完了後）
+  - id: detect_personal_habits
+    type: detect_habits
+    input: manuscript.txt
+    depends_on: [extract_core_phrases]
+    output: results/03_habits_report.csv
+    params:
+      z_score_threshold: 1.5
+      min_occurrences: 2
+
+  # ステップ4: 関連記事検索（divergenceチェック完了後）
+  - id: find_related_previous_articles
+    type: kwic
+    input: manuscript.txt
+    depends_on: [check_abstract_body_consistency]
+    params:
+      context_lines: 3

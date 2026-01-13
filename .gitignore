@@ -1,0 +1,123 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+.test-venv/
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+nosetests.xml
+coverage.xml
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Claude settings cache (but keep documentation)
+.claude/**/*
+!.claude/internal_docs/
+!.claude/plans/
+!.claude/internal_docs/*.md
+!.claude/plans/*.md
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build/Distribution
+*.whl
+*.tar.gz
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Project specific - 分析結果・実験データは完全に除外
+.experiments/
+experiments/results/
+experiments/data/
+examples/data/
+examples/workflows/
+scripts/generated_data/
+results/
+data/
+!requirements*.txt
+!LICENSE.txt
+
+# 個人設定・機密ファイル
+CLAUDE.md
+.claude.md
+claude.md
+*.personal
+
+# ComfyUI・分析関連
+comfy_*.py
+*comfy*
+*analysis*
+*comparison*
+scripts/generate_*.py
+scripts/run_*.py
+scripts/batch_*.py
+scripts/find_*.py
+
+# Data files (CSV, Excel)
+*.csv
+*.xls
+*.xlsx
+
+# JSON (but keep config files)
+*.json
+!package.json
+!pyproject.toml
+
+# Test files (temporary/sample data)
+test_phrases.csv
+test_workflow_sample.txt
+
+# Jupyter
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/
+
+nul
+
+*.db
+
+examples/data/*
+*tmpclaude*-cwd
+scripts/*
