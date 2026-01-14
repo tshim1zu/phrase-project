@@ -121,3 +121,14 @@ nul
 examples/data/*
 *tmpclaude*-cwd
 scripts/*
+
+# Ensure pytest cache is excluded (if not already covered above)
+.pytest_cache/
+
+# Ensure build artifacts are excluded
+build/
+dist/
+*.egg-info/
+
+# nmf-prompt-generator is maintained independently
+nmf-prompt-generator/
