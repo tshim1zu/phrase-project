@@ -14,8 +14,15 @@ __author__ = "Takeshi SHIMIZU"
 __copyright__ = "Copyright 2026"
 
 import re
-from typing import List, Dict, Tuple
+import json
+import logging
+from typing import List, Dict, Tuple, Optional
 from collections import defaultdict, Counter
+
+from .utils_robustness import ScoreValidator, ConfigValidator, TextProcessor, ErrorHandler
+from .utils_advanced import CachingAnalyzer, MetricsCollector, PositionTracker
+
+logger = logging.getLogger(__name__)
 
 
 class EndingHeatmapGenerator:
@@ -50,6 +57,12 @@ class EndingHeatmapGenerator:
         Args:
             chunk_size: ヒートマップのチャンクサイズ（文の数）
         """
+        # チャンクサイズのバリデーション
+        validation = ConfigValidator.validate_chunk_size(chunk_size, min_size=1)
+        if not validation.is_valid:
+            logger.warning(f"{validation.message}、デフォルト値 5 を使用")
+            chunk_size = 5
+        
         self.chunk_size = chunk_size
 
     def analyze(self, text: str) -> Dict[str, any]:
@@ -320,3 +333,112 @@ class EndingHeatmapGenerator:
             report += "\n\n✓ 文末表現のバランスは良好です。"
 
         return report
+
+    def export_analysis_json(self, analysis: Dict[str, any], 
+                            filepath: str, include_issues: bool = True,
+                            threshold: float = 0.6) -> None:
+        """
+        分析結果をJSON形式で出力
+
+        Args:
+            analysis: analyze() の戻り値
+            filepath: 出力ファイルパス
+            include_issues: 問題リストを含めるか
+            threshold: 問題検出の閾値
+        """
+        # 閾値のバリデーション
+        threshold_validation = ConfigValidator.validate_threshold(threshold)
+        if not threshold_validation.is_valid:
+            logger.warning(f"{threshold_validation.message}、0.6 を使用")
+            threshold = 0.6
+
+        output = {
+            'metadata': {
+                'total_sentences': analysis['total_sentences'],
+                'total_chunks': analysis['total_chunks'],
+                'chunk_size': self.chunk_size,
+            },
+            'overall_stats': analysis['overall_stats'],
+            'chunk_analysis': analysis['chunk_analysis']
+        }
+
+        if include_issues:
+            issues = self.detect_issues(analysis, threshold)
+            output['issues'] = issues
+
+        success, output_path = ErrorHandler.safe_json_export(
+            output, filepath, fallback_format='csv'
+        )
+        
+        if success:
+            logger.info(f"分析結果を {output_path} に出力しました")
+        else:
+            logger.error(f"分析結果の出力に失敗しました")
+
+    def suggest_improvements(self, analysis: Dict[str, any], 
+                           top_n: int = 3) -> List[Dict[str, any]]:
+        """
+        文末表現の改善提案を生成
+
+        Args:
+            analysis: analyze() の戻り値
+            top_n: 提案する改善数
+
+        Returns:
+            改善提案のリスト
+        """
+        improvements = []
+        overall = analysis['overall_stats']
+
+        if not overall['most_common']:
+            return improvements
+
+        # 最頻出のパターンに対する改善提案
+        for pattern_name, count in overall['most_common'][:top_n]:
+            ratio = count / analysis['total_sentences']
+
+            # パターンに応じた改善提案を生成
+            alternatives = self._get_alternative_patterns(pattern_name)
+
+            improvements.append({
+                'current_pattern': pattern_name,
+                'description': self.PATTERN_DESCRIPTIONS.get(pattern_name, pattern_name),
+                'usage_ratio': ratio,
+                'usage_count': count,
+                'suggestion': f'「{self.PATTERN_DESCRIPTIONS.get(pattern_name)}」が多く使用されています。バリエーションを増やしてください。',
+                'alternative_patterns': alternatives,
+                'expected_improvement': f'多様性スコアが {overall["diversity_score"]:.2f} から {min(overall["diversity_score"] + 0.2, 1.0):.2f} に改善の可能性'
+            })
+
+        return improvements
+
+    def _get_alternative_patterns(self, pattern_name: str) -> List[Dict[str, str]]:
+        """パターンに対する代替表現を提案"""
+        alternatives_map = {
+            'past_plain': [
+                {'pattern': 'past_progressive', 'example': '〜ていた', 'reason': 'より具体的な時間経過を表現'},
+                {'pattern': 'past_polite', 'example': '〜ました', 'reason': '丁寧な印象に'},
+            ],
+            'past_progressive': [
+                {'pattern': 'past_plain', 'example': '〜だった', 'reason': 'より直接的に'},
+                {'pattern': 'continuous', 'example': '〜している', 'reason': '現在への流れを表現'},
+            ],
+            'continuous': [
+                {'pattern': 'present_masu', 'example': '〜ます', 'reason': '丁寧な表現に'},
+                {'pattern': 'present_da', 'example': '〜だ', 'reason': 'より直接的に'},
+            ],
+            'present_desu': [
+                {'pattern': 'present_masu', 'example': '〜ます', 'reason': '文体統一'},
+                {'pattern': 'present_da', 'example': '〜だ', 'reason': 'カジュアルに'},
+            ],
+            'present_masu': [
+                {'pattern': 'present_desu', 'example': 'です', 'reason': '文体統一'},
+                {'pattern': 'present_da', 'example': '〜だ', 'reason': 'よりカジュアルに'},
+            ],
+            'present_da': [
+                {'pattern': 'present_masu', 'example': '〜ます', 'reason': '丁寧に'},
+                {'pattern': 'present_dearu', 'example': 'である', 'reason': '格調高く'},
+            ],
+        }
+
+        return alternatives_map.get(pattern_name, [])

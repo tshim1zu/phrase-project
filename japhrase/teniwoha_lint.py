@@ -13,7 +13,13 @@ __author__ = "Takeshi SHIMIZU"
 __copyright__ = "Copyright 2026"
 
 import re
+import logging
 from typing import List, Dict, Tuple
+
+from .utils_robustness import TextProcessor, ConfigValidator
+from .utils_advanced import MetricsCollector, StreamingAnalyzer
+
+logger = logging.getLogger(__name__)
 
 
 class TeniwohaLinter:

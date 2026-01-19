@@ -15,8 +15,15 @@ __author__ = "Takeshi SHIMIZU"
 __copyright__ = "Copyright 2026"
 
 import re
+import json
+import logging
 from typing import List, Dict, Tuple, Optional
 from collections import defaultdict
+
+from .utils_robustness import ScoreValidator, ConfigValidator, TextProcessor, ErrorHandler
+from .utils_advanced import MetricsCollector, PositionTracker
+
+logger = logging.getLogger(__name__)
 
 
 class SubjectPOVDetector:
@@ -35,6 +42,12 @@ class SubjectPOVDetector:
         Args:
             sensitivity: 検出感度（'low', 'medium', 'high'）
         """
+        # 感度のバリデーション
+        validation = ConfigValidator.validate_sensitivity(sensitivity)
+        if not validation.is_valid:
+            logger.warning(f"{validation.message}、'medium' を使用")
+            sensitivity = 'medium'
+
         self.sensitivity = sensitivity
 
         # 感度に応じた閾値設定
@@ -306,3 +319,133 @@ class SubjectPOVDetector:
         """チェックを実行し、結果をフォーマットして返す便利メソッド"""
         issues = self.check(text)
         return self.format_issues(issues, text)
+
+    def export_issues_json(self, issues: List[Dict[str, any]], 
+                          filepath: str) -> None:
+        """
+        検出された問題をJSON形式で出力
+
+        Args:
+            issues: check() の戻り値
+            filepath: 出力ファイルパス
+        """
+        output = {
+            'metadata': {
+                'total_issues': len(issues),
+                'by_type': self._count_by_type(issues),
+            },
+            'issues': issues
+        }
+
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(output, f, ensure_ascii=False, indent=2)
+
+    def _count_by_type(self, issues: List[Dict[str, any]]) -> Dict[str, int]:
+        """問題を種類別にカウント"""
+        counts = defaultdict(int)
+        for issue in issues:
+            counts[issue['type']] += 1
+        return dict(counts)
+
+    def get_statistics(self, text: str) -> Dict[str, any]:
+        """
+        テキスト全体の統計を返す
+
+        Args:
+            text: 分析対象テキスト
+
+        Returns:
+            統計情報を含む辞書
+        """
+        analysis = self.analyze_text(text)
+        issues = self.check(text)
+
+        return {
+            'analysis': analysis,
+            'issues': issues,
+            'issue_count': len(issues),
+            'dominant_pov_ratio': self._calculate_pov_dominance(analysis),
+            'subject_stability_score': self._calculate_subject_stability(text),
+        }
+
+    def _calculate_pov_dominance(self, analysis: Dict[str, any]) -> float:
+        """視点の支配度を計算（0-1）"""
+        pov_dist = analysis.get('pov_distribution', {})
+        if not pov_dist:
+            return 0.0
+
+        total = sum(pov_dist.values())
+        if total == 0:
+            return 0.0
+
+        max_pov_count = max(pov_dist.values())
+        
+        result = ScoreValidator.safe_divide(max_pov_count, total, default=0.0)
+        is_valid, normalized, msg = ScoreValidator.validate_score(result)
+        return normalized
+
+    def _calculate_subject_stability(self, text: str) -> float:
+        """主語の安定性を計算（0-1、高いほど安定）"""
+        sentences = self._split_sentences(text)
+        subjects = []
+
+        for sentence in sentences:
+            subject = self._extract_subject(sentence)
+            if subject:
+                subjects.append(subject)
+
+        if len(subjects) < 2:
+            return 1.0
+
+        # 同じ主語が連続する割合を計算
+        consecutive_count = 0
+        for i in range(1, len(subjects)):
+            if subjects[i] == subjects[i - 1]:
+                consecutive_count += 1
+
+        stability = consecutive_count / (len(subjects) - 1)
+        return min(stability, 1.0)
+
+    def suggest_improvements(self, text: str) -> List[Dict[str, any]]:
+        """
+        検出された問題に対する改善提案を生成
+
+        Args:
+            text: 分析対象テキスト
+
+        Returns:
+            改善提案のリスト
+        """
+        issues = self.check(text)
+        suggestions = []
+
+        for issue in issues:
+            if issue['type'] == 'subject_changes':
+                suggestions.append({
+                    'issue_type': 'subject_changes',
+                    'severity': issue['severity'],
+                    'problem': f"主語が{issue['change_count']}回変化しています",
+                    'suggestions': [
+                        '同じ主語で複数の行動を述べる場合は、文を並べ替える',
+                        '段落を分割して、主語ごとにグループ化する',
+                        '「〜は」「〜は」で統一し、主語の一貫性を保つ',
+                        '主語を明示的に記述し、曖昧性を減らす'
+                    ],
+                    'subjects_involved': issue.get('subjects', [])
+                })
+
+            elif issue['type'] == 'pov_inconsistency':
+                suggestions.append({
+                    'issue_type': 'pov_inconsistency',
+                    'severity': issue['severity'],
+                    'problem': f"視点が混在しています: {', '.join(set(issue.get('povs', [])))}",
+                    'suggestions': [
+                        '一人称 (I/We) で統一するか、三人称 (He/She/They) で統一する',
+                        '一貫した視点で全文を書き直す',
+                        '段落単位で視点を統一する（章ごとに視点を変えるなど）',
+                        '視点の切り替わりが意図的でないか確認する'
+                    ],
+                    'povs_involved': issue.get('povs', [])
+                })
+
+        return suggestions

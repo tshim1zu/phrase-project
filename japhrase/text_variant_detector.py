@@ -7,12 +7,16 @@
 """
 
 import logging
+import json
 from dataclasses import dataclass, field, asdict
 from typing import List, Dict, Tuple, Set, Optional
 from collections import defaultdict, Counter
 import pandas as pd
 from difflib import SequenceMatcher
 import re
+
+from .utils_robustness import ScoreValidator, ConfigValidator, TextProcessor, ErrorHandler
+from .utils_advanced import CachingAnalyzer, MetricsCollector, ContextAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +47,10 @@ class VariantCandidate:
     co_occur_count: int = 0
     recommendation: str = ""
     reasoning: str = ""
+    
+    # 推奨表記モード用
+    preferred_form: Optional[str] = None  # ユーザー指定の推奨表記
+    preferred_reason: str = ""            # 推奨理由
 
     def to_dict(self) -> Dict:
         """辞書に変換（JSON化用）"""
@@ -52,13 +60,16 @@ class VariantCandidate:
 class TextVariantDetector:
     """表記ゆれを統計的に検出"""
 
-    def __init__(self, similarity_threshold: float = 0.7):
+    def __init__(self, similarity_threshold: float = 0.7, 
+                 preferred_dictionary: Optional[Dict[str, str]] = None):
         """
         Parameters:
             similarity_threshold: スコアがこの値以上のペアを候補とする
+            preferred_dictionary: 推奨表記辞書 {変異形 -> 推奨表記}
         """
         self.similarity_threshold = similarity_threshold
         self.context_freq = {}  # フレーズ周辺単語の統計
+        self.preferred_dictionary = preferred_dictionary or {}  # {variant: preferred}
 
     def detect_variants(
         self,
@@ -198,7 +209,11 @@ class TextVariantDetector:
         if len(s1) == 0 or len(s2) == 0:
             return 0.0
 
-        ratio = min(len(s1), len(s2)) / max(len(s1), len(s2))
+        ratio = ScoreValidator.safe_divide(
+            min(len(s1), len(s2)),
+            max(len(s1), len(s2)),
+            default=0.0
+        )
 
         if ratio >= 0.95:  # ほぼ同じ長さ
             return 0.95
@@ -282,8 +297,14 @@ class TextVariantDetector:
             'co_occurrence_score': 0.10,
         }
 
-        total = sum(scores.get(k, 0) * weights[k] for k in weights)
-        return total
+        # スコアを正規化
+        normalized_scores = ScoreValidator.normalize_scores(scores)
+
+        total = sum(normalized_scores.get(k, 0) * weights[k] for k in weights)
+        
+        # 合成スコアを検証
+        is_valid, composite, msg = ScoreValidator.validate_score(total, name='composite_score')
+        return composite
 
     def _calculate_confidence(
         self,
@@ -507,3 +528,112 @@ class TextVariantDetector:
         df_export = pd.DataFrame(data)
         df_export.to_csv(filepath, index=False, encoding='utf-8-sig')
         logger.info(f"候補を {filepath} に出力しました")
+
+    def load_preferred_dictionary(self, filepath: str) -> None:
+        """推奨表記辞書をJSONから読み込む"""
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                self.preferred_dictionary = json.load(f)
+            logger.info(f"推奨表記辞書を {filepath} から読み込みました ({len(self.preferred_dictionary)} 件)")
+        except FileNotFoundError:
+            logger.warning(f"推奨表記辞書ファイルが見つかりません: {filepath}")
+
+    def save_preferred_dictionary(self, filepath: str) -> None:
+        """推奨表記辞書をJSONに保存"""
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(self.preferred_dictionary, f, ensure_ascii=False, indent=2)
+        logger.info(f"推奨表記辞書を {filepath} に保存しました ({len(self.preferred_dictionary)} 件)")
+
+    def add_preferred_form(self, variants: List[str], preferred: str, reason: str = "") -> None:
+        """推奨表記を辞書に追加"""
+        for var in variants:
+            if var != preferred:
+                self.preferred_dictionary[var] = {
+                    'preferred': preferred,
+                    'reason': reason
+                }
+        logger.info(f"推奨表記を追加しました: {variants} -> {preferred}")
+
+    def apply_preferred_forms(self, candidates: List[VariantCandidate]) -> List[VariantCandidate]:
+        """推奨表記辞書を候補に適用"""
+        for cand in candidates:
+            # 基準フレーズが推奨表記辞書に登録されているか
+            if cand.primary in self.preferred_dictionary:
+                pref_entry = self.preferred_dictionary[cand.primary]
+                cand.preferred_form = pref_entry.get('preferred', cand.primary)
+                cand.preferred_reason = pref_entry.get('reason', '推奨表記辞書による')
+
+            # バリアント側も確認
+            for var in cand.variants:
+                if var in self.preferred_dictionary:
+                    pref_entry = self.preferred_dictionary[var]
+                    cand.preferred_form = pref_entry.get('preferred')
+                    cand.preferred_reason = pref_entry.get('reason', '推奨表記辞書による')
+                    break
+
+        return candidates
+
+    def export_candidates_json(self, candidates: List[VariantCandidate],
+                              filepath: str) -> None:
+        """候補をJSON形式で出力"""
+        data = {
+            'metadata': {
+                'total_candidates': len(candidates),
+                'with_preferred_forms': sum(1 for c in candidates if c.preferred_form),
+                'export_date': pd.Timestamp.now().isoformat()
+            },
+            'candidates': [cand.to_dict() for cand in candidates]
+        }
+
+        success, output_path = ErrorHandler.safe_json_export(
+            data, filepath, fallback_format='csv'
+        )
+        
+        if success:
+            logger.info(f"候補を {output_path} に出力しました")
+        else:
+            logger.error(f"候補の出力に失敗しました")
+
+    def generate_correction_suggestions(self, text: str, 
+                                      candidates: List[VariantCandidate]) -> List[Dict[str, any]]:
+        """
+        テキストに対して、推奨表記に基づく修正案を生成
+
+        Args:
+            text: 対象テキスト
+            candidates: 検出された表記ゆれ候補
+
+        Returns:
+            修正案のリスト
+        """
+        suggestions = []
+
+        for cand in candidates:
+            if cand.preferred_form:
+                # 基準フレーズを推奨表記に置換
+                if cand.primary != cand.preferred_form:
+                    matches = list(re.finditer(re.escape(cand.primary), text))
+                    for match in matches:
+                        suggestions.append({
+                            'original': cand.primary,
+                            'preferred': cand.preferred_form,
+                            'position': match.span(),
+                            'reason': cand.preferred_reason,
+                            'confidence': cand.confidence
+                        })
+
+                # バリアントを推奨表記に置換
+                for var in cand.variants:
+                    matches = list(re.finditer(re.escape(var), text))
+                    for match in matches:
+                        suggestions.append({
+                            'original': var,
+                            'preferred': cand.preferred_form,
+                            'position': match.span(),
+                            'reason': cand.preferred_reason or f"{cand.primary} の表記ゆれ",
+                            'confidence': cand.confidence
+                        })
+
+        # 位置でソート
+        suggestions.sort(key=lambda x: x['position'][0])
+        return suggestions

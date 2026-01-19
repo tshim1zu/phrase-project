@@ -15,9 +15,16 @@ __author__ = "Takeshi SHIMIZU"
 __copyright__ = "Copyright 2026"
 
 import re
+import json
+import logging
 from typing import List, Dict, Tuple
 from collections import defaultdict
 import hashlib
+
+from .utils_robustness import ScoreValidator, ConfigValidator, TextProcessor, ErrorHandler
+from .utils_advanced import CachingAnalyzer, MetricsCollector, StreamingAnalyzer
+
+logger = logging.getLogger(__name__)
 
 
 class SentenceVariationGenerator:
@@ -291,3 +298,168 @@ class SentenceVariationGenerator:
         """検出とレポート生成を一度に実行する便利メソッド"""
         repetitions = self.detect_repetitions(text)
         return self.format_report(repetitions, text)
+
+    def export_repetitions_json(self, repetitions: List[Dict[str, any]], 
+                               filepath: str) -> None:
+        """
+        検出された繰り返しをJSON形式で出力
+
+        Args:
+            repetitions: detect_repetitions() の戻り値
+            filepath: 出力ファイルパス
+        """
+        output = {
+            'metadata': {
+                'total_repetitions': len(repetitions),
+                'high_priority': sum(1 for r in repetitions if r['count'] >= 3),
+            },
+            'repetitions': repetitions
+        }
+
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(output, f, ensure_ascii=False, indent=2)
+
+    def generate_correction_text(self, text: str, 
+                               repetitions: List[Dict[str, any]] = None,
+                               apply_all: bool = False,
+                               select_indices: Dict[str, int] = None) -> str:
+        """
+        繰り返しを修正したテキストを生成
+
+        Args:
+            text: 元のテキスト
+            repetitions: detect_repetitions() の戻り値（Noneの場合は自動検出）
+            apply_all: Trueの場合、最初の候補を自動適用
+            select_indices: {normalized_sentence: variation_index} で候補を指定
+
+        Returns:
+            修正されたテキスト
+        """
+        if repetitions is None:
+            repetitions = self.detect_repetitions(text)
+
+        if not repetitions:
+            return text
+
+        select_indices = select_indices or {}
+        corrected = text
+
+        # 後ろから置換（位置ズレを防ぐ）
+        sorted_reps = sorted(repetitions, 
+                            key=lambda x: x['positions'][0] if x['positions'] else 0,
+                            reverse=True)
+
+        for rep in sorted_reps:
+            normalized = rep['normalized']
+            positions = rep['positions']
+            original = rep['sentence']
+
+            # バリエーション候補を選択
+            if normalized in select_indices:
+                var_index = select_indices[normalized]
+                if var_index < len(rep['variations']):
+                    selected_var = rep['variations'][var_index]
+                    replacement_text = selected_var['text']
+                else:
+                    continue
+            elif apply_all and rep['variations']:
+                replacement_text = rep['variations'][0]['text']
+            else:
+                continue
+
+            # 2番目以降の出現をバリエーションで置換
+            for i, pos in enumerate(positions[1:], 1):
+                # テキスト上の位置から置換対象を特定
+                end_pos = pos + len(original)
+                if corrected[pos:end_pos] == original:
+                    corrected = corrected[:pos] + replacement_text + corrected[end_pos:]
+
+        return corrected
+
+    def suggest_corrections(self, text: str, repetitions: List[Dict[str, any]] = None,
+                          priority: str = 'high') -> List[Dict[str, any]]:
+        """
+        修正提案を生成
+
+        Args:
+            text: 元のテキスト
+            repetitions: detect_repetitions() の戻り値
+            priority: 'high' (3回以上), 'medium' (2-3回), 'all'
+
+        Returns:
+            修正提案のリスト
+        """
+        if repetitions is None:
+            repetitions = self.detect_repetitions(text)
+
+        suggestions = []
+
+        priority_map = {'high': 3, 'medium': 2, 'all': 1}
+        min_count = priority_map.get(priority, 3)
+
+        for rep in repetitions:
+            if rep['count'] < min_count:
+                continue
+
+            for var_idx, variation in enumerate(rep['variations']):
+                # 最初の出現位置
+                first_pos = rep['positions'][0]
+                
+                # 2番目以降の位置で置換を提案
+                for pos_idx in range(1, len(rep['positions'])):
+                    pos = rep['positions'][pos_idx]
+                    
+                    suggestions.append({
+                        'position': pos,
+                        'length': len(rep['sentence']),
+                        'original': rep['sentence'],
+                        'original_first_occurrence': first_pos,
+                        'current_occurrence': pos_idx + 1,
+                        'total_occurrences': rep['count'],
+                        'suggested_replacement': variation['text'],
+                        'variation_type': variation['type'],
+                        'variation_description': variation['description'],
+                        'reasoning': f"この文は{rep['count']}回繰り返されています（最初は {first_pos} 行目）"
+                    })
+
+        return suggestions
+
+    def apply_suggestions(self, text: str, 
+                        suggestions: List[Dict[str, any]],
+                        confirm_func=None) -> str:
+        """
+        提案を対話的にテキストに適用
+
+        Args:
+            text: 元のテキスト
+            suggestions: suggest_corrections() の戻り値
+            confirm_func: 各提案について確認を取る関数（True/False を返す）
+
+        Returns:
+            修正されたテキスト
+        """
+        if not suggestions:
+            return text
+
+        # 後ろから置換（位置ズレを防ぐ）
+        sorted_suggestions = sorted(suggestions, 
+                                   key=lambda x: x['position'],
+                                   reverse=True)
+
+        result = text
+        applied_count = 0
+
+        for sugg in sorted_suggestions:
+            if confirm_func and not confirm_func(sugg):
+                continue
+
+            pos = sugg['position']
+            length = sugg['length']
+            replacement = sugg['suggested_replacement']
+
+            # テキスト上の位置から置換対象を特定
+            if result[pos:pos+length] == sugg['original']:
+                result = result[:pos] + replacement + result[pos+length:]
+                applied_count += 1
+
+        return result, applied_count
