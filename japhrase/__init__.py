@@ -96,6 +96,20 @@ from .insight_generator import (
     InsightGenerator,
     Insight
 )
+# 執筆支援: てにをはLint
+from .teniwoha_lint import TeniwohaLinter
+# 執筆支援: 同文反復検出とバリエーション生成
+from .sentence_variation import SentenceVariationGenerator
+# 執筆支援: 主語/視点ブレ検出
+from .subject_pov_detector import SubjectPOVDetector
+# 執筆支援: 冗長語尾のヒートマップ
+from .ending_heatmap import EndingHeatmapGenerator
+# 執筆支援: 比喩・専門語の過密警告
+from .metaphor_density_detector import MetaphorDensityDetector
+# 執筆支援: 文章テンポスコア
+from .tempo_analyzer import TempoAnalyzer
+# 執筆支援: 場面転換の弱さ検出
+from .scene_transition_detector import SceneTransitionDetector
 
 __all__ = [
     'PhraseExtracter',
@@ -172,4 +186,18 @@ __all__ = [
     # Phase B: インサイト生成
     'InsightGenerator',
     'Insight',
+    # 執筆支援: てにをはLint
+    'TeniwohaLinter',
+    # 執筆支援: 同文反復検出とバリエーション生成
+    'SentenceVariationGenerator',
+    # 執筆支援: 主語/視点ブレ検出
+    'SubjectPOVDetector',
+    # 執筆支援: 冗長語尾のヒートマップ
+    'EndingHeatmapGenerator',
+    # 執筆支援: 比喩・専門語の過密警告
+    'MetaphorDensityDetector',
+    # 執筆支援: 文章テンポスコア
+    'TempoAnalyzer',
+    # 執筆支援: 場面転換の弱さ検出
+    'SceneTransitionDetector',
 ]
