@@ -91,6 +91,8 @@ from .streaming_processor import (
     IncrementalAggregator,
     StreamingAnalyzer
 )
+# Incremental state
+from .incremental import IncrementalPhraseState
 # Phase B: 自動インサイト生成
 from .insight_generator import (
     InsightGenerator,
@@ -110,6 +112,10 @@ from .metaphor_density_detector import MetaphorDensityDetector
 from .tempo_analyzer import TempoAnalyzer
 # 執筆支援: 場面転換の弱さ検出
 from .scene_transition_detector import SceneTransitionDetector
+# Evidence and reports
+from .evidence import build_phrase_evidence
+from .stats_utils import compute_stats_data
+from .stats_report import render_stats_html
 
 __all__ = [
     'PhraseExtracter',
@@ -183,6 +189,7 @@ __all__ = [
     'ChunkedTextReader',
     'IncrementalAggregator',
     'StreamingAnalyzer',
+    'IncrementalPhraseState',
     # Phase B: インサイト生成
     'InsightGenerator',
     'Insight',
@@ -200,4 +207,7 @@ __all__ = [
     'TempoAnalyzer',
     # 執筆支援: 場面転換の弱さ検出
     'SceneTransitionDetector',
+    'build_phrase_evidence',
+    'compute_stats_data',
+    'render_stats_html',
 ]

@@ -568,27 +568,40 @@ class PhraseExtracter:
             return (1 - similarity) * seq_length
 
     def get_dfphrase(self, sentences: List[str]) -> pd.DataFrame:
-        """
-        メイン処理：テキストからタグを抽出（形態素解析不要）
-
-        タグベース統計処理により、日本語・英語両対応
-
-        Parameters:
-            sentences: 文章のリストまたはpandas.Series
-
-        Returns:
-            pandas.DataFrame: 抽出されたタグのデータフレーム
-        """
-        # 入力バリデーション
+        """Extract phrases from texts and return a DataFrame."""
         if sentences is None or len(sentences) == 0:
-            raise ValueError("入力テキストが空です")
+            raise ValueError("Input text is empty.")
 
         sentences = np.array(sentences).reshape(-1,)
 
         if self.verbose >= 1:
-            logger.info(f"タグ抽出開始: {len(sentences)}件のテキストを分析します")
+            logger.info(f"テキスト処理: {len(sentences)}行を読み込みました")
 
-        # タグを抽出
+        # N-gramベースのフレーズ抽出
+        df_tmp = pd.DataFrame()
+        for sentences_batch in self.gen_sentences(sentences):
+            if len(sentences_batch) > 0:
+                df_unique = self.find_uniques(sentences_batch)
+                df_tmp = pd.concat([df_tmp, df_unique], ignore_index=True)
+
+        if len(df_tmp) == 0:
+            if self.verbose >= 1:
+                logger.warning(
+                    f"フレーズが見つかりませんでした。min_count={self.min_count}を下げてください"
+                )
+            return pd.DataFrame()
+
+        # 類似フレーズの除去
+        if self.threshold_originality > 0:
+            df_tmp = self.remove_similar(df_tmp)
+
+        if self.verbose >= 1:
+            logger.info(f"抽出完了: {len(df_tmp)}個のフレーズを検出しました")
+
+        return df_tmp
+
+    def count_phrases(self, sentences: List[str]) -> Counter:
+        """Count phrases from sentences without applying min_count."""
         tag_counter = Counter()
 
         for text in tqdm(sentences, desc="Extracting tags", unit="text", leave=False):
@@ -596,17 +609,12 @@ class PhraseExtracter:
             if not text_str:
                 continue
 
-            # BREAK で分割
             for part in text_str.split("BREAK"):
-                # カンマで分割
                 for tag in part.split(","):
                     tag = tag.strip()
-
-                    # 短すぎるタグをスキップ
                     if not tag or len(tag) < self.min_length:
                         continue
 
-                    # 括弧を除去
                     while tag and tag[0] in "[({":
                         close_idx = tag.find("]}")
                         if close_idx >= 0:
@@ -614,43 +622,75 @@ class PhraseExtracter:
                         else:
                             tag = tag[1:]
 
-                    # パラメータ部分を除去（:以降）
                     if ":" in tag:
                         tag = tag.split(":")[0]
 
                     tag = tag.strip()
-
-                    # フィルタリング後のタグをカウント
                     if tag and len(tag) >= self.min_length:
                         tag_counter[tag] += 1
 
-        if self.verbose >= 1:
-            logger.info(f"ユニークタグ: {len(tag_counter)}個")
+        return tag_counter
 
-        # min_count でフィルタリング
-        filtered_tags = {tag: count for tag, count in tag_counter.items() if count >= self.min_count}
+    def df_from_counts(self, tag_counter: Dict[str, int]) -> pd.DataFrame:
+        """Build a phrase DataFrame from counts, applying min_count."""
+        filtered_tags = {
+            tag: count
+            for tag, count in tag_counter.items()
+            if count >= self.min_count
+        }
 
         if not filtered_tags:
-            if self.verbose >= 1:
-                logger.warning(f"フィルタリング後のタグなし。min_count={self.min_count}を減らしてください")
             return pd.DataFrame()
 
-        # DataFrameに変換（互換性保持）
-        df = pd.DataFrame([
-            {
-                'phrase': tag,
-                'freq': count,
-                'score': count  # スコアは出現回数
-            }
-            for tag, count in sorted(filtered_tags.items(), key=lambda x: x[1], reverse=True)
-        ])
-
-        if self.verbose >= 1:
-            logger.info(f"抽出完了: {len(df)}個のタグを検出しました")
-
+        df = pd.DataFrame(
+            [
+                {
+                    "phrase": tag,
+                    "freq": int(count),
+                    "score": int(count),
+                }
+                for tag, count in sorted(filtered_tags.items(), key=lambda x: x[1], reverse=True)
+            ]
+        )
+        df["seqchar"] = df["phrase"]
+        df["length"] = df["phrase"].astype(str).map(len)
         return df
 
-    # ==================== ユーティリティメソッド ====================
+
+    @classmethod
+    def infer_preset_name(cls, texts: List[str]) -> str:
+        """Infer a preset name from simple text statistics."""
+        cleaned = [str(t).strip() for t in texts if str(t).strip()]
+        if not cleaned:
+            return "default"
+
+        lengths = [len(t) for t in cleaned]
+        avg_len = sum(lengths) / len(lengths)
+        short_rate = sum(l <= 30 for l in lengths) / len(lengths)
+        long_rate = sum(l >= 120 for l in lengths) / len(lengths)
+
+        total_chars = sum(lengths)
+        if total_chars == 0:
+            return "default"
+
+        digits = sum(ch.isdigit() for t in cleaned for ch in t)
+        ascii_letters = sum(ch.isascii() and ch.isalpha() for t in cleaned for ch in t)
+        symbols = sum(ch in "#@/" for t in cleaned for ch in t)
+
+        digit_ratio = digits / total_chars
+        ascii_ratio = ascii_letters / total_chars
+        symbol_ratio = symbols / total_chars
+
+        if avg_len <= 35 or short_rate >= 0.55 or symbol_ratio >= 0.02:
+            return "sns"
+        if avg_len >= 140 or long_rate >= 0.30:
+            return "novel"
+        if digit_ratio >= 0.08 or ascii_ratio >= 0.25:
+            return "report"
+        if avg_len >= 60:
+            return "news"
+        return "default"
+
 
     @classmethod
     def preset(cls, preset_name: str, **kwargs):

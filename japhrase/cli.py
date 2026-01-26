@@ -12,6 +12,16 @@ import logging
 import pandas as pd
 
 from .extracter import PhraseExtracter, PRESETS
+from .incremental import IncrementalPhraseState
+from .stats_utils import (
+    compute_stats_data,
+    flatten_stats_for_csv,
+    resolve_phrase_column,
+    resolve_frequency_column,
+    ensure_length_column,
+)
+from .evidence import build_phrase_evidence
+from .stats_report import render_stats_html
 from .writing_assistant import (
     KWICAnalyzer,
     AbstractBodyChecker,
@@ -27,6 +37,100 @@ from .checker import QualityChecker
 from .utils import read_file, export_to_csv, export_to_json
 
 logger = logging.getLogger(__name__)
+
+PRESET_CHOICES = list(PRESETS.keys()) + ["auto"]
+
+
+def _resolve_preset_name(preset: Optional[str], texts: List[str]) -> Optional[str]:
+    if preset == "auto":
+        return PhraseExtracter.infer_preset_name(texts)
+    return preset
+
+
+def _build_extractor(
+    final_params: dict,
+    min_count: Optional[int],
+    max_length: Optional[int],
+    verbose: bool,
+    texts: List[str],
+) -> PhraseExtracter:
+    preset_name = final_params.get("preset")
+    if preset_name:
+        preset_name = _resolve_preset_name(preset_name, texts)
+        preset_overrides = {
+            k: v
+            for k, v in final_params.items()
+            if k
+            in [
+                "min_count",
+                "max_length",
+                "min_length",
+                "threshold_originality",
+                "weight_freq",
+                "weight_len",
+                "removes",
+                "knowns",
+                "unnecesary",
+                "use_pmi",
+                "use_branching_entropy",
+                "selection",
+            ]
+        }
+        if min_count is not None:
+            preset_overrides["min_count"] = min_count
+        if max_length is not None:
+            preset_overrides["max_length"] = max_length
+        return PhraseExtracter.preset(
+            preset_name, verbose=1 if verbose else 0, **preset_overrides
+        )
+
+    if "min_count" not in final_params:
+        final_params["min_count"] = 6
+    if "max_length" not in final_params:
+        final_params["max_length"] = 16
+
+    return PhraseExtracter(
+        verbose=1 if verbose else 0,
+        **{
+            k: v
+            for k, v in final_params.items()
+            if k
+            in [
+                "min_count",
+                "max_length",
+                "min_length",
+                "threshold_originality",
+                "weight_freq",
+                "weight_len",
+                "removes",
+                "knowns",
+                "unnecesary",
+                "use_pmi",
+                "use_branching_entropy",
+                "selection",
+            ]
+        },
+    )
+
+
+def _apply_incremental_state(
+    extractor: PhraseExtracter,
+    texts: List[str],
+    state_path: Optional[str],
+    resume: bool,
+) -> Optional[IncrementalPhraseState]:
+    if not state_path:
+        return None
+
+    state = None
+    if resume and Path(state_path).exists():
+        state = IncrementalPhraseState.load(state_path)
+    if state is None:
+        state = IncrementalPhraseState.from_extractor(extractor)
+
+    state.update(extractor, texts)
+    state.save(state_path)
+    return state
 
 
 # ルートグループ
@@ -72,14 +176,19 @@ def cli(ctx):
 @click.argument('input_file', type=click.Path(exists=True), metavar='INPUT_FILE')
 @click.option('-o', '--output', type=click.Path(), help='出力ファイルパス (CSV/JSON形式で保存)')
 @click.option('--config', type=click.Path(exists=True), help='設定ファイル (.japhrase.toml / .japhrase.yml)')
-@click.option('--preset', type=click.Choice(list(PRESETS.keys())),
-              help=f'パラメータプリセット ({", ".join(PRESETS.keys())} から選択)')
+@click.option('--preset', type=click.Choice(PRESET_CHOICES),
+              help=f'パラメータプリセット ({", ".join(PRESET_CHOICES)} から選択)')
 @click.option('--min-count', type=int, help='最小出現回数フィルタ (デフォルト: 6)')
 @click.option('--max-length', type=int, help='最大フレーズ長フィルタ (デフォルト: 16)')
 @click.option('--format', type=click.Choice(['csv', 'json', 'table']), default='table',
               help='出力形式: table=コンソール表示, csv/json=ファイル保存用')
 @click.option('-v', '--verbose', is_flag=True, help='詳細なログを表示')
-def extract(input_file, output, config, preset, min_count, max_length, format, verbose):
+@click.option('--use-pmi', is_flag=True, help='PMI（自己相互情報量）を有効化')
+@click.option('--use-entropy', is_flag=True, help='分岐エントロピーを有効化')
+@click.option('--no-selection', is_flag=True, help='フィルタリングを無効化（全フレーズを出力）')
+@click.option('--state-path', type=click.Path(), help='Incremental state JSON path')
+@click.option('--resume', is_flag=True, help='Resume from existing state')
+def extract(input_file, output, config, preset, min_count, max_length, format, verbose, use_pmi, use_entropy, no_selection, state_path, resume):
     """
     テキストからフレーズを自動抽出（PMI/エントロピー分析）
 
@@ -89,16 +198,20 @@ def extract(input_file, output, config, preset, min_count, max_length, format, v
     CLIオプションは設定ファイルの値を上書きします（優先度: CLI > 設定ファイル > デフォルト）。
 
     出力フィールド:
-      seqchar      - 抽出フレーズ
-      freq         - 出現回数
-      length       - 文字数
-      originality  - オリジナリティ係数 (0.0-1.0)
-      periodic     - 周期性指標
+      seqchar         - 抽出フレーズ
+      freq            - 出現回数
+      length          - 文字数
+      pmi             - PMI（自己相互情報量）※--use-pmi有効時
+      boundary_score  - 境界スコア（0-1）※--use-entropy有効時
+      originality     - オリジナリティ係数 (0.0-1.0)
 
     使用例:
     \b
       # SNS投稿向けプリセットで抽出
       japhrase extract tweets.txt --preset sns -o result.csv --format csv
+
+      # PMI・エントロピー分析を有効化
+      japhrase extract paper.txt --min-count 5 --use-pmi --use-entropy --no-selection
 
       # カスタムパラメータで抽出
       japhrase extract paper.txt --min-count 10 --max-length 20 --format json -o output.json
@@ -124,28 +237,30 @@ def extract(input_file, output, config, preset, min_count, max_length, format, v
             final_params['min_count'] = min_count
         if max_length is not None:
             final_params['max_length'] = max_length
+        if use_pmi:
+            final_params['use_pmi'] = True
+        if use_entropy:
+            final_params['use_branching_entropy'] = True
+        if no_selection:
+            final_params['selection'] = 0
 
-        # PhraseExtracter 初期化
-        if 'preset' in final_params and not min_count and not max_length:
-            extractor = PhraseExtracter.preset(final_params['preset'], verbose=1 if verbose else 0)
+        # PhraseExtracter init
+        resolved_preset = _resolve_preset_name(final_params.get('preset'), texts)
+        if final_params.get('preset') == 'auto':
+            click.echo(f"Auto preset selected: {resolved_preset}", err=True)
+        if resolved_preset:
+            final_params['preset'] = resolved_preset
+
+        extractor = _build_extractor(final_params, min_count, max_length, verbose, texts)
+
+        # Extract
+        click.echo("?? ????????...", err=True)
+        state = _apply_incremental_state(extractor, texts, state_path, resume)
+        if state:
+            phrases_df = state.to_df(extractor)
         else:
-            # デフォルト値を設定
-            if 'min_count' not in final_params:
-                final_params['min_count'] = 6
-            if 'max_length' not in final_params:
-                final_params['max_length'] = 16
+            phrases_df = extractor.get_dfphrase(texts)
 
-            extractor = PhraseExtracter(
-                verbose=1 if verbose else 0,
-                **{k: v for k, v in final_params.items() if k in [
-                    'min_count', 'max_length', 'min_length', 'threshold_originality',
-                    'weight_freq', 'weight_len', 'removes', 'knowns', 'unnecesary'
-                ]}
-            )
-
-        # 抽出実行
-        click.echo("🔍 フレーズを抽出中...", err=True)
-        phrases_df = extractor.get_dfphrase(texts)
 
         if len(phrases_df) == 0:
             click.echo("❌ フレーズが見つかりませんでした", err=True)
@@ -155,7 +270,13 @@ def extract(input_file, output, config, preset, min_count, max_length, format, v
 
         # 出力
         if format == 'table':
-            click.echo(phrases_df[['seqchar', 'freq', 'length']].head(20).to_string(index=False))
+            # PMI/エントロピー列があれば追加して表示
+            display_cols = [resolve_phrase_column(phrases_df), resolve_frequency_column(phrases_df), 'length']
+            if 'pmi' in phrases_df.columns:
+                display_cols.append('pmi')
+            if 'boundary_score' in phrases_df.columns:
+                display_cols.append('boundary_score')
+            click.echo(ensure_length_column(phrases_df)[display_cols].head(20).to_string(index=False))
         elif format == 'csv' and output:
             export_to_csv(phrases_df, output)
             click.echo(f"💾 {output} に保存しました", err=True)
@@ -163,7 +284,13 @@ def extract(input_file, output, config, preset, min_count, max_length, format, v
             export_to_json(phrases_df, output)
             click.echo(f"💾 {output} に保存しました", err=True)
         else:
-            click.echo(phrases_df[['seqchar', 'freq', 'length']].to_string(index=False))
+            # PMI/エントロピー列があれば追加して表示
+            display_cols = [resolve_phrase_column(phrases_df), resolve_frequency_column(phrases_df), 'length']
+            if 'pmi' in phrases_df.columns:
+                display_cols.append('pmi')
+            if 'boundary_score' in phrases_df.columns:
+                display_cols.append('boundary_score')
+            click.echo(ensure_length_column(phrases_df)[display_cols].to_string(index=False))
 
     except Exception as e:
         click.echo(f"❌ エラー: {e}", err=True)
@@ -175,14 +302,16 @@ def extract(input_file, output, config, preset, min_count, max_length, format, v
 @click.argument('input_file', type=click.Path(exists=True), metavar='INPUT_FILE')
 @click.option('-o', '--output', type=click.Path(), help='統計結果出力先 (JSON/CSV形式)')
 @click.option('--config', type=click.Path(exists=True), help='設定ファイル (.japhrase.toml / .japhrase.yml)')
-@click.option('--preset', type=click.Choice(list(PRESETS.keys())),
-              help=f'パラメータプリセット ({", ".join(PRESETS.keys())} から選択)')
+@click.option('--preset', type=click.Choice(PRESET_CHOICES),
+              help=f'パラメータプリセット ({", ".join(PRESET_CHOICES)} から選択)')
 @click.option('--min-count', type=int, help='最小出現回数フィルタ (デフォルト: 6)')
 @click.option('--max-length', type=int, help='最大フレーズ長フィルタ (デフォルト: 16)')
 @click.option('--format', type=click.Choice(['csv', 'json', 'table']), default='json',
               help='出力形式 (デフォルト: json - NRE v7対応)')
 @click.option('--top-n', type=int, default=20, help='出力する上位フレーズ数 (デフォルト: 20)')
-def stats(input_file, output, config, preset, min_count, max_length, format, top_n):
+@click.option('--state-path', type=click.Path(), help='Incremental state JSON path')
+@click.option('--resume', is_flag=True, help='Resume from existing state')
+def stats(input_file, output, config, preset, min_count, max_length, format, top_n, state_path, resume):
     """
     フレーズ統計を計算（JSON/CSV/テーブル形式対応）
 
@@ -232,15 +361,15 @@ def stats(input_file, output, config, preset, min_count, max_length, format, top
       japhrase stats corpus.txt --min-count 5 --max-length 20 -o output.json
     """
     try:
-        # 設定ファイルを読み込む
+        # ???????????
         cfg = JaphraseConfig(config)
         config_params = cfg.get_extractor_params()
 
-        # ファイル読込
+        # ??????
         texts = read_file(input_file, encoding='auto')
-        click.echo(f"📖 {len(texts)}行を読み込みました", err=True)
+        click.echo(f"?? {len(texts)}?????????", err=True)
 
-        # パラメータをマージ（CLIオプション > 設定ファイル）
+        # ??????????CLI????? > ???????
         final_params = config_params.copy()
         if preset is not None:
             final_params['preset'] = preset
@@ -249,162 +378,90 @@ def stats(input_file, output, config, preset, min_count, max_length, format, top
         if max_length is not None:
             final_params['max_length'] = max_length
 
-        # PhraseExtracter 初期化
-        if 'preset' in final_params and not min_count and not max_length:
-            extractor = PhraseExtracter.preset(final_params['preset'], verbose=0)
+        resolved_preset = _resolve_preset_name(final_params.get('preset'), texts)
+        if final_params.get('preset') == 'auto':
+            click.echo(f"Auto preset selected: {resolved_preset}", err=True)
+        if resolved_preset:
+            final_params['preset'] = resolved_preset
+
+        extractor = _build_extractor(final_params, min_count, max_length, False, texts)
+
+        # ????????
+        click.echo("?? ????????...", err=True)
+        state = _apply_incremental_state(extractor, texts, state_path, resume)
+        if state:
+            phrases_df = state.to_df(extractor)
+            total_texts = state.total_texts
         else:
-            if 'min_count' not in final_params:
-                final_params['min_count'] = 6
-            if 'max_length' not in final_params:
-                final_params['max_length'] = 16
-
-            extractor = PhraseExtracter(
-                verbose=0,
-                **{k: v for k, v in final_params.items() if k in [
-                    'min_count', 'max_length', 'min_length', 'threshold_originality',
-                    'weight_freq', 'weight_len', 'removes', 'knowns', 'unnecesary'
-                ]}
-            )
-
-        # フレーズ抽出実行
-        click.echo("🔍 フレーズを抽出中...", err=True)
-        phrases_df = extractor.get_dfphrase(texts)
+            phrases_df = extractor.get_dfphrase(texts)
+            total_texts = len(texts)
 
         if len(phrases_df) == 0:
-            click.echo("❌ フレーズが見つかりませんでした", err=True)
+            click.echo("? ???????????????", err=True)
             sys.exit(1)
 
-        click.echo(f"✅ {len(phrases_df)}個のフレーズを検出しました", err=True)
+        click.echo(f"? {len(phrases_df)}?????????????", err=True)
 
-        # 統計計算
-        click.echo("📊 統計を計算中...", err=True)
-        import numpy as np
-        from datetime import datetime
-
-        freq_col = phrases_df['freq'].values
-        length_col = phrases_df['length'].values
-        originality_col = phrases_df['originality'].values if 'originality' in phrases_df.columns else np.ones_like(freq_col)
-
-        stats_data = {
-            'status': 'success',
-            'timestamp': datetime.now().isoformat(),
-            'parameters': {
-                'input_file': str(input_file),
-                'min_count': final_params.get('min_count', 6),
-                'max_length': final_params.get('max_length', 16),
-                'preset': final_params.get('preset', 'custom')
-            },
-            'summary': {
-                'total_phrases': int(len(phrases_df)),
-                'unique_phrases': int(len(phrases_df)),
-                'text_lines': int(len(texts)),
-                'total_phrase_occurrences': int(freq_col.sum())
-            },
-            'frequency': {
-                'mean': float(np.mean(freq_col)),
-                'median': float(np.median(freq_col)),
-                'std_dev': float(np.std(freq_col)),
-                'min': int(np.min(freq_col)),
-                'max': int(np.max(freq_col))
-            },
-            'length': {
-                'mean': float(np.mean(length_col)),
-                'median': float(np.median(length_col)),
-                'std_dev': float(np.std(length_col)),
-                'min': int(np.min(length_col)),
-                'max': int(np.max(length_col))
-            },
-            'originality': {
-                'mean': float(np.mean(originality_col)),
-                'median': float(np.median(originality_col)),
-                'std_dev': float(np.std(originality_col)),
-                'min': float(np.min(originality_col)),
-                'max': float(np.max(originality_col))
-            },
-            'diversity': {
-                'entropy': float(-np.sum((freq_col / freq_col.sum()) * np.log2(freq_col / freq_col.sum() + 1e-10))),
-                'gini_coefficient': float(2 * np.sum(np.arange(1, len(freq_col) + 1) * np.sort(freq_col)) / (len(freq_col) * np.sum(freq_col)) - (len(freq_col) + 1) / len(freq_col))
-            },
-            'top_phrases': []
+        params = {
+            'input_file': str(input_file),
+            'min_count': final_params.get('min_count', 6),
+            'max_length': final_params.get('max_length', 16),
+            'preset': final_params.get('preset', 'custom'),
         }
+        stats_data = compute_stats_data(
+            phrases_df,
+            texts,
+            params,
+            top_n=top_n,
+            total_texts_override=total_texts,
+        )
 
-        # 上位フレーズを追加
-        top_phrases_df = phrases_df.nlargest(min(top_n, len(phrases_df)), 'freq')
-        for idx, row in top_phrases_df.iterrows():
-            stats_data['top_phrases'].append({
-                'phrase': str(row['seqchar']),
-                'frequency': int(row['freq']),
-                'length': int(row['length']),
-                'originality': float(row['originality']) if 'originality' in row else 0.0
-            })
-
-        # 出力
+        # ??
         if format == 'json':
             if output:
                 export_to_json(pd.DataFrame([stats_data]), output)
-                click.echo(f"✅ JSON統計を出力しました: {output}", err=True)
+                click.echo(f"? JSON?????????: {output}", err=True)
             else:
                 import json
                 click.echo(json.dumps(stats_data, ensure_ascii=False, indent=2))
         elif format == 'csv':
             if output:
-                # CSVには平坦化したデータを出力
-                csv_data = []
-                csv_data.append({
-                    'metric': 'total_phrases',
-                    'value': stats_data['summary']['total_phrases']
-                })
-                csv_data.append({
-                    'metric': 'frequency_mean',
-                    'value': stats_data['frequency']['mean']
-                })
-                csv_data.append({
-                    'metric': 'frequency_median',
-                    'value': stats_data['frequency']['median']
-                })
-                csv_data.append({
-                    'metric': 'length_mean',
-                    'value': stats_data['length']['mean']
-                })
-                csv_data.append({
-                    'metric': 'entropy',
-                    'value': stats_data['diversity']['entropy']
-                })
-                csv_df = pd.DataFrame(csv_data)
+                csv_df = flatten_stats_for_csv(stats_data)
                 export_to_csv(csv_df, output)
-                click.echo(f"✅ CSV統計を出力しました: {output}", err=True)
+                click.echo(f"? CSV?????????: {output}", err=True)
             else:
-                click.echo("❌ CSV形式では -o/--output オプションでファイル指定が必須です", err=True)
+                click.echo("? CSV???? -o/--output ?????????????????", err=True)
                 sys.exit(1)
-        else:  # table
+        else:
             click.echo("\n" + "=" * 70)
-            click.echo("フレーズ統計レポート")
+            click.echo("統計サマリ")
             click.echo("=" * 70)
-            click.echo(f"\n【基本情報】")
-            click.echo(f"  フレーズ総数: {stats_data['summary']['total_phrases']}")
-            click.echo(f"  テキスト行数: {stats_data['summary']['text_lines']}")
-            click.echo(f"  総出現回数: {stats_data['summary']['total_phrase_occurrences']}")
+            click.echo("\n基本統計")
+            click.echo(f"  フレーズ数: {stats_data['summary']['total_phrases']}")
+            click.echo(f"  行数: {stats_data['summary']['text_lines']}")
+            click.echo(f"  出現総数: {stats_data['summary']['total_phrase_occurrences']}")
 
-            click.echo(f"\n【頻度統計】")
+            click.echo("\n頻度統計")
             click.echo(f"  平均: {stats_data['frequency']['mean']:.2f}")
             click.echo(f"  中央値: {stats_data['frequency']['median']:.2f}")
             click.echo(f"  標準偏差: {stats_data['frequency']['std_dev']:.2f}")
             click.echo(f"  範囲: {stats_data['frequency']['min']}-{stats_data['frequency']['max']}")
 
-            click.echo(f"\n【長さ統計】")
+            click.echo("\n長さ統計")
             click.echo(f"  平均: {stats_data['length']['mean']:.2f} 文字")
             click.echo(f"  中央値: {stats_data['length']['median']:.2f} 文字")
             click.echo(f"  範囲: {stats_data['length']['min']}-{stats_data['length']['max']} 文字")
 
-            click.echo(f"\n【多様性指標】")
+            click.echo("\n多様性統計")
             click.echo(f"  エントロピー: {stats_data['diversity']['entropy']:.3f}")
             click.echo(f"  ジニ係数: {stats_data['diversity']['gini_coefficient']:.3f}")
 
-            click.echo(f"\n【出現頻度上位 {len(stats_data['top_phrases'])} フレーズ】")
+            click.echo(f"\n上位頻出フレーズ {len(stats_data['top_phrases'])} 個")
             for i, phrase_info in enumerate(stats_data['top_phrases'], 1):
-                click.echo(f"  {i:2d}. {phrase_info['phrase']:<20} (出現: {phrase_info['frequency']:3d}回, 長さ: {phrase_info['length']:2d})")
+                click.echo(
+                    f"  {i:2d}. {phrase_info['phrase']:<20} (頻度: {phrase_info['frequency']:3d} 回, 長さ: {phrase_info['length']:2d})"
+                )
             click.echo("\n" + "=" * 70)
-
     except Exception as e:
         click.echo(f"❌ エラー: {e}", err=True)
         import traceback
@@ -412,12 +469,208 @@ def stats(input_file, output, config, preset, min_count, max_length, format, top
         sys.exit(1)
 
 
-# ===== コマンド: kwic =====
+# ===== Command: explain =====
 @cli.command()
 @click.argument('input_file', type=click.Path(exists=True), metavar='INPUT_FILE')
-@click.option('--phrase', required=True, help='検索対象フレーズ (必須)')
-@click.option('-o', '--output', type=click.Path(), help='結果出力先ファイル')
-@click.option('--context', type=int, default=1, help='前後の文脈行数 (デフォルト: 1)')
+@click.option('--phrase', multiple=True, help='Target phrase (repeatable)')
+@click.option('--top-n', type=int, default=10, help='Top N phrases to explain')
+@click.option('--context-chars', type=int, default=20, help='Context characters around a phrase')
+@click.option('--max-samples', type=int, default=3, help='Max samples per phrase')
+@click.option('--format', type=click.Choice(['json', 'table']), default='json', help='Output format')
+@click.option('-o', '--output', type=click.Path(), help='Output file path (JSON)')
+@click.option('--config', type=click.Path(exists=True), help='Config file (.japhrase.toml / .japhrase.yml)')
+@click.option('--preset', type=click.Choice(PRESET_CHOICES), help='Preset name')
+@click.option('--min-count', type=int, help='Min count filter')
+@click.option('--max-length', type=int, help='Max length filter')
+@click.option('--state-path', type=click.Path(), help='Incremental state JSON path')
+@click.option('--resume', is_flag=True, help='Resume from existing state')
+@click.option('-v', '--verbose', is_flag=True, help='Verbose output')
+def explain(
+    input_file,
+    phrase,
+    top_n,
+    context_chars,
+    max_samples,
+    format,
+    output,
+    config,
+    preset,
+    min_count,
+    max_length,
+    state_path,
+    resume,
+    verbose,
+):
+    """Explain phrases with PMI, entropy, and context samples."""
+    try:
+        cfg = JaphraseConfig(config)
+        config_params = cfg.get_extractor_params()
+
+        texts = read_file(input_file, encoding='auto')
+        click.echo(f"?? {len(texts)}?????????", err=True)
+
+        final_params = config_params.copy()
+        if preset is not None:
+            final_params['preset'] = preset
+        if min_count is not None:
+            final_params['min_count'] = min_count
+        if max_length is not None:
+            final_params['max_length'] = max_length
+
+        resolved_preset = _resolve_preset_name(final_params.get('preset'), texts)
+        if final_params.get('preset') == 'auto':
+            click.echo(f"Auto preset selected: {resolved_preset}", err=True)
+        if resolved_preset:
+            final_params['preset'] = resolved_preset
+
+        extractor = _build_extractor(final_params, min_count, max_length, verbose, texts)
+
+        click.echo("?? ????????...", err=True)
+        state = _apply_incremental_state(extractor, texts, state_path, resume)
+        if state:
+            phrases_df = state.to_df(extractor)
+        else:
+            phrases_df = extractor.get_dfphrase(texts)
+
+        if phrases_df.empty:
+            click.echo("? ???????????????", err=True)
+            sys.exit(1)
+
+        phrases_df = ensure_length_column(phrases_df)
+        phrase_col = resolve_phrase_column(phrases_df)
+        freq_col = resolve_frequency_column(phrases_df)
+
+        if phrase:
+            target_phrases = list(phrase)
+        else:
+            target_phrases = (
+                phrases_df.nlargest(min(top_n, len(phrases_df)), freq_col)[phrase_col]
+                .astype(str)
+                .tolist()
+            )
+
+        phrase_freqs = {
+            str(row[phrase_col]): int(row[freq_col])
+            for _, row in phrases_df.iterrows()
+        }
+
+        evidence = build_phrase_evidence(
+            texts,
+            target_phrases,
+            phrase_freqs,
+            context_chars=context_chars,
+            max_samples=max_samples,
+        )
+
+        if format == 'json':
+            if output:
+                Path(output).parent.mkdir(parents=True, exist_ok=True)
+                import json
+                with open(output, 'w', encoding='utf-8') as f:
+                    json.dump(evidence, f, ensure_ascii=False, indent=2)
+                click.echo(f"? JSON???????: {output}", err=True)
+            else:
+                import json
+                click.echo(json.dumps(evidence, ensure_ascii=False, indent=2))
+        else:
+            for item in evidence:
+                click.echo(f"\n[{item['phrase']}] freq={item['frequency']} pmi={item['pmi']:.3f} boundary={item['boundary_score']:.3f}")
+                for sample in item['samples']:
+                    click.echo(f"  L{sample['line_num']}: {sample['context']}")
+
+    except Exception as e:
+        click.echo(f"? ???: {e}", err=True)
+        sys.exit(1)
+
+
+# ===== Command: stats-report =====
+@cli.command(name='stats-report')
+@click.argument('input_file', type=click.Path(exists=True), metavar='INPUT_FILE')
+@click.option('-o', '--output', type=click.Path(), required=True, help='HTML output path')
+@click.option('--title', type=str, default='Phrase Stats Report', help='Report title')
+@click.option('--config', type=click.Path(exists=True), help='Config file (.japhrase.toml / .japhrase.yml)')
+@click.option('--preset', type=click.Choice(PRESET_CHOICES), help='Preset name')
+@click.option('--min-count', type=int, help='Min count filter')
+@click.option('--max-length', type=int, help='Max length filter')
+@click.option('--top-n', type=int, default=20, help='Top N phrases to include')
+@click.option('--state-path', type=click.Path(), help='Incremental state JSON path')
+@click.option('--resume', is_flag=True, help='Resume from existing state')
+@click.option('-v', '--verbose', is_flag=True, help='Verbose output')
+def stats_report(
+    input_file,
+    output,
+    title,
+    config,
+    preset,
+    min_count,
+    max_length,
+    top_n,
+    state_path,
+    resume,
+    verbose,
+):
+    """Generate an HTML stats report."""
+    try:
+        cfg = JaphraseConfig(config)
+        config_params = cfg.get_extractor_params()
+
+        texts = read_file(input_file, encoding='auto')
+        click.echo(f"?? {len(texts)}?????????", err=True)
+
+        final_params = config_params.copy()
+        if preset is not None:
+            final_params['preset'] = preset
+        if min_count is not None:
+            final_params['min_count'] = min_count
+        if max_length is not None:
+            final_params['max_length'] = max_length
+
+        resolved_preset = _resolve_preset_name(final_params.get('preset'), texts)
+        if final_params.get('preset') == 'auto':
+            click.echo(f"Auto preset selected: {resolved_preset}", err=True)
+        if resolved_preset:
+            final_params['preset'] = resolved_preset
+
+        extractor = _build_extractor(final_params, min_count, max_length, verbose, texts)
+
+        click.echo("?? ????????...", err=True)
+        state = _apply_incremental_state(extractor, texts, state_path, resume)
+        if state:
+            phrases_df = state.to_df(extractor)
+            total_texts = state.total_texts
+        else:
+            phrases_df = extractor.get_dfphrase(texts)
+            total_texts = len(texts)
+
+        if phrases_df.empty:
+            click.echo("? ???????????????", err=True)
+            sys.exit(1)
+
+        params = {
+            'input_file': str(input_file),
+            'min_count': final_params.get('min_count', 6),
+            'max_length': final_params.get('max_length', 16),
+            'preset': final_params.get('preset', 'custom'),
+        }
+        stats_data = compute_stats_data(
+            phrases_df,
+            texts,
+            params,
+            top_n=top_n,
+            total_texts_override=total_texts,
+        )
+
+        html = render_stats_html(stats_data, title=title)
+        Path(output).parent.mkdir(parents=True, exist_ok=True)
+        with open(output, 'w', encoding='utf-8') as f:
+            f.write(html)
+        click.echo(f"? HTML???????????: {output}", err=True)
+
+    except Exception as e:
+        click.echo(f"? ???: {e}", err=True)
+        sys.exit(1)
+
+
 def kwic(input_file, phrase, output, context):
     """
     フレーズの出現箇所を文脈付きで検索 (KWIC: Keyword in Context)
@@ -559,7 +812,7 @@ def detect_habits(input_file, reference_dir, top_n, output):
 @click.option('--corpus-dir', type=click.Path(exists=True),
               help='過去原稿ディレクトリ (セルフリコメンデーション用)')
 @click.option('-o', '--output', type=click.Path(), help='分析レポート出力先')
-@click.option('--preset', type=click.Choice(list(PRESETS.keys())), default='default',
+@click.option('--preset', type=click.Choice(PRESET_CHOICES), default='default',
               help=f'抽出パラメータプリセット (デフォルト: default)')
 def analyze(input_file, abstract, corpus_dir, output, preset):
     """
