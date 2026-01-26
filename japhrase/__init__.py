@@ -116,6 +116,8 @@ from .scene_transition_detector import SceneTransitionDetector
 from .evidence import build_phrase_evidence
 from .stats_utils import compute_stats_data
 from .stats_report import render_stats_html
+# 書き癖検出
+from .writing_habit_detector import WritingHabitDetector
 
 __all__ = [
     'PhraseExtracter',
@@ -210,4 +212,6 @@ __all__ = [
     'build_phrase_evidence',
     'compute_stats_data',
     'render_stats_html',
+    # 書き癖検出
+    'WritingHabitDetector',
 ]

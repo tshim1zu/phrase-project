@@ -34,6 +34,7 @@ df = analyzer.analyze(text, "ターゲット単語")
 | **PhraseExtracter** | PMI/エントロピーベースの統計的フレーズ抽出 | SNS分析、ニュース抽出、キーワード検出 |
 | **Summarizer** ⭐ NEW | 統計的要約エンジン（LLM不要・高速・確実） | テキスト圧縮、アブストラクト生成 |
 | **CooccurrenceAnalyzer** ⭐ NEW | 共起語分析による特徴語抽出 | キャラクター分析、製品評判分析、トレンド背景分析 |
+| **WritingHabitDetector** ⭐ NEW | 高頻度×低PMIで書き癖を自動検出 | 文章癖の発見、スタイル分析、執筆支援 |
 | **ComparisonAnalyzer** | Good/Bad プロンプト比較 | ComfyUI最適化、プロンプト改善 |
 | **SimilarityAnalyzer** | 複数テキスト間の類似度分析 | コピペ検出、重複分析 |
 
@@ -125,7 +126,27 @@ print(df)  # [自動運転, セキュリティ, 透明性, ...]
 
 **詳細**: `examples/cooccurrence_demo.py`
 
-### 4. プロンプト比較分析
+### 4. 書き癖検出 ⭐ 新機能（v0.2.0）
+
+```python
+from japhrase import WritingHabitDetector
+
+# 高頻度×低PMIで書き癖を自動検出
+detector = WritingHabitDetector(min_count=10, max_pmi=3.0)
+df = detector.detect("your_text.txt")
+
+# 上位10個の書き癖を表示
+detector.visualize_top_habits(df, top_n=10)
+```
+
+**特徴:**
+- ✅ 純粋に統計ベース（高頻度×低PMI）
+- ✅ 「〜だった」「それは」などの文末・接続詞の癖を自動検出
+- ✅ 著者比較、カテゴリ別分析が可能
+
+**詳細**: `examples/writing_habit_demo.py`
+
+### 5. プロンプト比較分析
 
 Good と Bad のプロンプトを比較して、成功テンプレートと失敗パターンを抽出：
 
@@ -138,7 +159,7 @@ python scripts/run_comfy_analysis.py \
 
 **詳細**: [USAGE.md](docs/USAGE.md)
 
-### 5. 類似度分析
+### 6. 類似度分析
 
 ```python
 from japhrase import SimilarityAnalyzer
