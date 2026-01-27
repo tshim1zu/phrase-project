@@ -35,6 +35,7 @@ from .use_cases import WritingWorkflow
 from .config import JaphraseConfig
 from .checker import QualityChecker
 from .utils import read_file, export_to_csv, export_to_json
+from .document_vectorizer import DocumentVectorizer
 
 logger = logging.getLogger(__name__)
 
@@ -990,6 +991,175 @@ def workflow(workflow_file, parallel, max_workers, output, verbose):
 
     except FileNotFoundError as e:
         click.echo(f"❌ ファイルが見つかりません: {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"❌ エラー: {e}", err=True)
+        if verbose:
+            import traceback
+            traceback.print_exc()
+        sys.exit(1)
+
+
+# ===== コマンド: vectorize =====
+@cli.command()
+@click.argument('files', nargs=-1, type=click.Path(exists=True), required=True)
+@click.option('--n-topics', '-t', type=int, default=10, help='NMFのトピック数')
+@click.option('--output', '-o', type=click.Path(), required=True, help='出力ディレクトリ')
+@click.option('--feature-mode', '-m',
+              type=click.Choice(['tfidf', 'low_pmi', 'high_pmi', 'hybrid']),
+              default='tfidf',
+              help='特徴抽出モード')
+@click.option('--pmi-threshold', type=float, default=3.0, help='PMI閾値')
+@click.option('--min-count', type=int, default=6, help='最小出現回数')
+@click.option('--visualize', is_flag=True, help='可視化を生成')
+@click.option('--encoding', default='auto', help='ファイルエンコーディング')
+@click.option('-v', '--verbose', is_flag=True, help='詳細出力')
+def vectorize(files, n_topics, output, feature_mode, pmi_threshold, min_count,
+              visualize, encoding, verbose):
+    """
+    複数のドキュメントをNMFでベクトル化し、差分を可視化
+
+    特徴モード:
+    \b
+    - tfidf: 標準TF-IDF（意味的な差を検出）
+    - low_pmi: 低PMIフレーズのみ（文体・手癖の差を検出）
+    - high_pmi: 高PMIフレーズのみ（意味的な表現の差）
+    - hybrid: 複合特徴空間
+
+    使用例:
+    \b
+        japhrase vectorize doc1.txt doc2.txt doc3.txt -t 10 -o results/
+        japhrase vectorize author1.txt author2.txt -t 10 -o habits_analysis/ \\
+            --feature-mode low_pmi --pmi-threshold 3.0 --visualize
+    """
+    try:
+        from pathlib import Path
+        import os
+
+        # 出力ディレクトリを作成
+        Path(output).mkdir(parents=True, exist_ok=True)
+
+        click.echo(f"📊 ドキュメント ベクトル化を開始します", err=True)
+        click.echo(f"   ファイル数: {len(files)}", err=True)
+        click.echo(f"   トピック数: {n_topics}", err=True)
+        click.echo(f"   特徴モード: {feature_mode}", err=True)
+
+        # DocumentVectorizerを作成
+        vectorizer = DocumentVectorizer(
+            n_topics=n_topics,
+            feature_mode=feature_mode,
+            pmi_threshold=pmi_threshold,
+            min_count=min_count,
+            verbose=1 if verbose else 0
+        )
+
+        # ファイルからベクトル化
+        click.echo("📖 ファイルを読み込み中...", err=True)
+        result = vectorizer.from_files(
+            list(files),
+            n_topics=n_topics,
+            feature_mode=feature_mode,
+            encoding=encoding
+        )
+
+        click.echo(f"✅ ベクトル化完了: {result.document_topic_matrix.shape[0]}件 × {result.document_topic_matrix.shape[1]}トピック", err=True)
+
+        # 結果を保存
+        result_pkl = os.path.join(output, 'vectorization_result.pkl')
+        result.save(result_pkl)
+
+        # ドキュメント-トピック行列を保存
+        doc_topic_csv = os.path.join(output, 'document_topic_matrix.csv')
+        vectorizer.export_matrix(result, doc_topic_csv, format='csv', matrix_type='normalized')
+
+        # 上位タームを保存
+        top_terms_json = os.path.join(output, 'top_terms.json')
+        vectorizer.export_top_terms(result, top_terms_json, n_terms=20, format='json')
+
+        # テキストベースの分析結果を表示
+        click.echo("\n" + "=" * 80)
+        text_report = vectorizer.format_document_profiles_as_text(result)
+        click.echo(text_report)
+
+        click.echo("\n" + vectorizer.format_topic_summary_as_text(result, n_terms=15))
+
+        # ペアワイズ距離を計算・表示
+        distances = vectorizer.calculate_pairwise_distances(result, metric='cosine')
+        distances_csv = os.path.join(output, 'pairwise_distances.csv')
+        distances.to_csv(distances_csv, encoding='utf-8-sig')
+
+        click.echo("\n" + "=" * 80)
+        click.echo("📏 ドキュメント間の距離（コサイン距離）")
+        click.echo("=" * 80)
+        click.echo(distances.round(3).to_string())
+
+        # 最初のドキュメントとの差分を計算・表示
+        if len(files) > 1:
+            diffs = vectorizer.calculate_differences(result, 0, list(range(1, len(files))))
+            diff_text = vectorizer.format_differences_as_text(diffs, top_n_topics=None)
+            click.echo("\n" + diff_text)
+
+            # 差分行列を保存
+            diff_csv = os.path.join(output, 'topic_differences.csv')
+            diffs.to_csv(diff_csv, encoding='utf-8-sig')
+
+        # 可視化を生成（オプション）
+        if visualize:
+            click.echo("\n🎨 可視化を生成中...", err=True)
+
+            # ドキュメント-トピック ヒートマップ
+            heatmap_path = os.path.join(output, 'document_topic_heatmap.png')
+            vectorizer.export_heatmap(result, heatmap_path)
+            click.echo(f"  ✅ {Path(heatmap_path).name}", err=True)
+
+            # 複数ドキュメント比較（レーダープロット）
+            if len(files) >= 2 and len(files) <= 5:
+                radar_path = os.path.join(output, 'document_comparison_radar.png')
+                doc_indices = list(range(min(5, len(files))))
+                vectorizer.export_radar_plot(result, doc_indices, radar_path)
+                click.echo(f"  ✅ {Path(radar_path).name}", err=True)
+
+            # 最初のドキュメントとの差分を可視化
+            if len(files) > 1:
+                diffs = vectorizer.calculate_differences(result, 0, list(range(1, len(files))))
+
+                # 差分 ヒートマップ
+                diff_heatmap = os.path.join(output, 'difference_heatmap.png')
+                vectorizer.export_difference_heatmap(diffs, diff_heatmap)
+                click.echo(f"  ✅ {Path(diff_heatmap).name}", err=True)
+
+                # 差分 バーチャート
+                diff_bars = os.path.join(output, 'difference_bars.png')
+                vectorizer.export_difference_bars(diffs, diff_bars, top_n_topics=10)
+                click.echo(f"  ✅ {Path(diff_bars).name}", err=True)
+
+        # 最終サマリー
+        click.echo("\n" + "=" * 80, err=True)
+        click.echo("✅ ベクトル化処理完了", err=True)
+        click.echo("=" * 80, err=True)
+        click.echo(f"出力ディレクトリ: {output}", err=True)
+        click.echo(f"\n📁 出力ファイル一覧:", err=True)
+        click.echo(f"  基本出力:", err=True)
+        click.echo(f"    - vectorization_result.pkl (Python再利用用オブジェクト)", err=True)
+        click.echo(f"    - document_topic_matrix.csv (正規化されたドキュメント-トピック行列)", err=True)
+        click.echo(f"    - pairwise_distances.csv (ドキュメント間の距離)", err=True)
+        click.echo(f"    - top_terms.json (各トピックの上位20ターム)", err=True)
+        if len(files) > 1:
+            click.echo(f"    - topic_differences.csv (ドキュメント間の差分)", err=True)
+        if visualize:
+            click.echo(f"  可視化:", err=True)
+            click.echo(f"    - document_topic_heatmap.png", err=True)
+            if len(files) >= 2 and len(files) <= 5:
+                click.echo(f"    - document_comparison_radar.png", err=True)
+            if len(files) > 1:
+                click.echo(f"    - difference_heatmap.png", err=True)
+                click.echo(f"    - difference_bars.png", err=True)
+
+    except FileNotFoundError as e:
+        click.echo(f"❌ ファイルが見つかりません: {e}", err=True)
+        sys.exit(1)
+    except ValueError as e:
+        click.echo(f"❌ エラー: {e}", err=True)
         sys.exit(1)
     except Exception as e:
         click.echo(f"❌ エラー: {e}", err=True)

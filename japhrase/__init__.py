@@ -118,6 +118,8 @@ from .stats_utils import compute_stats_data
 from .stats_report import render_stats_html
 # 書き癖検出
 from .writing_habit_detector import WritingHabitDetector
+# ドキュメント ベクトル化
+from .document_vectorizer import DocumentVectorizer, VectorizationResult
 
 __all__ = [
     'PhraseExtracter',
@@ -214,4 +216,7 @@ __all__ = [
     'render_stats_html',
     # 書き癖検出
     'WritingHabitDetector',
+    # ドキュメント ベクトル化
+    'DocumentVectorizer',
+    'VectorizationResult',
 ]
