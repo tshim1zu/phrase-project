@@ -126,6 +126,10 @@ from .orthography_checker import OrthographyVariantDetector, check_orthography
 from .stylometry import StylometryAnalyzer, analyze_stylometry, get_stylometry_summary
 from .character_network import CharacterNetworkGenerator, generate_character_network
 from .prompt_optimizer import PromptOptimizer, optimize_prompt
+# 執筆支援: 高度な分析機能
+from .ending_repetition_police import EndingRepetitionPolice, EndingRepetitionIssue
+from .entropy_pacing import EntropyPacing, PacingIssue
+from .chekhov_gun_detector import ChekhofGunDetector, UnfiredGun
 
 __all__ = [
     'PhraseExtracter',
@@ -237,4 +241,11 @@ __all__ = [
     'generate_character_network',
     'PromptOptimizer',
     'optimize_prompt',
+    # 執筆支援: 高度な分析機能（Sharp Features）
+    'EndingRepetitionPolice',
+    'EndingRepetitionIssue',
+    'EntropyPacing',
+    'PacingIssue',
+    'ChekhofGunDetector',
+    'UnfiredGun',
 ]
