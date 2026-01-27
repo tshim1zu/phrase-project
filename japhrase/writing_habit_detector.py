@@ -41,6 +41,13 @@ class WritingHabitDetector:
         >>> print(df.head(10))  # 上位10個の書き癖を表示
     """
 
+    # スコアリングウェイト（経験的に決定）
+    # 習慣的使用の指標としての頻度を重視（70%）
+    WEIGHT_FREQUENCY = 0.7
+
+    # 定型表現の指標としてPMI逆数を用いる（30%）
+    WEIGHT_PMI_INVERSE = 0.3
+
     def __init__(
         self,
         min_count: int = 10,
@@ -328,11 +335,15 @@ class WritingHabitDetector:
 
     def _calculate_habit_score(self, df: pd.DataFrame) -> pd.Series:
         """
-        書き癖スコアを計算
+        書き癖スコアを計算（重み付き統計スコア）
 
-        スコア = 正規化された頻度 × (1 / 正規化されたPMI)
+        スコア = WEIGHT_FREQUENCY × 正規化頻度 + WEIGHT_PMI_INVERSE × 正規化PMI逆数
 
         高頻度 & 低PMI → 高スコア
+
+        Weights:
+            - WEIGHT_FREQUENCY (0.7): 習慣的使用の指標としての頻度を重視
+            - WEIGHT_PMI_INVERSE (0.3): 定型表現の指標としてPMI逆数を用いる
         """
         # 列名を確認
         count_col = 'count' if 'count' in df.columns else 'freq'
@@ -351,8 +362,8 @@ class WritingHabitDetector:
         norm_pmi_inv = 1.0 / (df['pmi'] + 0.1)
         norm_pmi_inv = norm_pmi_inv / norm_pmi_inv.max()
 
-        # 重み付き平均（頻度70%、PMI逆数30%）
-        score = 0.7 * norm_freq + 0.3 * norm_pmi_inv
+        # 重み付き平均
+        score = self.WEIGHT_FREQUENCY * norm_freq + self.WEIGHT_PMI_INVERSE * norm_pmi_inv
 
         return score
 

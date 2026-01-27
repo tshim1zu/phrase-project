@@ -18,6 +18,13 @@ from .patterns import get_positive_patterns, get_negative_patterns
 
 logger = logging.getLogger(__name__)
 
+# Optional dependency for optimized Levenshtein distance
+try:
+    import Levenshtein
+    HAS_LEVENSHTEIN = True
+except ImportError:
+    HAS_LEVENSHTEIN = False
+
 # Lazy import to avoid circular dependency
 _similarity_analyzer = None
 
@@ -218,34 +225,60 @@ class PhraseExtracter:
         })
         return df
 
-    def calculate_pmi(self, phrases: List[str], all_text: str) -> Dict[str, float]:
+    def calculate_pmi(self, phrases_or_freq, all_text_or_counter=None, total_chars=None) -> Dict[str, float]:
         """
-        PMI (Pointwise Mutual Information) を計算
+        PMI (Pointwise Mutual Information) を計算（最適化版 + 後方互換性）
 
         PMI(phrase) = log(P(phrase) / product(P(char_i)))
 
         高いPMI = 文字の結合度が強い (例: "機械学習")
         低いPMI = 単なる組み合わせ (例: "ていう")
 
+        最適化: 事前計算済みの頻度データを使用し、str.count()呼び出しを排除
+        - 計算量: O(n+m) （n=フレーズ数, m=テキスト長）
+        - 旧版: O(n×m) （フレーズごとに全テキスト走査）
+
+        後方互換性: 以下の2つの呼び出し形式をサポート
+        1. 最適化版: calculate_pmi(phrase_freq: Dict, char_counter: Counter, total_chars: int)
+        2. 旧版（互換性）: calculate_pmi(phrases: List[str], all_text: str)
+
         Parameters:
-            phrases: フレーズのリスト
-            all_text: 全テキスト（文字確率計算用）
+            phrases_or_freq: フレーズリスト（旧版）またはフレーズ→頻度の辞書（新版）
+            all_text_or_counter: テキスト文字列（旧版）またはCounter（新版）
+            total_chars: テキスト総文字数（新版のみ）
 
         Returns:
             Dict[phrase: pmi_score]
         """
-        if not phrases or not all_text:
+        # 引数形式の判定と変換
+        if isinstance(phrases_or_freq, dict) and isinstance(all_text_or_counter, Counter):
+            # 新版: 最適化版（phrase_freq, char_counter, total_chars）
+            phrase_freq = phrases_or_freq
+            char_counter = all_text_or_counter
+        elif isinstance(phrases_or_freq, (list, tuple)) and isinstance(all_text_or_counter, str):
+            # 旧版互換性: リスト形式（phrases, all_text）
+            # テキストから頻度情報を構築
+            phrases = phrases_or_freq
+            all_text = all_text_or_counter
+            if not phrases or not all_text:
+                return {}
+
+            char_counter = Counter(all_text)
+            total_chars = len(all_text)
+
+            # フレーズ の出現回数を計算（完全一致のみ）
+            phrase_freq = {}
+            for phrase in phrases:
+                phrase_freq[phrase] = all_text.count(phrase)
+        else:
             return {}
 
-        # 全文字の出現頻度をカウント
-        char_counter = Counter(all_text)
-        total_chars = len(all_text)
+        if not phrase_freq or total_chars == 0:
+            return {}
 
         pmi_scores = {}
 
-        for phrase in phrases:
-            # フレーズの出現回数（大まかな推定）
-            phrase_count = all_text.count(phrase)
+        for phrase, phrase_count in phrase_freq.items():
             if phrase_count == 0:
                 pmi_scores[phrase] = 0.0
                 continue
@@ -486,10 +519,15 @@ class PhraseExtracter:
         if not len(df_concat):
             return df_concat
 
-        # PMI計算を追加
+        # PMI計算を追加（最適化版）
         if self.use_pmi:
             all_text = "".join(sentences)
-            pmi_scores = self.calculate_pmi(df_concat[self.clm_seqchar].tolist(), all_text)
+            # 頻度データを事前準備（str.count()の呼び出しを排除）
+            phrase_freq = dict(zip(df_concat[self.clm_seqchar], df_concat[self.clm_freq]))
+            char_counter = Counter(all_text)
+            total_chars = len(all_text)
+            # 最適化されたメソッドを呼び出し
+            pmi_scores = self.calculate_pmi(phrase_freq, char_counter, total_chars)
             df_concat["pmi"] = df_concat[self.clm_seqchar].map(pmi_scores).fillna(0.0)
 
         # 分岐エントロピー計算を追加
@@ -553,16 +591,15 @@ class PhraseExtracter:
         """
         レーベンシュタイン距離を計算
 
-        Note: This method delegates to SimilarityAnalyzer for optimized computation
+        HAS_LEVENSHTEIN フラグに基づいて最適化バージョンを使用
         """
-        try:
-            # Try to use python-Levenshtein if available
-            import Levenshtein
+        if HAS_LEVENSHTEIN:
+            # python-Levenshteinライブラリを使用（高速）
             return float(Levenshtein.distance(seq_x, seq_y))
-        except ImportError:
-            # Fallback to pure Python implementation
+        else:
+            # フォールバック：純Python実装
             analyzer = _get_similarity_analyzer()
-            # Calculate distance from similarity
+            # 類似度から距離を計算
             similarity = analyzer.similarity_levenshtein(seq_x, seq_y)
             seq_length = (len(seq_x) + len(seq_y)) / 2
             return (1 - similarity) * seq_length

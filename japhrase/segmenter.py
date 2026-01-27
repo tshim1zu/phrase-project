@@ -52,47 +52,58 @@ class TextSegmenter:
         
     def calculate_right_entropy_profile(self, text: str) -> Tuple[np.ndarray, List[str]]:
         """
-        テキスト全体の「右側分岐エントロピー」プロファイルを計算
-        
+        テキスト全体の「右側分岐エントロピー」プロファイルを計算（最適化版）
+
         各位置で、直前のフレーズ（window_size分）の直後に来る文字の
         分岐エントロピーを計算します。
-        
+
+        最適化: 辞書ベースのアルゴリズムで計算量を O(n²) → O(n×w) に削減
+        - STEP 1: コンテキスト辞書を1回のスキャンで構築 O(n)
+        - STEP 2: 各位置でエントロピーを辞書参照で計算 O(n)
+        - (w = window_size は通常4なので実質 O(n))
+
         Parameters:
             text (str): 入力テキスト
-            
+
         Returns:
-            (entropy_profile, contexts): 
+            (entropy_profile, contexts):
                 - entropy_profile: 各位置のエントロピー値 (numpy.ndarray)
                 - contexts: 各位置での直前フレーズ (List[str])
         """
         if not text or len(text) < 2:
             return np.array([]), []
-        
+
+        # STEP 1: コンテキスト辞書を構築 O(n×w)
+        # context_map[context] = [next_char1, next_char2, ...]
+        context_map = {}
+
+        for i in range(len(text)):
+            # 複数のコンテキスト長を考慮（1～window_size文字）
+            for context_len in range(1, min(self.window_size + 1, i + 1)):
+                context = text[i - context_len:i]
+                if i < len(text):
+                    next_char = text[i]
+                    if context not in context_map:
+                        context_map[context] = []
+                    context_map[context].append(next_char)
+
+        # STEP 2: エントロピープロファイルを計算 O(n)
         entropy_profile = []
         contexts = []
-        
-        # 各位置をスキャン
+
         for i in range(len(text)):
             # 直前のフレーズを抽出
             start_idx = max(0, i - self.window_size)
             context = text[start_idx:i]
             contexts.append(context)
-            
-            # この位置から後ろに出現する文字を収集
-            right_chars = []
-            for j in range(i, len(text)):
-                if text[j:j+len(context)] == context if context else False:
-                    # コンテキストが一致する場所の直後の文字
-                    if j + len(context) < len(text):
-                        right_chars.append(text[j + len(context)])
-                elif not context:
-                    # コンテキストが空の場合（テキスト開始）
-                    right_chars.append(text[j])
-            
+
+            # コンテキストに対応する後続文字を辞書から取得 O(1)
+            right_chars = context_map.get(context, [])
+
             # エントロピーを計算
             entropy = self._calculate_entropy(right_chars)
             entropy_profile.append(entropy)
-        
+
         return np.array(entropy_profile), contexts
     
     @staticmethod
