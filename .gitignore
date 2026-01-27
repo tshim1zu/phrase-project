@@ -84,6 +84,7 @@ data/
 CLAUDE.md
 .claude.md
 claude.md
+comment.md
 *.personal
 
 # ComfyUI・分析関連

@@ -174,8 +174,28 @@ class GrammarPatternExtractor:
 
         # PMI計算
         if self.use_pmi:
+            # 事前計算: フレーズと部分フレーズの出現頻度を計算
+            full_text_counter = Counter(
+                phrase for phrase_match in df['phrase'].unique()
+                for phrase in [phrase_match]
+            )
+            # 実際には substring counting が必要なので、全フレーズに対するカウント辞書を作成
+            phrase_substrings = {}
+            for phrase in df['phrase'].unique():
+                mid = len(phrase) // 2
+                part1 = phrase[:mid]
+                part2 = phrase[mid:]
+                phrase_substrings[phrase] = {
+                    'part1': part1,
+                    'part2': part2,
+                    'count': full_text.count(phrase),
+                    'count_part1': full_text.count(part1),
+                    'count_part2': full_text.count(part2)
+                }
+
+            total_chars = len(full_text)
             df['pmi'] = df['phrase'].apply(
-                lambda p: self._calculate_pmi(p, full_text)
+                lambda p: self._calculate_pmi(p, phrase_substrings, total_chars)
             )
         else:
             df['pmi'] = 0.0
@@ -291,32 +311,31 @@ class GrammarPatternExtractor:
             for pattern, group in df.groupby('pattern')
         }
 
-    def _calculate_pmi(self, phrase: str, full_text: str) -> float:
+    def _calculate_pmi(self, phrase: str, phrase_substrings: Dict, total_chars: int) -> float:
         """
-        PMI（自己相互情報量）を計算
+        PMI（自己相互情報量）を計算（最適化版）
 
         PMI(x,y) = log2(P(x,y) / (P(x) * P(y)))
 
         ここでは、フレーズを前半と後半に分割してPMIを計算します。
+        事前計算済みの substring カウントを使用することで計算量を削減。
+
+        Parameters:
+            phrase: 対象フレーズ
+            phrase_substrings: {phrase: {'part1', 'part2', 'count', 'count_part1', 'count_part2'}}
+            total_chars: テキスト全体の文字数
         """
-        if len(phrase) < 2:
+        if len(phrase) < 2 or total_chars == 0:
             return 0.0
 
-        # フレーズを分割（中間点で分ける）
-        mid = len(phrase) // 2
-        part1 = phrase[:mid]
-        part2 = phrase[mid:]
-
-        # 全体のトークン数
-        total_chars = len(full_text)
-
-        if total_chars == 0:
+        # 事前計算済みデータから取得
+        if phrase not in phrase_substrings:
             return 0.0
 
-        # 各部分の出現回数
-        count_phrase = full_text.count(phrase)
-        count_part1 = full_text.count(part1)
-        count_part2 = full_text.count(part2)
+        counts = phrase_substrings[phrase]
+        count_phrase = counts['count']
+        count_part1 = counts['count_part1']
+        count_part2 = counts['count_part2']
 
         # 確率計算
         p_phrase = count_phrase / total_chars

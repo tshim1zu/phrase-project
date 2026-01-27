@@ -60,16 +60,27 @@ class VariantCandidate:
 class TextVariantDetector:
     """表記ゆれを統計的に検出"""
 
-    def __init__(self, similarity_threshold: float = 0.7, 
-                 preferred_dictionary: Optional[Dict[str, str]] = None):
+    # ブロッキングフィルタの設定（計算量最適化）
+    MAX_LENGTH_DIFF = 3           # 長さの差がこれ以上なら比較しない
+    MAX_COMPARISON_PAIRS = 10000  # 最大比較ペア数（超過時は警告）
+    DEFAULT_TOP_N = 500           # デフォルトで上位500フレーズのみ比較
+
+    def __init__(self, similarity_threshold: float = 0.7,
+                 preferred_dictionary: Optional[Dict[str, str]] = None,
+                 max_comparison_pairs: int = 10000,
+                 enable_blocking: bool = True):
         """
         Parameters:
             similarity_threshold: スコアがこの値以上のペアを候補とする
             preferred_dictionary: 推奨表記辞書 {変異形 -> 推奨表記}
+            max_comparison_pairs: 最大比較ペア数（計算量削減用）
+            enable_blocking: ブロッキングフィルタを有効にするか
         """
         self.similarity_threshold = similarity_threshold
         self.context_freq = {}  # フレーズ周辺単語の統計
         self.preferred_dictionary = preferred_dictionary or {}  # {variant: preferred}
+        self.max_comparison_pairs = max_comparison_pairs
+        self.enable_blocking = enable_blocking
 
     def detect_variants(
         self,
@@ -102,18 +113,47 @@ class TextVariantDetector:
         if texts:
             self.context_freq = self._analyze_context(phrases, texts, context_window)
 
-        # ペアごとに類似度を計算
+        # ペアごとに類似度を計算（最適化版：ブロッキングフィルタ付き）
         candidates_raw = []
         compared = set()
 
         sorted_phrases = sorted(phrase_dict.items(), key=lambda x: x[1], reverse=True)
 
+        # 計算量削減：上位 N 件のみ比較対象にする
+        if len(sorted_phrases) > self.DEFAULT_TOP_N:
+            logger.warning(
+                f"フレーズ数 ({len(sorted_phrases)}) が多すぎます。"
+                f"上位 {self.DEFAULT_TOP_N} 件のみを比較対象とします。"
+            )
+            sorted_phrases = sorted_phrases[: self.DEFAULT_TOP_N]
+
+        comparison_count = 0
+
         for i, (phrase1, freq1) in enumerate(sorted_phrases):
+            # 内側ループの早期終了（ブロッキング）
             for phrase2, freq2 in sorted_phrases[i + 1:]:
                 pair_key = tuple(sorted([phrase1, phrase2]))
                 if pair_key in compared:
                     continue
+
+                # ブロッキングフィルタ：長さの差が大きい場合はスキップ
+                if self.enable_blocking:
+                    if abs(len(phrase1) - len(phrase2)) > self.MAX_LENGTH_DIFF:
+                        continue
+                    # 最初の文字が異なる場合は明らかに異なるので比較対象から外す
+                    if phrase1[0] != phrase2[0]:
+                        continue
+
                 compared.add(pair_key)
+                comparison_count += 1
+
+                # 比較ペア数が上限を超えたら警告
+                if comparison_count > self.max_comparison_pairs:
+                    logger.warning(
+                        f"比較ペア数 ({comparison_count}) が上限 ({self.max_comparison_pairs}) を超過。"
+                        f"処理を打ち切ります。"
+                    )
+                    break
 
                 scores = self._similarity_scores(phrase1, phrase2)
                 composite = self._composite_score(scores)
@@ -141,6 +181,10 @@ class TextVariantDetector:
                         'composite': composite,
                         'confidence': confidence,
                     })
+
+            # 外側ループでも上限チェック
+            if comparison_count > self.max_comparison_pairs:
+                break
 
         # 候補をマージ（同じ基準フレーズのグループ化）
         candidates_merged = self._merge_candidates(candidates_raw)
