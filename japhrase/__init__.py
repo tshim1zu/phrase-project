@@ -120,6 +120,11 @@ from .stats_report import render_stats_html
 from .writing_habit_detector import WritingHabitDetector
 # ドキュメント ベクトル化
 from .document_vectorizer import DocumentVectorizer, VectorizationResult
+# テキストマイニング・計量文学モジュール
+from .dialogue_analyzer import DialogueAnalyzer, analyze_dialogue
+from .orthography_checker import OrthographyVariantDetector, check_orthography
+from .stylometry import StylometryAnalyzer, analyze_stylometry, get_stylometry_summary
+from .character_network import CharacterNetworkGenerator, generate_character_network
 
 __all__ = [
     'PhraseExtracter',
@@ -219,4 +224,14 @@ __all__ = [
     # ドキュメント ベクトル化
     'DocumentVectorizer',
     'VectorizationResult',
+    # テキストマイニング・計量文学モジュール
+    'DialogueAnalyzer',
+    'analyze_dialogue',
+    'OrthographyVariantDetector',
+    'check_orthography',
+    'StylometryAnalyzer',
+    'analyze_stylometry',
+    'get_stylometry_summary',
+    'CharacterNetworkGenerator',
+    'generate_character_network',
 ]
