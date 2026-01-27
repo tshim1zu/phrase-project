@@ -80,12 +80,18 @@ data/
 !requirements*.txt
 !LICENSE.txt
 
-# 個人設定・機密ファイル
+# 個人設定・機密ファイル・内部ドキュメント
 CLAUDE.md
 .claude.md
 claude.md
 comment.md
 *.personal
+DAILY_SUMMARY_*.md
+ROBUSTNESS_*.md
+DOCUMENT_VECTORIZER_*.md
+WRITING_ASSISTANT_*.md
+COMFY_*.md
+README_ROBUSTNESS_*.md
 
 # ComfyUI・分析関連
 comfy_*.py
