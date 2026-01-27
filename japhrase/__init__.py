@@ -125,6 +125,7 @@ from .dialogue_analyzer import DialogueAnalyzer, analyze_dialogue
 from .orthography_checker import OrthographyVariantDetector, check_orthography
 from .stylometry import StylometryAnalyzer, analyze_stylometry, get_stylometry_summary
 from .character_network import CharacterNetworkGenerator, generate_character_network
+from .prompt_optimizer import PromptOptimizer, optimize_prompt
 
 __all__ = [
     'PhraseExtracter',
@@ -234,4 +235,6 @@ __all__ = [
     'get_stylometry_summary',
     'CharacterNetworkGenerator',
     'generate_character_network',
+    'PromptOptimizer',
+    'optimize_prompt',
 ]
