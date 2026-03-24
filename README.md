@@ -384,13 +384,10 @@ compare(text_a, text_b).report()                                  # → 比較�
 ## インストール
 
 ```bash
-pip install japhrase                  # コア（numpy, pandas, scipy）
-pip install japhrase[similarity]      # + sklearn, Levenshtein
-pip install japhrase[viz]             # + matplotlib, seaborn
-pip install japhrase[all]             # 全部入り
+pip install japhrase
 ```
 
-Python 3.8+
+これだけで全機能が使える。Python 3.8+。
 
 ## 使い方を調べる
 

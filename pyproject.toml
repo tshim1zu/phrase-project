@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "japhrase"
-version = "0.3.6"
+version = "0.3.7"
 description = "Pure-math text intelligence engine for Japanese — vocabulary richness, contamination detection, writing habit analysis, character voice fingerprinting"
 readme = {file = "README.md", content-type = "text/markdown"}
 requires-python = ">=3.8"
@@ -49,32 +49,17 @@ dependencies = [
     "chardet>=4.0.0",
     "click>=8.0.0",
     "PyYAML>=6.0",
-]
-
-[project.optional-dependencies]
-viz = [
-    "matplotlib>=3.3.0",
-    "seaborn>=0.11.0",
-]
-similarity = [
     "python-Levenshtein>=0.12.0",
     "scikit-learn>=0.24.0",
 ]
-network = [
-    "networkx>=2.6",
-]
-excel = [
-    "openpyxl>=3.0.0",
-]
+
+[project.optional-dependencies]
 dev = [
     "pytest>=6.0.0",
     "pytest-cov>=2.0.0",
     "black>=21.0",
     "flake8>=3.9.0",
     "mypy>=0.910",
-]
-all = [
-    "japhrase[viz,similarity,network,excel,dev]",
 ]
 
 [project.scripts]
