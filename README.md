@@ -179,13 +179,63 @@ help(EPDashboard)                   # 話数間推移ダッシュボード
 help(PartHealthReport)              # A〜E 健康診断
 ```
 
-### ドキュメント
+### サンプルスクリプト
 
-| ドキュメント | 内容 |
-|-----------|------|
-| [USAGE.md](docs/USAGE.md) | 詳細な使用ガイド |
-| [API_REFERENCE.md](docs/API_REFERENCE.md) | API リファレンス |
-| [POSITIONING.md](docs/POSITIONING.md) | 設計思想と位置づけ |
+```bash
+python examples/quickstart.py    # 全機能の動作確認（コピペで動く）
+```
+
+### 使用ガイド
+
+#### ファイルから抽出
+
+```python
+from japhrase import PhraseExtracter
+
+df = PhraseExtracter.from_file("input.txt")                          # テキスト
+df = PhraseExtracter.from_file("data.csv", column="text")            # CSV（列指定）
+df = PhraseExtracter.from_file("input.txt", min_count=10, max_length=20)  # パラメータ指定
+```
+
+#### パラメータ
+
+```python
+extractor = PhraseExtracter(
+    min_count=6,                # 最小出現回数（小さいと計算時間が増える）
+    max_length=16,              # フレーズの最大文字数
+    min_length=4,               # フレーズの最小文字数
+    threshold_originality=0.5,  # 類似フレーズ除去の閾値（0.0〜1.0）
+    use_pmi=True,               # PMI で意味的結合を評価
+    use_branching_entropy=True, # 分岐エントロピーで境界を検出
+    knowns=["既知語1"],         # 優先的に抽出したい既知語
+    verbose=1,                  # 進捗表示（0:非表示, 1:表示）
+)
+```
+
+#### 結果のエクスポート
+
+```python
+extractor.export_csv(df, "output.csv")      # CSV（Excel対応BOM付きUTF-8）
+extractor.export_json(df, "output.json")    # JSON
+extractor.export_excel(df, "output.xlsx")   # Excel（要 pip install japhrase[excel]）
+```
+
+#### 対応ファイル形式
+
+テキスト（`.txt`）、CSV（`.csv`）、TSV（`.tsv`）。エンコーディングは自動検出（UTF-8 / Shift-JIS / EUC-JP）。
+
+#### トラブルシューティング
+
+```python
+# メモリ不足 → バッチサイズを小さくする
+extractor = PhraseExtracter(size_sentence=1000)
+
+# 処理が遅い → min_count を上げる / max_length を下げる
+extractor = PhraseExtracter(min_count=20, max_length=10)
+
+# 結果が多すぎる → 類似度閾値を上げる
+extractor = PhraseExtracter(threshold_originality=0.8)
+```
 
 ## テスト
 
