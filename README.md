@@ -1,13 +1,17 @@
 # japhrase
 
-**統計的日本語テキスト分析エンジン：辞書なし・形態素解析なしのフレーズ抽出と計量言語学ツール**
+**辞書もLLMも使わずに、テキストから単語を見つける。**
+
+japhrase は日本語テキストの中から、繰り返し出現するフレーズを統計だけで検出する。MeCab も辞書ファイルも外部 AI も要らない。テキストを入れれば、そこに何度も現れている言葉が出てくる——それが既知語であろうと、辞書に載っていない新語・造語・専門用語であろうと関係ない。
+
+さらに PMI（自己相互情報量）と分岐エントロピーを使うことで、「偶然の並び」と「意味のある結合」を区別できる。「大規模言語モデル」は偶然8文字並んだのではなく、意味的に結合した1つのフレーズだと、統計が教えてくれる。
+
+この抽出エンジンを土台に、テキスト間の類似度比較・語彙分布の統計的比較・計量言語学的な多様性計測といった分析機能群を積み上げている。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI](https://img.shields.io/pypi/v/japhrase)](https://pypi.org/project/japhrase/)
 [![Tests](https://img.shields.io/badge/tests-290%2B%20passing-brightgreen)](https://github.com/tshim1zu/japhrase)
-
-N-gram の頻度分析と PMI（自己相互情報量）を軸に、日本語テキストの中に潜むパターンを統計的に検出する。辞書に載っていない新語・専門用語・造語でも、繰り返されていれば見つかる。その上に、類似度分析・分布比較・語彙多様性計測・汚染検出といった計量言語学ツール群を備える。外部AI不要。numpy + scipy だけで動く。
 
 ## インストール
 
