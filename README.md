@@ -2,68 +2,99 @@
 
 **辞書もLLMも使わずに、テキストからフレーズを見つける。**
 
-japhrase は日本語テキストの中から、繰り返し出現するフレーズを統計だけで検出する。MeCab も辞書ファイルも外部 AI も要らない。テキストを入れれば、そこに何度も現れているフレーズが出てくる——それが既知語であろうと、辞書に載っていない新語・造語・専門用語であろうと関係ない。
-
-さらに PMI（自己相互情報量）と分岐エントロピーを使うことで、「偶然の並び」と「意味のある結合」を区別できる。「大規模言語モデル」は偶然8文字並んだのではなく、意味的に結合した1つのフレーズだと、統計が教えてくれる。
-
-この抽出エンジンを土台に、テキスト間の類似度比較・語彙分布の統計的比較・計量言語学的な多様性計測といった分析機能群を積み上げている。
-
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI](https://img.shields.io/pypi/v/japhrase)](https://pypi.org/project/japhrase/)
 [![Tests](https://img.shields.io/badge/tests-290%2B%20passing-brightgreen)](https://github.com/tshim1zu/japhrase)
 
-## インストール
-
 ```bash
-pip install japhrase                  # コア（numpy, pandas, scipy）
-pip install japhrase[similarity]      # + sklearn, Levenshtein（高度な類似度分析）
-pip install japhrase[viz]             # + matplotlib, seaborn（可視化）
-pip install japhrase[all]             # 全部入り
+pip install japhrase
 ```
 
-## クイックスタート
+## 何をするツールか
+
+日本語テキストの中から、繰り返し出現するフレーズを統計だけで検出する。MeCab も辞書ファイルも外部 AI も要らない。テキストを入れれば、そこに何度も現れているフレーズが出てくる——それが既知語であろうと、辞書に載っていない新語・造語・専門用語であろうと関係ない。
+
+## 方法論
+
+### N-gram による頻度抽出
+
+テキストを「連続する N 文字」の断片（N-gram）に分解し、その出現頻度を数える。
+
+たとえば「大規模言語モデル」という8文字が、テキスト中に10回現れていれば、それは統計的に「頻出するフレーズ」である。この方法は辞書を参照しない。テキストの中で実際に繰り返されているかどうかだけを見る。だから、辞書に未収録の新語でも、テキスト中で使われていれば発見できる。
 
 ```python
-from japhrase import PhraseExtracter, SimilarityAnalyzer, StylometryAnalyzer
+from japhrase import PhraseExtracter
 
-# 辞書なしでテキストから頻出フレーズを抽出
+extractor = PhraseExtracter(min_count=2, max_length=12, min_length=2)
+df = extractor.extract(sentences)
+```
+
+```
+         seqchar  freq
+            生成AI    45    ← 辞書にない新語でも頻度があれば見つかる
+    大規模言語モデル    10
+プロンプトエンジニアリング     5
+```
+
+ただし、N-gram の頻度だけでは「である」「している」のような意味のないフレーズも大量に拾ってしまう。そこで PMI を使う。
+
+### PMI（自己相互情報量）による洗練
+
+PMI は「2つの要素が偶然一緒に現れる確率」と「実際に一緒に現れた頻度」の比を測る指標である。
+
+- **PMI が高い** = 偶然では説明できないほど一緒に出現している = 意味的に結合している
+  - 例：「大規模」と「言語モデル」→ 個別の出現確率から期待される共起よりはるかに多い → PMI 高い
+- **PMI が低い** = たまたま隣り合っているだけ
+  - 例：「である」→ どんな文脈でも出現する → PMI 低い
+
+```python
+extractor = PhraseExtracter(min_count=3, use_pmi=True)
+df = extractor.extract(sentences)
+# PMI が高いフレーズだけが残る → 意味のある結合だけを抽出
+```
+
+### 分岐エントロピーによる境界検出
+
+分岐エントロピーは「あるフレーズの次に来る文字の多様性」を測る。フレーズの境界（切れ目）では、次に来る文字の種類が急に増える。この性質を使って、フレーズの自然な切れ目を統計的に特定する。
+
+```python
+extractor = PhraseExtracter(min_count=3, use_pmi=True, use_branching_entropy=True)
+```
+
+### 3つの方法論の関係
+
+```
+N-gram 頻度 → 「繰り返されているもの」を見つける（広く拾う）
+     ↓
+PMI → 「意味のある結合」だけを残す（精度を上げる）
+     ↓
+分岐エントロピー → 「フレーズの自然な境界」を特定する（切れ目を正確にする）
+```
+
+この3層が japhrase のコアである。
+
+## プリセット
+
+テキスト種別ごとに最適化されたパラメータセット（Optuna による実験的最適化済み）。
+
+```python
+extractor = PhraseExtracter.preset('sns')     # SNS/Twitter（短文・高頻度）
+extractor = PhraseExtracter.preset('news')    # ニュース（専門用語重視）
+extractor = PhraseExtracter.preset('novel')   # 小説（繰り返し表現・長め）
+extractor = PhraseExtracter.preset('report')  # 論文/レポート（定型・学術用語）
+```
+
+## ファイルからの読み込み
+
+```python
 df = PhraseExtracter.from_file("input.txt")
-print(df)
-#          seqchar  freq
-#             生成AI    45
-#     大規模言語モデル    10
-# プロンプトエンジニアリング   5
-
-# 複数テキスト間の類似度を計算
-matrix = SimilarityAnalyzer().compare_files(["doc1.txt", "doc2.txt", "doc3.txt"])
-
-# 語彙の豊かさを7指標で定量化
-result = StylometryAnalyzer().analyze_full(text)
-
-# テキストの汚染（文字化け・重複・句読点揺れ等）を8軸で検出
-from japhrase.contamination import scan
-print(scan(text).explain())
+# エンコーディング自動検出（UTF-8 / Shift-JIS / EUC-JP）
 ```
 
-## 主な機能
+## コアの上に積み上げた分析機能
 
-### フレーズ抽出（コア）
-
-| 機能 | 説明 | 用途 |
-|------|------|------|
-| **PhraseExtracter** | N-gram + PMI + 分岐エントロピーによる統計的フレーズ抽出 | 未知語検出、SNS分析、キーワード発見 |
-| **プリセット** | Optuna最適化済みパラメータ（sns / news / novel / report） | テキスト種別ごとの最適化 |
-| **from_file** | ファイル直接読込（UTF-8 / Shift-JIS / EUC-JP 自動検出） | バッチ処理 |
-
-```python
-# PMI + 分岐エントロピーで意味的に有意な結合だけを抽出
-ext = PhraseExtracter(min_count=3, use_pmi=True, use_branching_entropy=True)
-df = ext.extract(sentences)
-
-# テキスト種別に応じたプリセット
-ext = PhraseExtracter.preset('news')  # ニュース向け最適パラメータ
-```
+フレーズ抽出エンジンを土台として、以下の統計分析機能を提供する。
 
 ### テキスト比較・分析
 
@@ -75,17 +106,6 @@ ext = PhraseExtracter.preset('news')  # ニュース向け最適パラメータ
 | **CooccurrenceAnalyzer** | ターゲット語の周辺に特異的に出現する語を抽出 | コンテキスト頻度、特異度スコア |
 | **TemporalAnalyzer** | 複数テキスト間の時系列変化を追跡 | バースト検出、語彙飽和度、トレンド |
 
-```python
-from japhrase import DistributionComparator
-from collections import Counter
-
-# 2テキストの語彙分布がどれだけ違うかを定量化
-comp = DistributionComparator()
-result = comp.compare(Counter(freq_a), Counter(freq_b))
-print(f"JS距離: {result.jsd:.4f}")              # 0=同一、1=完全に別
-print(comp.generate_report(freq_a, freq_b))      # キーネス分析付きレポート
-```
-
 ### 計量言語学
 
 | 機能 | 説明 | 主な指標 |
@@ -94,40 +114,31 @@ print(comp.generate_report(freq_a, freq_b))      # キーネス分析付きレ�
 | **ComplexityAnalyzer** | テキスト複雑度・情報密度 | パープレキシティ、圧縮率、語彙密度、情報率 |
 | **StatisticalScorer** | フレーズの統計的有意性評価 | カイ二乗、相互情報量、Zipf異常、Wilson信頼区間 |
 
-```python
-from japhrase import StylometryAnalyzer
-
-stylo = StylometryAnalyzer()
-adv = stylo.analyze_advanced_diversity(text)
-print(f"Hapax比: {adv['hapax_ratio']}")       # 一度しか使わなかった語の割合
-print(f"Simpson's D: {adv['simpsons_d']}")    # 語彙の多様度（1に近いほど多様）
-
-mattr = stylo.analyze_mattr(text)
-print(f"MATTR: {mattr['mattr']}")             # テキスト長に依存しない語彙多様性
-
-growth = stylo.analyze_vocabulary_growth(text)
-print(f"Heaps β: {growth['heaps_beta']}")     # 語彙の増加速度
-```
-
 ### テキスト品質
 
-| 機能 | 説明 | 用途 |
-|------|------|------|
-| **TextVariantDetector** | 表記ゆれ検出（統計ベース） | サーバー/サーバ、出来る/できる |
-| **Summarizer** | 統計的要約（LLM不要、ハルシネーションなし） | テキスト圧縮、アブストラクト生成 |
-| **WritingHabitDetector** | 高頻度×低PMIで書き癖を検出 | 文章癖の発見、スタイル分析 |
+| 機能 | 説明 |
+|------|------|
+| **TextVariantDetector** | 表記ゆれ検出（サーバー/サーバ、出来る/できる） |
+| **WritingHabitDetector** | 高頻度×低PMIで書き癖を検出 |
+| **Summarizer** | 統計的要約（LLM不要） |
 
-## その他の機能
+### その他
 
-- **汚染検出**: 文字化け・重複・句読点揺れ等を8軸で検出（`from japhrase.contamination import scan`）
-- **テキストセグメンテーション**: 文書を最適な長さに自動分割
-- **エンコーディング自動検出**: UTF-8 / Shift-JIS / EUC-JP を自動判別
-- **ストリーミング処理**: 大規模テキストのチャンク単位処理
-- **パラメータ自動最適化**: テキスト特性に応じた抽出パラメータの自動推定
-- **自動インサイト生成**: 抽出結果から「何が重要か」を統計的に提示
-- **NMF文書ベクトル化**: 文書-トピック行列によるテーマ分析
-- **執筆ワークフロー**: 公開前品質ゲート、話数間推移、書き癖追跡、和英乖離検出、キャラ文体指紋、健康診断（`japhrase.applied`）
-- **複数出力形式**: CSV、JSON、Excel、HTML レポート
+- **汚染検出**: 文字化け・重複・句読点揺れ等を8軸で検出（`japhrase.contamination`）
+- **執筆ワークフロー**: 公開前品質ゲート、話数間推移、キャラ文体指紋等（`japhrase.applied`）
+- **NMF文書ベクトル化** / **ストリーミング処理** / **パラメータ自動最適化** / **自動インサイト生成**
+- **出力形式**: CSV、JSON、Excel、HTML レポート
+
+## インストール
+
+```bash
+pip install japhrase                  # コア（numpy, pandas, scipy）
+pip install japhrase[similarity]      # + sklearn, Levenshtein
+pip install japhrase[viz]             # + matplotlib, seaborn
+pip install japhrase[all]             # 全部入り
+```
+
+Python 3.8+
 
 ## ドキュメント
 
@@ -136,18 +147,17 @@ print(f"Heaps β: {growth['heaps_beta']}")     # 語彙の増加速度
 | [USAGE.md](docs/USAGE.md) | 詳細な使用ガイド |
 | [API_REFERENCE.md](docs/API_REFERENCE.md) | API リファレンス |
 | [POSITIONING.md](docs/POSITIONING.md) | 設計思想と位置づけ |
-| [CHANGELOG.md](docs/CHANGELOG.md) | 変更履歴 |
 
 ## テスト
 
 ```bash
-pytest                            # 290件以上
-pytest --cov=japhrase             # カバレッジ付き
+pytest                   # 290件以上
+pytest --cov=japhrase    # カバレッジ付き
 ```
 
 ## English Summary
 
-**japhrase** is a dictionary-free Japanese text analysis engine. Core: statistical phrase extraction using N-gram + PMI + branching entropy — finds unknown words, neologisms, and domain-specific terms without morphological analysis. Built on top: text similarity (Jaccard/Levenshtein/cosine), distribution comparison (JSD, G², keyness), collocation scoring (PMI, MI³, t-score, z-score, Log-Dice, Delta-P), vocabulary richness (7 metrics: Hapax, MATTR, Brunet's W, Honoré's R, Simpson's D, Heaps' law), text complexity (perplexity, compression ratio, lexical density), 8-axis contamination detection, and editorial workflow tools. Pure math, no LLM, 290+ tests, numpy/scipy only.
+**japhrase** finds phrases in Japanese text without a dictionary or LLM. It uses N-gram frequency analysis to detect recurring patterns, then refines results with PMI (pointwise mutual information) to distinguish meaningful collocations from noise, and branching entropy to identify natural phrase boundaries. On top of this extraction core: text similarity, distribution comparison (JSD, G², keyness), collocation scoring (6 metrics), vocabulary richness (7 metrics), text complexity, and more. Pure math, no external AI, 290+ tests, numpy/scipy only.
 
 ## ライセンス
 
