@@ -58,6 +58,10 @@ dmypy.json
 !.claude/internal_docs/*.md
 !.claude/plans/*.md
 
+# Secrets
+.env
+*.env
+
 # OS
 .DS_Store
 Thumbs.db
