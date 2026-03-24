@@ -21,7 +21,7 @@ import logging
 from typing import List, Optional, Dict
 
 from .profile import ContaminationProfile, AxisScore, Anomaly
-from .detectors import DETECTOR_REGISTRY, ALL_DETECTOR_NAMES
+from ._detectors import DETECTOR_REGISTRY, ALL_DETECTOR_NAMES
 
 logger = logging.getLogger(__name__)
 
@@ -137,46 +137,4 @@ class ContaminationScanner:
         return min(100, int(score))
 
 
-# ═══════════════════════════════════════════════════════════════
-# トップレベル関数
-# ═══════════════════════════════════════════════════════════════
-
-_default_scanner = None
-
-
-def scan(
-    text: str,
-    detectors: Optional[List[str]] = None,
-    reference_text: Optional[str] = None,
-    **kwargs,
-) -> ContaminationProfile:
-    """
-    テキストの汚染度を評価する
-
-    基本:
-        >>> profile = scan(text)
-        >>> print(profile.overall)     # 0-100
-        >>> print(profile.is_clean())  # True / False
-        >>> print(profile.explain())   # 何が問題で、どこで、どう直すか
-
-    テキスト間比較:
-        >>> profile = scan(text_a, reference_text=text_b)
-
-    検出器を選択:
-        >>> profile = scan(text, detectors=['duplicate', 'consistency'])
-
-    Parameters:
-        text: 評価対象テキスト
-        detectors: 実行する検出器名（None=全8種）
-        reference_text: 比較対象テキスト（テキスト間分析用）
-        **kwargs: ContaminationScanner のパラメータ
-    """
-    if kwargs:
-        scanner = ContaminationScanner(**kwargs)
-    else:
-        global _default_scanner
-        if _default_scanner is None:
-            _default_scanner = ContaminationScanner()
-        scanner = _default_scanner
-
-    return scanner.scan(text, detectors=detectors, reference_text=reference_text)
+    # 旧トップレベル scan() は api.py に移行済み
