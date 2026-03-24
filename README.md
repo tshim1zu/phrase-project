@@ -11,6 +11,127 @@
 pip install japhrase
 ```
 
+## コピペで動く使用例
+
+以下のコードはすべてコピペでそのまま動く。
+
+### フレーズ抽出（辞書なし・形態素解析なし）
+
+```python
+from japhrase import PhraseExtracter
+
+text = """ChatGPTの登場により生成AIが注目を集めている。
+生成AIはテキストだけでなく画像生成にも使われる。
+大規模言語モデルは生成AIの中核技術である。
+生成AIの倫理的課題について議論が活発化している。
+企業における生成AIの導入事例が増加している。""" * 5
+
+sentences = [s.strip() for s in text.split("。") if s.strip()]
+df = PhraseExtracter(min_count=2, min_length=2, max_length=10, selection=0, verbose=0).extract(sentences)
+print(df[["seqchar", "freq"]].head())
+```
+
+```
+    seqchar  freq
+       生成AI    25
+ChatGPTの登場に     5
+大規模言語モデルは生成     5
+```
+
+### 語彙の豊かさを比較
+
+```python
+from japhrase import StylometryAnalyzer
+
+stylo = StylometryAnalyzer()
+
+text_a = "朝靄の中を歩いていると、足元で小さな花が揺れた。名前は知らない。淡い紫色の花弁が露を含んで光っている。道の先に古い石橋が見えた。"
+text_b = "男は歩いた。男は止まった。男はまた歩いた。男は見た。男は聞いた。男は歩いた。"
+
+for label, t in [("豊かな文", text_a), ("単調な文", text_b)]:
+    r = stylo.analyze_advanced_diversity(t)
+    print(f"{label}: Hapax比={r['hapax_ratio']:.2f}  → {r['assessment']}")
+```
+
+```
+豊かな文: Hapax比=0.97  → 語彙が非常に豊か（高度に多様）
+単調な文: Hapax比=0.68  → 語彙が非常に豊か（高度に多様）
+```
+
+### 2つのテキストの語彙分布を比較
+
+```python
+from japhrase import DistributionComparator
+from collections import Counter
+
+comp = DistributionComparator()
+result = comp.compare(
+    Counter({"騎士": 10, "剣": 8, "王城": 5}),
+    Counter({"研究": 12, "実験": 9, "データ": 7}),
+)
+print(f"JS距離: {result.jsd:.4f}  (0=同一, 1=完全に別)")
+```
+
+```
+JS距離: 1.0000  (0=同一, 1=完全に別)
+```
+
+### 語の結びつきの強さを測る
+
+```python
+from japhrase import CollocationScorer
+
+scorer = CollocationScorer()
+cs = scorer.score_phrase("生成AI", 45, "生成AIが注目されている。" * 50)
+print(f"PMI={cs.pmi:.1f}  t-score={cs.t_score:.1f}  Log-Dice={cs.log_dice:.1f}")
+```
+
+```
+PMI=3.6  t-score=6.1  Log-Dice=13.9
+```
+
+### テキストの複雑度を測る
+
+```python
+from japhrase import ComplexityAnalyzer
+
+cx = ComplexityAnalyzer()
+r = cx.analyze("朝靄の中を歩いていると、足元で小さな花が揺れた。名前は知らない。淡い紫色の花弁が露を含んで光っている。")
+print(f"圧縮率={r['compression_ratio']:.3f}  情報率={r['information_rate']:.3f}")
+```
+
+```
+圧縮率=0.709  情報率=0.984
+```
+
+### テキストの汚染を検出
+
+```python
+from japhrase.contamination import scan
+
+profile = scan("正常な文章。\nâ€™文字化け。\n「閉じない台詞")
+print(f"汚染スコア: {profile.overall}/100")
+print(profile.explain())
+```
+
+```
+汚染スコア: 15/100
+⚠️ 汚染スコア: 15/100
+
+■ エンコーディング (55/100, 1件)
+  L2: mojibakeパターン: 'â€™'
+  💡 文字化け箇所を正しい文字に置換してください。
+```
+
+### 全機能のデモを一括実行
+
+```python
+import japhrase
+japhrase.run_demo()
+```
+
+---
+
 ## 何をするツールか
 
 日本語テキストの中から、繰り返し出現するフレーズを統計だけで検出する。MeCab も辞書ファイルも外部 AI も要らない。テキストを入れれば、そこに何度も現れているフレーズが出てくる——それが既知語であろうと、辞書に載っていない新語・造語・専門用語であろうと関係ない。
