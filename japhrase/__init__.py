@@ -130,6 +130,29 @@ from .prompt_optimizer import PromptOptimizer, optimize_prompt
 from .ending_repetition_police import EndingRepetitionPolice, EndingRepetitionIssue
 from .entropy_pacing import EntropyPacing, PacingIssue
 from .chekhov_gun_detector import ChekhofGunDetector, UnfiredGun
+# Phase 2 強化: 分布比較エンジン
+from .distribution_comparator import (
+    DistributionComparator,
+    DistributionComparison,
+    KeynessResult,
+)
+# Phase 2 強化: コロケーション結合度
+from .collocation_scorer import (
+    CollocationScorer,
+    CollocationScore,
+)
+# Phase 2 強化: テキスト複雑度
+from .complexity_metrics import (
+    ComplexityAnalyzer,
+    ComplexityProfile,
+)
+# Phase 2 強化: 時系列分析
+from .temporal_analyzer import (
+    TemporalAnalyzer,
+    TemporalSnapshot,
+    TermTrend,
+    BurstInterval,
+)
 
 __all__ = [
     'PhraseExtracter',
@@ -248,4 +271,19 @@ __all__ = [
     'PacingIssue',
     'ChekhofGunDetector',
     'UnfiredGun',
+    # Phase 2 強化: 分布比較エンジン
+    'DistributionComparator',
+    'DistributionComparison',
+    'KeynessResult',
+    # Phase 2 強化: コロケーション結合度
+    'CollocationScorer',
+    'CollocationScore',
+    # Phase 2 強化: テキスト複雑度
+    'ComplexityAnalyzer',
+    'ComplexityProfile',
+    # Phase 2 強化: 時系列分析
+    'TemporalAnalyzer',
+    'TemporalSnapshot',
+    'TermTrend',
+    'BurstInterval',
 ]
