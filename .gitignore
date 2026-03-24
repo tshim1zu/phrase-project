@@ -62,6 +62,9 @@ dmypy.json
 .env
 *.env
 
+# 黒歴史（ローカル参照用、リポジトリには載せない）
+TATTOO.md
+
 # OS
 .DS_Store
 Thumbs.db
