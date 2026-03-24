@@ -296,4 +296,33 @@ __all__ = [
     'TemporalSnapshot',
     'TermTrend',
     'BurstInterval',
+    # デモ
+    'run_demo',
 ]
+
+
+def run_demo():
+    """全機能のデモを実行。使い方: import japhrase; japhrase.run_demo()"""
+    from .demo import demo_all
+    demo_all()
+
+
+# 各クラスに .demo() クラスメソッドを付与
+def _attach_demos():
+    from .demo import (
+        demo_phrase_extracter, demo_stylometry, demo_complexity,
+        demo_distribution, demo_collocation, demo_contamination,
+        demo_preflight,
+    )
+    _pairs = [
+        (PhraseExtracter, demo_phrase_extracter),
+        (StylometryAnalyzer, demo_stylometry),
+        (ComplexityAnalyzer, demo_complexity),
+        (DistributionComparator, demo_distribution),
+        (CollocationScorer, demo_collocation),
+    ]
+    for cls, func in _pairs:
+        if cls is not None:
+            cls.demo = classmethod(lambda cls_, _f=func: _f())
+
+_attach_demos()

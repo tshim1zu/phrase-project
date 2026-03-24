@@ -179,6 +179,26 @@ help(EPDashboard)                   # 話数間推移ダッシュボード
 help(PartHealthReport)              # A〜E 健康診断
 ```
 
+### デモ（例文入り・結果付き）
+
+```python
+import japhrase
+japhrase.run_demo()              # 全7機能のデモを順に実行（例文・分析結果・次のステップ付き）
+```
+
+各クラス個別にデモもできる:
+
+```python
+from japhrase import PhraseExtracter, StylometryAnalyzer, ComplexityAnalyzer
+from japhrase import DistributionComparator, CollocationScorer
+
+PhraseExtracter.demo()           # フレーズ抽出のデモ
+StylometryAnalyzer.demo()        # 語彙多様性のデモ
+ComplexityAnalyzer.demo()        # テキスト複雑度のデモ
+DistributionComparator.demo()    # 分布比較のデモ
+CollocationScorer.demo()         # コロケーション分析のデモ
+```
+
 ### サンプルスクリプト
 
 ```bash
