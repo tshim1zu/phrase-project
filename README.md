@@ -91,36 +91,193 @@ df = PhraseExtracter.from_file("input.txt")
 
 フレーズ抽出エンジンを土台として、以下の統計分析機能を提供する。
 
-### テキスト比較・分析
+### テキスト類似度
 
-| 機能 | 説明 | 主な指標 |
-|------|------|---------|
-| **SimilarityAnalyzer** | 複数テキスト間の類似度計算 | Jaccard / Levenshtein / コサイン |
-| **DistributionComparator** | 2テキスト間の語彙分布比較 | JS距離、対数尤度比(G²)、Effect Size、キーネス |
-| **CollocationScorer** | 語の結びつきの強さを多角評価 | PMI、MI³、t値、z値、Log-Dice、Delta-P |
-| **CooccurrenceAnalyzer** | ターゲット語の周辺の特異語を抽出 | コンテキスト頻度、特異度スコア |
-| **TemporalAnalyzer** | 複数テキスト間の時系列変化を追跡 | バースト検出、語彙飽和度、トレンド |
+複数テキスト間の類似度を計算し、コピペ検出や重複分析を行う。
 
-### 計量言語学
+```python
+from japhrase import SimilarityAnalyzer
 
-| 機能 | 説明 | 主な指標 |
-|------|------|---------|
-| **StylometryAnalyzer** | 語彙多様性の定量測定 | TTR、MATTR、Hapax比、Brunet's W、Honoré's R、Simpson's D、Heaps則 |
-| **ComplexityAnalyzer** | テキスト複雑度・情報密度 | パープレキシティ、圧縮率、語彙密度、情報率 |
-| **StatisticalScorer** | フレーズの統計的有意性評価 | カイ二乗、相互情報量、Zipf異常、Wilson信頼区間 |
+analyzer = SimilarityAnalyzer(method='jaccard')
+matrix = analyzer.compare_files(["doc1.txt", "doc2.txt", "doc3.txt"])
+pairs = analyzer.find_similar_pairs(matrix, threshold=0.7)
+# → [('doc1.txt', 'doc2.txt', 0.82)]  ← 82% 類似
+```
+
+Jaccard（N-gram の重なり）、Levenshtein（編集距離）、コサイン（TF-IDF）の3手法。`method='auto'` で自動選択。
+
+### 分布比較（2テキスト間の語彙の違い）
+
+2つのテキストの語彙分布がどれだけ違うかを定量化する。「テキスト A にだけ多い語」「テキスト B にだけ多い語」をキーネススコア付きで抽出できる。
+
+```python
+from japhrase import DistributionComparator
+from collections import Counter
+
+comp = DistributionComparator()
+freq_a = Counter({'騎士': 10, '剣': 8, '王城': 5})
+freq_b = Counter({'研究': 12, '実験': 9, 'データ': 7})
+result = comp.compare(freq_a, freq_b)
+```
+
+```
+JS距離: 1.0000  （0 = 同一の語彙、1 = 完全に別の語彙）
+Aにだけ多い語: 騎士, 剣, 王城    ← 「テキストAらしさ」
+Bにだけ多い語: 研究, 実験, データ  ← 「テキストBらしさ」
+```
+
+JS距離（Jensen-Shannon Divergence）は対称的で有界（0〜1）。対数尤度比（G²）はカイ二乗より疎データに強い。Effect Size（Log Ratio）は「有意かどうか」ではなく「どれだけ違うか」を測る。
+
+### コロケーション分析（語の結びつきの強さ）
+
+フレーズを構成する語同士の結びつきを6つの異なる角度から測る。
+
+```python
+from japhrase import CollocationScorer
+
+scorer = CollocationScorer()
+cs = scorer.score_phrase('生成AI', 45, text)
+```
+
+```
+「生成AI」:
+  PMI = 3.6      ← 意味的に結合している（偶然ではない）
+  t-score = 6.1  ← 高頻度で安定した結合
+  Log-Dice = 13.9 ← コーパスサイズに依存しない結合度
+```
+
+| 指標 | 何に強いか |
+|------|----------|
+| PMI | レアだが意味のある結合を発見する（低頻度に敏感） |
+| t-score | 高頻度で安定した結合を発見する（PMI の逆） |
+| Log-Dice | コーパスの大きさに影響されない（最も安定） |
+| MI³ | PMI の低頻度バイアスを数学的に補正する |
+| Delta-P | 方向性がある結合を測る（A→B と B→A は非対称） |
+
+### 共起語分析
+
+特定のキーワードの周辺に、統計的に特異な頻度で出現する語を抽出する。
+
+```python
+from japhrase import CooccurrenceAnalyzer
+
+analyzer = CooccurrenceAnalyzer(window_size=50)
+df = analyzer.analyze(text, "機械学習", top_n=10)
+# → 機械学習の周辺50字以内に特異的に出現する語のランキング
+```
+
+キャラクター分析（あるキャラの周辺に頻出する語彙）、製品の評判分析（「画面」の周辺に「綺麗」があるか）等に使える。
+
+### 時系列分析（複数テキスト間の推移）
+
+複数のテキストを時系列として並べ、語彙がどう変化しているかを追跡する。
+
+```python
+from japhrase import TemporalAnalyzer
+
+ta = TemporalAnalyzer()
+result = ta.analyze_series([ch1, ch2, ch3, ch4, ch5], labels=["1章","2章","3章","4章","5章"])
+```
+
+```
+語彙飽和度: 0.62  （後半で新語が減っている = 語彙が枯れ始めている）
+MATTRトレンド: -0.008  （語彙の多様性が徐々に低下）
+```
+
+バースト検出: 特定の語が突然増えた区間を自動で見つける。伏線の使用状況やテーマの変化を追跡できる。
+
+### 語彙多様性（計量言語学）
+
+テキストの語彙がどれだけ豊かかを、7つの統計指標で定量化する。
+
+```python
+from japhrase import StylometryAnalyzer
+
+stylo = StylometryAnalyzer()
+adv = stylo.analyze_advanced_diversity(text)
+```
+
+```
+豊かな文章 → Hapax比 0.97 / Simpson 0.9996 → 「語彙が非常に豊か」
+単調な文章 → Hapax比 0.26 / Simpson 0.9676 → 「標準的」
+```
+
+| 指標 | 何を測るか | 読み方 |
+|------|----------|--------|
+| Hapax比 | 一度しか使わなかった語の割合 | 高い = 同じ語に頼っていない |
+| MATTR | テキスト長に依存しない語彙多様性 | 高い = 長文でも語彙が豊か |
+| Simpson's D | 同じ語に2回当たる確率の逆数 | 1に近い = 多様 |
+| Brunet's W / Honoré's R | 長文で崩壊しない多様性指標 | 長編小説の比較に使える |
+| Heaps' Law (β) | 読み進めるほど新語がどれだけ出るか | 高い = 最後まで新語が出続ける |
+
+### テキスト複雑度・情報密度
+
+テキストの「難しさ」「密度」「冗長さ」を複数の角度から測る。
+
+```python
+from japhrase import ComplexityAnalyzer
+
+cx = ComplexityAnalyzer()
+result = cx.analyze(text)
+```
+
+```
+豊かな文章 → 圧縮率 0.71 / 情報率 0.98  ← 各文が新しい情報を提供
+繰り返し   → 圧縮率 0.36 / 情報率 0.43  ← 同じことの言い直し
+```
+
+| 指標 | 何を測るか | 読み方 |
+|------|----------|--------|
+| 圧縮率 | zlib で圧縮したサイズ比 | 低い = 同じパターンの繰り返しが多い |
+| 情報率 | 各文が提供する新情報の割合 | 低い = 前の文と同じことを言っている |
+| 語彙密度 | 内容語 / 全語の比率 | 低い = 機能語（助詞等）が多く冗長 |
+| パープレキシティ | N-gram の予測困難度 | 高い = 多様で予測しにくい文章 |
 
 ### テキスト品質
 
-| 機能 | 説明 |
-|------|------|
-| **TextVariantDetector** | 表記ゆれ検出（サーバー/サーバ、出来る/できる） |
-| **WritingHabitDetector** | 高頻度×低PMIで書き癖を検出 |
-| **Summarizer** | 統計的要約（LLM不要） |
+| 機能 | 説明 | 使い方 |
+|------|------|--------|
+| **TextVariantDetector** | 表記ゆれ検出 | サーバー/サーバ、出来る/できる を発見 |
+| **WritingHabitDetector** | 書き癖検出 | 高頻度×低PMI = 無意識の繰り返しを発見 |
+| **Summarizer** | 統計的要約 | LLM不要・ハルシネーションなしでテキスト圧縮 |
+
+### 汚染検出
+
+テキストの破損（文字化け・コピペ重複・句読点の揺れ等）を8軸で検出する。
+
+```python
+from japhrase.contamination import scan, quick_check
+
+quick_check(text)       # → True（汚染あり）/ False（クリーン）
+
+profile = scan(text)
+print(profile.explain())
+```
+
+```
+⚠️ 汚染スコア: 16/100
+
+■ エンコーディング (55/100, 1件)
+  L2: mojibakeパターン: 'â€™'
+  💡 文字化け箇所を正しい文字に置換してください。
+
+■ 構造 (39/100, 1件)
+  L3: 開き括弧「が閉じていない
+  💡 括弧の対応を確認してください。
+```
+
+複数テキストの一括チェックやテキスト間比較もできる:
+
+```python
+from japhrase.contamination import batch_scan, compare
+
+batch_scan({"1章": t1, "2章": t2, "3章": t3}).contaminated_keys  # → ['2章']
+compare(text_a, text_b).report()                                  # → 比較レポート
+```
 
 ### その他
 
-- **汚染検出**: 文字化け・重複・句読点揺れ等を8軸で検出（`japhrase.contamination`）
-- **執筆ワークフロー**: 公開前品質ゲート、話数間推移、キャラ文体指紋等（`japhrase.applied`）
+- **執筆ワークフロー**: 公開前品質ゲート、話数間推移、キャラ文体指紋、A〜E健康診断（`japhrase.applied`）
 - **NMF文書ベクトル化** / **ストリーミング処理** / **パラメータ自動最適化** / **自動インサイト生成**
 - **出力形式**: CSV、JSON、Excel、HTML レポート
 
