@@ -278,6 +278,6 @@ pytest    # 290件以上、4秒で全パス
 
 ## ライセンス
 
-MIT License — 清水健
+MIT License — Takeshi SHIMIZU
 
 **japhrase**: テキストの中に隠れたパターンを、数学で見つける。
