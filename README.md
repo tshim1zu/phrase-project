@@ -15,64 +15,59 @@ pip install japhrase
 
 日本語テキストの中から、繰り返し出現するフレーズを統計だけで検出する。MeCab も辞書ファイルも外部 AI も要らない。テキストを入れれば、そこに何度も現れているフレーズが出てくる——それが既知語であろうと、辞書に載っていない新語・造語・専門用語であろうと関係ない。
 
-## 方法論
+## N-gram による頻度抽出
 
-### N-gram による頻度抽出
+テキストを「連続する N 文字」の断片（N-gram）に分解し、出現頻度を数える。
 
-テキストを「連続する N 文字」の断片（N-gram）に分解し、その出現頻度を数える。
-
-たとえば「大規模言語モデル」という8文字が、テキスト中に10回現れていれば、それは統計的に「頻出するフレーズ」である。この方法は辞書を参照しない。テキストの中で実際に繰り返されているかどうかだけを見る。だから、辞書に未収録の新語でも、テキスト中で使われていれば発見できる。
+たとえば生成 AI に関する記事を入力すると：
 
 ```python
 from japhrase import PhraseExtracter
 
-extractor = PhraseExtracter(min_count=2, max_length=12, min_length=2)
+extractor = PhraseExtracter(min_count=2, max_length=10, min_length=2)
 df = extractor.extract(sentences)
 ```
 
 ```
-         seqchar  freq
-            生成AI    45    ← 辞書にない新語でも頻度があれば見つかる
-    大規模言語モデル    10
-プロンプトエンジニアリング     5
+     seqchar  freq
+      ている    12   ← 意味のないフレーズも拾ってしまう
+      生成AI    10
+  大規模言語モデル     4
+      である     4   ← これも意味がない
 ```
 
-ただし、N-gram の頻度だけでは「である」「している」のような意味のないフレーズも大量に拾ってしまう。そこで PMI を使う。
+「生成AI」「大規模言語モデル」は見つかった。しかし「ている」「である」のような、どんなテキストにも現れる意味のないフレーズも一緒に出てくる。N-gram の頻度だけでは、意味のある結合と偶然の並びを区別できない。
 
-### PMI（自己相互情報量）による洗練
+## PMI による洗練
 
-PMI は「2つの要素が偶然一緒に現れる確率」と「実際に一緒に現れた頻度」の比を測る指標である。
-
-- **PMI が高い** = 偶然では説明できないほど一緒に出現している = 意味的に結合している
-  - 例：「大規模」と「言語モデル」→ 個別の出現確率から期待される共起よりはるかに多い → PMI 高い
-- **PMI が低い** = たまたま隣り合っているだけ
-  - 例：「である」→ どんな文脈でも出現する → PMI 低い
+ここで PMI（自己相互情報量）を使う。PMI は「2つの要素が偶然一緒に現れる確率」と「実際に一緒に現れた頻度」の比を測る。
 
 ```python
-extractor = PhraseExtracter(min_count=3, use_pmi=True)
+extractor = PhraseExtracter(min_count=2, use_pmi=True)
 df = extractor.extract(sentences)
-# PMI が高いフレーズだけが残る → 意味のある結合だけを抽出
 ```
 
-### 分岐エントロピーによる境界検出
+```
+     seqchar  freq    pmi
+      生成AI    10   10.0   ← PMI が高い = 意味のある結合
+  大規模言語モデル     4   10.0   ← 偶然ではない
+      である     4    7.2   ← PMI が低い = ありふれた並び
+```
 
-分岐エントロピーは「あるフレーズの次に来る文字の多様性」を測る。フレーズの境界（切れ目）では、次に来る文字の種類が急に増える。この性質を使って、フレーズの自然な切れ目を統計的に特定する。
+PMI が高いフレーズは、構成要素が偶然隣り合っただけでは説明できないほど頻繁に共起している。「生成」と「AI」がこれほど一緒に出現するのは、それが1つの意味単位だからだ。一方「である」はどんな文脈にも現れるので PMI が低くなる。
+
+PMI を有効にすることで、**意味的に結合したフレーズだけを上位に浮かび上がらせる**ことができる。
+
+## 分岐エントロピーによる境界検出
+
+さらに分岐エントロピーを加えると、フレーズの自然な切れ目を特定できる。「あるフレーズの次にどんな文字が来るか」の多様性を測り、多様性が急に上がる位置をフレーズの境界とみなす。
 
 ```python
 extractor = PhraseExtracter(min_count=3, use_pmi=True, use_branching_entropy=True)
+df = extractor.extract(sentences)
 ```
 
-### 3つの方法論の関係
-
-```
-N-gram 頻度 → 「繰り返されているもの」を見つける（広く拾う）
-     ↓
-PMI → 「意味のある結合」だけを残す（精度を上げる）
-     ↓
-分岐エントロピー → 「フレーズの自然な境界」を特定する（切れ目を正確にする）
-```
-
-この3層が japhrase のコアである。
+N-gram が「繰り返されているもの」を広く拾い、PMI が「意味のある結合」だけを残し、分岐エントロピーが「切れ目」を正確にする。この3層が japhrase のコアである。
 
 ## プリセット
 
@@ -103,7 +98,7 @@ df = PhraseExtracter.from_file("input.txt")
 | **SimilarityAnalyzer** | 複数テキスト間の類似度計算 | Jaccard / Levenshtein / コサイン |
 | **DistributionComparator** | 2テキスト間の語彙分布比較 | JS距離、対数尤度比(G²)、Effect Size、キーネス |
 | **CollocationScorer** | 語の結びつきの強さを多角評価 | PMI、MI³、t値、z値、Log-Dice、Delta-P |
-| **CooccurrenceAnalyzer** | ターゲット語の周辺に特異的に出現する語を抽出 | コンテキスト頻度、特異度スコア |
+| **CooccurrenceAnalyzer** | ターゲット語の周辺の特異語を抽出 | コンテキスト頻度、特異度スコア |
 | **TemporalAnalyzer** | 複数テキスト間の時系列変化を追跡 | バースト検出、語彙飽和度、トレンド |
 
 ### 計量言語学
@@ -157,7 +152,7 @@ pytest --cov=japhrase    # カバレッジ付き
 
 ## English Summary
 
-**japhrase** finds phrases in Japanese text without a dictionary or LLM. It uses N-gram frequency analysis to detect recurring patterns, then refines results with PMI (pointwise mutual information) to distinguish meaningful collocations from noise, and branching entropy to identify natural phrase boundaries. On top of this extraction core: text similarity, distribution comparison (JSD, G², keyness), collocation scoring (6 metrics), vocabulary richness (7 metrics), text complexity, and more. Pure math, no external AI, 290+ tests, numpy/scipy only.
+**japhrase** finds phrases in Japanese text without a dictionary or LLM. It scans for recurring N-gram patterns, then uses PMI (pointwise mutual information) to separate meaningful collocations from noise — "生成AI" ranks high because its components co-occur far more than chance predicts, while "である" ranks low. Branching entropy further refines phrase boundaries. On top of this core: text similarity, distribution comparison (JSD, G², keyness), collocation scoring (6 metrics), vocabulary richness (7 metrics), text complexity, and more. Pure math, no external AI, 290+ tests, numpy/scipy only.
 
 ## ライセンス
 
