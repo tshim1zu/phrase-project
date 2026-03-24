@@ -38,12 +38,13 @@ class Anomaly:
 # 検出器ごとの修正アクション辞書
 _SUGGESTIONS = {
     'encoding': '文字化け箇所を正しい文字に置換してください。エンコーディング(UTF-8)を確認。',
-    'structural': '括弧の対応・改行・行長を確認してください。',
+    'structural': '括弧の対応・改行・行長・作業注釈の消し忘れを確認してください。',
     'duplicate': '重複している段落/文を削除してください（コピペミスの可能性）。',
     'repetition': '同じフレーズが短い区間内で繰り返されています。表現を変えるか、重複を削除。',
     'distribution': 'この区間の語彙が前後と大きく異なります。別テキストの混入や段落の順序間違いを確認。',
     'complexity': 'この区間の情報密度が異常です。繰り返しコピペか、ランダムデータの混入を確認。',
-    'vocabulary': 'この区間に、文書全体で使われていない語彙が集中しています。別文書からの混入を確認。',
+    'consistency': '表記・句読点を統一してください。全角/半角、漢字/ひらがな、長音の有無を確認。',
+    'language': 'この区間の言語が前後と異なります。別言語テキストの混入を確認。',
 }
 
 
@@ -82,7 +83,8 @@ class ContaminationProfile:
     repetition: AxisScore
     distribution: AxisScore
     complexity: AxisScore
-    vocabulary: AxisScore
+    consistency: AxisScore
+    language: AxisScore
 
     text_length: int = 0
 
@@ -91,7 +93,7 @@ class ContaminationProfile:
         return [
             self.encoding, self.structural, self.duplicate,
             self.repetition, self.distribution, self.complexity,
-            self.vocabulary,
+            self.consistency, self.language,
         ]
 
     @property
@@ -102,13 +104,14 @@ class ContaminationProfile:
         確度の高い軸ほど重みが大きい。
         """
         weights = {
-            'encoding': 0.20,       # 確定的 → 重い
+            'encoding': 0.18,       # 確定的 → 重い
             'structural': 0.15,     # 確定的
-            'duplicate': 0.20,      # 確定的
-            'repetition': 0.10,
-            'distribution': 0.15,
-            'complexity': 0.10,
-            'vocabulary': 0.10,
+            'duplicate': 0.18,      # 確定的
+            'repetition': 0.08,
+            'distribution': 0.12,
+            'complexity': 0.08,
+            'consistency': 0.12,    # 表記ゆれ・句読点
+            'language': 0.09,       # 言語混在
         }
         total = sum(
             getattr(self, name).score * w
