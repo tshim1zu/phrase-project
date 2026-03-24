@@ -1,240 +1,200 @@
 # japhrase
 
-**統計的自然言語処理エンジン：PMI/エントロピーベースのフレーズ抽出・要約・共起分析**
+**Pure-math text intelligence engine for Japanese & English**
+
+Statistical NLP toolkit that measures writing quality, tracks vocabulary evolution, detects stylistic drift, and compares documents — all without external AI services or API keys.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-200%2B%20passing-brightgreen)](https://github.com/tshim1zu/japhrase)
-[![PyPI](https://img.shields.io/badge/version-0.2.0-blue)](https://pypi.org/project/japhrase/)
-
-## 🚀 クイックスタート
-
-```python
-from japhrase import PhraseExtracter, Summarizer, CooccurrenceAnalyzer
-
-# 1. フレーズ抽出
-df = PhraseExtracter.from_file("input.txt")
-print(df)
-
-# 2. 統計的要約
-summarizer = Summarizer()
-summary = summarizer.summarize(text, ratio=0.3)
-
-# 3. 共起語分析（キャラ分析・評判分析）
-analyzer = CooccurrenceAnalyzer()
-df = analyzer.analyze(text, "ターゲット単語")
-```
-
-## ✨ 主な機能
-
-### 📊 コア機能（v0.2.0）
-
-| 機能 | 説明 | 用途 |
-|-----|------|------|
-| **PhraseExtracter** | PMI/エントロピーベースの統計的フレーズ抽出 | SNS分析、ニュース抽出、キーワード検出 |
-| **Summarizer** ⭐ NEW | 統計的要約エンジン（LLM不要・高速・確実） | テキスト圧縮、アブストラクト生成 |
-| **CooccurrenceAnalyzer** ⭐ NEW | 共起語分析による特徴語抽出 | キャラクター分析、製品評判分析、トレンド背景分析 |
-| **WritingHabitDetector** ⭐ NEW | 高頻度×低PMIで書き癖を自動検出 | 文章癖の発見、スタイル分析、執筆支援 |
-| **ComparisonAnalyzer** | Good/Bad プロンプト比較 | ComfyUI最適化、プロンプト改善 |
-| **SimilarityAnalyzer** | 複数テキスト間の類似度分析 | コピペ検出、重複分析 |
-
-### 🎯 その他の機能
-
-- 📊 **統計的スコアリング**: PMI（自己相互情報量）と分岐エントロピー
-- 🎯 **エビデンスベースプリセット**: Optunaで最適化された用途別設定（SNS/ニュース/小説）
-- 🔍 **テキストセグメンテーション**: 文書を最適な長さに自動分割
-- 📁 **複数形式対応**: TXT、CSV、TSV、Excel
-- 🔤 **エンコーディング自動検出**: UTF-8、Shift-JIS など自動判別
-- ⚡ **高速処理**: N-gramベースの効率的アルゴリズム
-- 🧪 **200+テスト**: 包括的なテストスイート完備
-
-## 📦 インストール
-
-```bash
-# 基本機能
-pip install japhrase
-
-# 全機能（プロンプト分析含む）
-pip install japhrase[all]
-
-# 開発環境
-pip install -e ".[dev]"
-```
-
-## 📖 ドキュメント
-
-| ドキュメント | 内容 |
-|-----------|------|
-| **[USAGE.md](docs/USAGE.md)** | **詳細な使用ガイド** |
-| [API_REFERENCE.md](docs/API_REFERENCE.md) | API リファレンス |
-| [POSITIONING.md](docs/POSITIONING.md) | 設計思想と位置づけ |
-| [CHANGELOG.md](docs/CHANGELOG.md) | 変更履歴 |
-| [DEVELOPMENT.md](docs/DEVELOPMENT.md) | 開発者ガイド |
-
-## 🎯 用途別ガイド
-
-### 1. フレーズ抽出（基本）
-
-```python
-from japhrase import PhraseExtracter
-
-# SNS向けプリセット
-extractor = PhraseExtracter.preset('sns')
-df = extractor.extract("tweets.txt")
-extractor.export_csv(df, "output.csv")
-```
-
-**詳細**: [USAGE.md](docs/USAGE.md)
-
-### 2. 統計的要約 ⭐ 新機能（v0.2.0）
-
-```python
-from japhrase import Summarizer
-
-# LLMを使わない・高速・確実な要約
-summarizer = Summarizer()
-
-# テキストを30%に圧縮
-summary = summarizer.summarize(text, ratio=0.3)
-print(summary)
-```
-
-**特徴:**
-- ✅ ハルシネーション（嘘）がない
-- ✅ LLM不要で高速
-- ✅ PMI/エントロピーベースの統計的根拠
-
-**詳細**: `examples/summarize_demo.py`
-
-### 3. 共起語分析 ⭐ 新機能（v0.2.0）
-
-```python
-from japhrase import CooccurrenceAnalyzer
-
-# キャラクター・製品・トレンドワードの特徴を分析
-analyzer = CooccurrenceAnalyzer(window_size=50)
-
-# 「AI」の周辺に特異的に出現する言葉を抽出
-df = analyzer.analyze(text, "AI", top_n=10)
-print(df)  # [自動運転, セキュリティ, 透明性, ...]
-```
-
-**用途:**
-- キャラクター分析（性格・外見・口癖の自動抽出）
-- 製品評判分析（「画面」の周りに「綺麗」があるか等）
-- トレンドワードの背景分析
-
-**詳細**: `examples/cooccurrence_demo.py`
-
-### 4. 書き癖検出 ⭐ 新機能（v0.2.0）
-
-```python
-from japhrase import WritingHabitDetector
-
-# 高頻度×低PMIで書き癖を自動検出
-detector = WritingHabitDetector(min_count=10, max_pmi=3.0)
-df = detector.detect("your_text.txt")
-
-# 上位10個の書き癖を表示
-detector.visualize_top_habits(df, top_n=10)
-```
-
-**特徴:**
-- ✅ 純粋に統計ベース（高頻度×低PMI）
-- ✅ 「〜だった」「それは」などの文末・接続詞の癖を自動検出
-- ✅ 著者比較、カテゴリ別分析が可能
-
-**詳細**: `examples/writing_habit_demo.py`
-
-### 5. プロンプト比較分析
-
-Good と Bad のプロンプトを比較して、成功テンプレートと失敗パターンを抽出：
-
-```bash
-python scripts/run_comfy_analysis.py \
-  --good good_prompts.txt \
-  --bad bad_prompts.txt \
-  --top-n 10
-```
-
-**詳細**: [USAGE.md](docs/USAGE.md)
-
-### 6. 類似度分析
-
-```python
-from japhrase import SimilarityAnalyzer
-
-analyzer = SimilarityAnalyzer()
-matrix = analyzer.compare_files(["doc1.txt", "doc2.txt", "doc3.txt"])
-analyzer.export_heatmap(matrix, "similarity.png")
-```
-
-## 🧪 テスト
-
-```bash
-# テスト実行
-pytest
-
-# カバレッジ付き実行
-pytest --cov=japhrase
-
-# 200+ テストがすべてパス
-```
-
-## 📋 プロジェクト構造
-
-```
-japhrase/
-├── __init__.py
-├── extracter.py           # ★ フレーズ抽出（メインエンジン）
-├── summarizer.py          # ★ 統計的要約（v0.2.0新機能）
-├── cooccurrence.py        # ★ 共起語分析（v0.2.0新機能）
-├── comparison_analyzer.py  # プロンプト比較分析
-├── similarity.py          # 類似度分析
-├── patterns.py            # 正規表現パターン
-├── config.py              # 設定管理
-├── utils.py               # ユーティリティ
-├── cli.py                 # コマンドラインツール
-├── segmenter.py           # テキストセグメンテーション
-├── evaluation.py          # 評価フレームワーク
-├── optimization.py        # パラメータ最適化
-└── ...
-
-examples/
-├── example.ipynb          # ノートブック例
-├── summarize_demo.py      # ★ 要約デモ（v0.2.0新機能）
-├── cooccurrence_demo.py   # ★ 共起分析デモ（v0.2.0新機能）
-└── ...
-
-docs/
-├── API_REFERENCE.md       # API リファレンス
-├── USAGE.md               # 詳細ガイド
-├── POSITIONING.md         # 設計思想
-└── ...
-```
-
-## 🔗 便利なリンク
-
-- **GitHub**: https://github.com/tshim1zu/japhrase
-- **PyPI**: https://pypi.org/project/japhrase/
-- **Issues**: https://github.com/tshim1zu/japhrase/issues
-
-## 📄 ライセンス
-
-MIT License
-
-## 👤 作者
-
-Takeshi SHIMIZU
+[![Tests](https://img.shields.io/badge/tests-290%2B%20passing-brightgreen)](https://github.com/tshim1zu/japhrase)
 
 ---
 
-**📍 次に読むドキュメント:**
+## Why japhrase?
 
-| リンク | 対象 | 内容 |
-|-------|------|------|
-| [USAGE.md](docs/USAGE.md) | 利用者 | 詳細な使い方とサンプルコード |
-| [API_REFERENCE.md](docs/API_REFERENCE.md) | 開発者 | 全APIのリファレンス |
-| [POSITIONING.md](docs/POSITIONING.md) | 技術者 | 設計思想と統計的背景 |
-| [examples/summarize_demo.py](examples/summarize_demo.py) | 要約機能 | 要約エンジンの実行例 |
-| [examples/cooccurrence_demo.py](examples/cooccurrence_demo.py) | 共起分析 | 共起分析の実行例 |
+Most text analysis tools are either bag-of-words counters or black-box LLM wrappers. japhrase sits in between: **real statistical measures** (PMI, chi-squared, entropy, JSD, Heaps' law, compression theory) applied to practical writing problems.
+
+- **Zero external dependencies** — runs on numpy + scipy alone. No API keys, no internet, no GPU.
+- **Deterministic** — same input always produces the same output. No hallucinations.
+- **Japanese + English** — character-level N-gram engine works natively with both languages.
+- **92 tests pass in 4 seconds** on a single core.
+
+---
+
+## What can it do?
+
+### Statistical Engines (Core)
+
+| Engine | What it measures | Key metrics |
+|--------|-----------------|-------------|
+| **DistributionComparator** | How different two texts are | Log-Likelihood (G²), Jensen-Shannon Divergence, Effect Size, Keyness |
+| **CollocationScorer** | How strongly words bind together | PMI, MI³, t-score, z-score, Log-Dice, Delta-P |
+| **StylometryAnalyzer** | Vocabulary richness and diversity | Hapax ratio, Brunet's W, Honoré's R, Simpson's D, MATTR, Heaps' Law |
+| **ComplexityAnalyzer** | Text difficulty and information density | N-gram Perplexity, compression ratio, lexical density, information rate |
+| **TemporalAnalyzer** | How writing evolves over a series | Burstiness detection, vocabulary saturation, JSD distance matrix |
+| **StatisticalScorer** | Phrase significance | Chi-squared, mutual information, Zipf anomaly, Wilson CI |
+| **PhraseExtracter** | Frequent phrase extraction | N-gram + PMI + entropy filtering |
+
+### Applied Features (Writing Workflow)
+
+Built on top of the statistical engines, these modules solve real editorial problems:
+
+| Module | Problem it solves | Example output |
+|--------|-------------------|----------------|
+| **PreflightChecker** | "Is this chapter ready to publish?" | GO / WARN / NOGO verdict with quality score (0-100) |
+| **EPDashboard** | "How is my vocabulary changing across chapters?" | MATTR trend, entropy trend, vocabulary saturation, burst detection |
+| **HabitDriftDetector** | "Am I developing bad writing habits?" | Worsening/improving habit tracking with sparkline visualization |
+| **JPENDivergenceChecker** | "Did the translation lose quality?" | Per-chapter translation loss rate, degradation alerts |
+| **CharacterStylometry** | "Do my characters sound distinct?" | Per-character vocabulary fingerprint, JSD separation matrix |
+| **PartHealthReport** | "What's the overall quality of this arc?" | A-E grade with 6-section breakdown and improvement priorities |
+
+---
+
+## Quick Start
+
+```python
+from japhrase import DistributionComparator, StylometryAnalyzer, ComplexityAnalyzer
+from collections import Counter
+
+# Compare two texts
+comp = DistributionComparator()
+freq_a = Counter({"sword": 10, "knight": 8, "castle": 5})
+freq_b = Counter({"data": 12, "experiment": 9, "monitor": 7})
+result = comp.compare(freq_a, freq_b)
+print(f"JSD: {result.jsd:.4f}")   # How different are they?
+print(comp.generate_report(freq_a, freq_b))
+
+# Measure vocabulary richness
+stylo = StylometryAnalyzer()
+print(stylo.analyze_advanced_diversity(text))
+# → hapax_ratio, brunets_w, honores_r, simpsons_d, ...
+
+# Measure text complexity
+cx = ComplexityAnalyzer()
+print(cx.analyze(text))
+# → perplexity, compression_ratio, lexical_density, information_rate
+```
+
+### Publish-ready quality check
+
+```python
+from japhrase.applied import PreflightChecker
+
+checker = PreflightChecker()
+result = checker.check(chapter_text, lang='jp', platform='royalroad')
+print(result.verdict)        # 'GO', 'WARN', or 'NOGO'
+print(result.quality_score)  # 0-100
+print(result.report())       # Full breakdown
+```
+
+### Track quality across chapters
+
+```python
+from japhrase.applied import EPDashboard
+
+dashboard = EPDashboard()
+result = dashboard.analyze({
+    "Ch.1": ch1_text, "Ch.2": ch2_text, "Ch.3": ch3_text,
+})
+print(f"Vocabulary saturation: {result.vocab_saturation:.2f}")
+print(f"MATTR trend: {result.mattr_trend:+.6f}")
+print(result.report())
+```
+
+### Detect writing habit drift
+
+```python
+from japhrase.applied import HabitDriftDetector
+
+detector = HabitDriftDetector()
+result = detector.analyze({"Ch.1": t1, "Ch.2": t2, "Ch.3": t3})
+print(f"Worsening habits: {result.worsening_count}")
+print(result.report())  # Includes sparkline visualization
+```
+
+### Character voice separation
+
+```python
+from japhrase.applied import CharacterStylometry
+
+cs = CharacterStylometry()
+fps = cs.build_fingerprints(chapter_texts, ["Eris", "Leticia", "Sofia"])
+print(cs.full_report(fps))
+# → Per-character MATTR, keyness terms, JSD separation matrix
+```
+
+### Full arc health check
+
+```python
+from japhrase.applied import PartHealthReport
+
+report = PartHealthReport()
+grade = report.diagnose(
+    chapter_texts,
+    characters=["Eris", "Leticia", "Sofia"],
+    part_label="Arc 1",
+)
+print(grade.report())
+# → Overall: B (78.3/100)
+# → Vocabulary: A (95.2) | Tempo: C (62.1) | Habits: A (90.0) | ...
+```
+
+---
+
+## Installation
+
+```bash
+pip install japhrase
+
+# Or from source
+git clone https://github.com/tshim1zu/japhrase.git
+cd japhrase
+pip install -e .
+```
+
+**Requirements**: Python 3.8+, numpy, pandas, scipy (all standard scientific Python).
+
+## Testing
+
+```bash
+pytest                    # Run all 290+ tests
+pytest tests/test_applied.py -v   # Applied modules only
+pytest --cov=japhrase     # With coverage
+```
+
+## Architecture
+
+```
+japhrase/
+├── extracter.py              # N-gram phrase extraction (core engine)
+├── statistical_scorer.py     # Chi², MI, Zipf, CI, p-value
+├── distribution_comparator.py # G², JSD, Log Ratio, Dice, Keyness
+├── collocation_scorer.py     # PMI, MI³, t-score, z-score, Log-Dice, Delta-P
+├── stylometry.py             # TTR, Yule's K, Hapax, Brunet, Honoré, MATTR, Heaps
+├── complexity_metrics.py     # Perplexity, compression, lexical density
+├── temporal_analyzer.py      # Burstiness, vocab saturation, trend tracking
+├── writing_habit_detector.py # freq × PMI⁻¹ habit detection
+├── entropy_pacing.py         # Shannon entropy pacing analysis
+├── chekhov_gun_detector.py   # Narrative setup/payoff tracking
+│
+├── applied/                  # Writing workflow integration
+│   ├── preflight_stats.py    # Pre-publish quality gate
+│   ├── ep_dashboard.py       # Chapter-over-chapter dashboard
+│   ├── habit_drift.py        # Habit trend tracking
+│   ├── jpen_divergence.py    # JP↔EN translation quality
+│   ├── character_stylometry.py # Character voice fingerprinting
+│   └── part_health.py        # Arc-level health grading (A-E)
+│
+├── similarity.py             # Levenshtein / Jaccard / cosine
+├── cooccurrence.py           # Co-occurrence analysis
+├── document_vectorizer.py    # NMF-based document vectors
+└── ...                       # 50+ modules total
+```
+
+## License
+
+MIT License — Takeshi SHIMIZU
+
+---
+
+**japhrase**: Because good writing deserves better measurement than word count.

@@ -117,6 +117,13 @@ scripts/find_*.py
 test_phrases.csv
 test_workflow_sample.txt
 
+# Test fixtures — 小説テキストの痕跡を残さない
+# テスト用の実テキスト（JP/EN）は gitignore。テストコード(.py)はトラック。
+tests/fixtures/novel_*.txt
+tests/fixtures/scene_*.txt
+tests/fixtures/manuscript_*.txt
+tests/fixtures/draft_*.txt
+
 # Jupyter
 .ipynb_checkpoints/
 */.ipynb_checkpoints/
