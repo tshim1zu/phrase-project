@@ -113,73 +113,16 @@ print(f"Heaps β: {growth['heaps_beta']}")     # 語彙の増加速度
 | **Summarizer** | 統計的要約（LLM不要、ハルシネーションなし） | テキスト圧縮、アブストラクト生成 |
 | **WritingHabitDetector** | 高頻度×低PMIで書き癖を検出 | 文章癖の発見、スタイル分析 |
 
-### 汚染検出（8軸異常検知）
-
-テキストの物理的破損・混入・不整合を8つの独立した検出器で多角的に評価する。
-
-| 軸 | 検出対象 | 確度 |
-|----|---------|------|
-| **encoding** | 文字化け、不正Unicode、制御文字 | 確定的 |
-| **structural** | 括弧不整合、マージ痕、メタデータ混入、作業注釈残存、空行過多 | 確定的 |
-| **duplicate** | 段落/文の完全一致・ほぼ一致の重複（テキスト内・テキスト間） | 確定的 |
-| **repetition** | 短区間内のフレーズ異常反復 | 高い |
-| **distribution** | 語彙分布の断絶、外来語彙の局所集中 | 中程度 |
-| **complexity** | 圧縮率の局所異常（極端な繰り返し / ランダムデータ） | 中程度 |
-| **consistency** | 句読点揺れ（、vs,/。vs.）、漢字/ひらがな揺れ、カタカナ長音揺れ | 中程度 |
-| **language** | 言語ブロック混在（日本語中に突然英語ブロック等） | 中程度 |
-
-```python
-from japhrase.contamination import scan, quick_check, batch_scan, compare
-
-# 汚染あり？
-quick_check(text)                           # True / False
-
-# 詳細：何が問題で、どこにあって、どう直すか
-profile = scan(text)
-print(profile.explain())
-
-# 複数テキストを一括チェック
-result = batch_scan({"ch1": t1, "ch2": t2, "ch3": t3})
-print(result.contaminated_keys)             # 汚染ありのキーリスト
-
-# 2テキスト間の比較
-result = compare(text_a, text_b)
-print(result.report())
-```
-
-### 応用：執筆ワークフロー
-
-統計エンジンを組み合わせた、連載原稿管理向けの高水準ツール群。
-
-| 機能 | 説明 |
-|------|------|
-| **PreflightChecker** | 公開前の品質ゲート（GO / WARN / NOGO 判定 + 0-100スコア） |
-| **EPDashboard** | 話数間の語彙推移・テンポ変化・伏線バースト検出 |
-| **HabitDriftDetector** | 書き癖の時系列追跡（悪化/改善のスパークライン可視化） |
-| **JPENDivergenceChecker** | 和英翻訳の品質乖離検出（話数ごとの翻訳ロス率） |
-| **CharacterStylometry** | キャラクター文体指紋・JSD分離度マトリクス |
-| **PartHealthReport** | パート全体の A〜E 5段階健康診断（6項目 + 改善優先度） |
-
-```python
-from japhrase.applied import PartHealthReport
-
-grade = PartHealthReport().diagnose(
-    {"ch1": t1, "ch2": t2, "ch3": t3},
-    characters=["田中", "鈴木", "佐藤"],
-)
-print(grade.report())
-# → 総合: B (78.3/100)
-# → 🟢 語彙健康度 A (95.2) | 🟡 テンポ C (62.1) | 🟢 書き癖 A (93.3) | ...
-```
-
 ## その他の機能
 
+- **汚染検出**: 文字化け・重複・句読点揺れ等を8軸で検出（`from japhrase.contamination import scan`）
 - **テキストセグメンテーション**: 文書を最適な長さに自動分割
 - **エンコーディング自動検出**: UTF-8 / Shift-JIS / EUC-JP を自動判別
 - **ストリーミング処理**: 大規模テキストのチャンク単位処理
 - **パラメータ自動最適化**: テキスト特性に応じた抽出パラメータの自動推定
 - **自動インサイト生成**: 抽出結果から「何が重要か」を統計的に提示
 - **NMF文書ベクトル化**: 文書-トピック行列によるテーマ分析
+- **執筆ワークフロー**: 公開前品質ゲート、話数間推移、書き癖追跡、和英乖離検出、キャラ文体指紋、健康診断（`japhrase.applied`）
 - **複数出力形式**: CSV、JSON、Excel、HTML レポート
 
 ## ドキュメント
