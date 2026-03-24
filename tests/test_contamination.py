@@ -205,6 +205,79 @@ class TestProfile:
             assert axis.label in ('clean', 'minor', 'moderate', 'severe', 'critical')
 
 
+class TestDrillDown:
+    """ドリルダウンAPIのテスト"""
+
+    def test_explain_clean(self):
+        p = scan(CLEAN_TEXT)
+        result = p.explain()
+        assert '問題なし' in result
+
+    def test_explain_contaminated(self):
+        text = '正常â€™文字化けï¿½がある\n「閉じない'
+        p = scan(text)
+        result = p.explain()
+        assert 'エンコーディング' in result or '構造' in result
+        assert '💡' in result  # 修正提案がある
+
+    def test_worst_axes(self):
+        text = '正常â€™文字化け'
+        p = scan(text)
+        worst = p.worst_axes
+        assert len(worst) > 0
+        # スコア降順
+        for i in range(len(worst) - 1):
+            assert worst[i].score >= worst[i + 1].score
+
+    def test_primary_issue(self):
+        text = '正常â€™文字化け'
+        p = scan(text)
+        assert p.primary_issue is not None
+        assert 'エンコーディング' in p.primary_issue
+
+    def test_primary_issue_clean(self):
+        p = scan(CLEAN_TEXT)
+        assert p.primary_issue is None
+
+    def test_top_issues(self):
+        text = '正常â€™文字化けï¿½あるし\n「括弧も閉じない'
+        p = scan(text)
+        issues = p.top_issues(3)
+        assert len(issues) <= 3
+        # 重篤度降順
+        for i in range(len(issues) - 1):
+            assert issues[i].severity >= issues[i + 1].severity
+
+    def test_locate(self):
+        text = '正常â€™文字化け\n「閉じない'
+        p = scan(text)
+        enc = p.locate('encoding')
+        struct = p.locate('structural')
+        assert all(a.detector == 'encoding' for a in enc)
+        assert all(a.detector == 'structural' for a in struct)
+
+    def test_anomaly_location(self):
+        text = '正常â€™文字化け'
+        p = scan(text, detectors=['encoding'])
+        for a in p.all_anomalies:
+            loc = a.location
+            assert loc.startswith('L') or loc.startswith('pos')
+
+    def test_anomaly_suggestion(self):
+        text = '正常â€™文字化け'
+        p = scan(text, detectors=['encoding'])
+        for a in p.all_anomalies:
+            assert len(a.suggestion) > 0
+
+    def test_summary_dict(self):
+        p = scan(CLEAN_TEXT)
+        d = p.summary_dict()
+        assert 'overall' in d
+        assert 'is_clean' in d
+        assert 'axes' in d
+        assert d['is_clean'] is True
+
+
 class TestScanner:
     """ContaminationScanner のテスト"""
 

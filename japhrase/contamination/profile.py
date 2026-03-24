@@ -1,10 +1,14 @@
 # coding: utf-8
 """
 汚染プロファイル（多軸結果）
+
+高水準: scan(text) → profile.overall → is_clean()
+ドリルダウン: profile.explain() → 何が問題で、どこにあって、どう直すか
+詳細: profile.worst_axes → profile.locate('duplicate') → anomaly.snippet
 """
 
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 
 @dataclass
@@ -17,6 +21,30 @@ class Anomaly:
     line_no: int            # 行番号（0-based, -1=不明）
     description: str        # 人間向け説明
     snippet: str            # 該当テキストの抜粋（50字以内）
+
+    @property
+    def location(self) -> str:
+        """人間向けの位置表記"""
+        if self.line_no >= 0:
+            return f"L{self.line_no + 1}"
+        return f"pos {self.start}-{self.end}"
+
+    @property
+    def suggestion(self) -> str:
+        """修正アクションの提案"""
+        return _SUGGESTIONS.get(self.detector, 'テキストを目視確認してください')
+
+
+# 検出器ごとの修正アクション辞書
+_SUGGESTIONS = {
+    'encoding': '文字化け箇所を正しい文字に置換してください。エンコーディング(UTF-8)を確認。',
+    'structural': '括弧の対応・改行・行長を確認してください。',
+    'duplicate': '重複している段落/文を削除してください（コピペミスの可能性）。',
+    'repetition': '同じフレーズが短い区間内で繰り返されています。表現を変えるか、重複を削除。',
+    'distribution': 'この区間の語彙が前後と大きく異なります。別テキストの混入や段落の順序間違いを確認。',
+    'complexity': 'この区間の情報密度が異常です。繰り返しコピペか、ランダムデータの混入を確認。',
+    'vocabulary': 'この区間に、文書全体で使われていない語彙が集中しています。別文書からの混入を確認。',
+}
 
 
 @dataclass
@@ -103,6 +131,109 @@ class ContaminationProfile:
     def is_clean(self, threshold: int = 10) -> bool:
         """汚染スコアが閾値以下なら clean"""
         return self.overall <= threshold
+
+    # ─── ドリルダウン API ─────────────────────────────────
+
+    @property
+    def worst_axes(self) -> List['AxisScore']:
+        """スコアが高い（汚染が酷い）順に軸を返す。score=0 の軸は除外。"""
+        return sorted(
+            [ax for ax in self.axes if ax.score > 0],
+            key=lambda ax: ax.score,
+            reverse=True,
+        )
+
+    @property
+    def primary_issue(self) -> Optional[str]:
+        """最も深刻な汚染の種類を1行で返す。汚染なしなら None。"""
+        worst = self.worst_axes
+        if not worst:
+            return None
+        ax = worst[0]
+        top_anomaly = ax.anomalies[0] if ax.anomalies else None
+        if top_anomaly:
+            return f"{ax.name}: {top_anomaly.description} ({top_anomaly.location})"
+        return f"{ax.name}: score {ax.score}/100"
+
+    def top_issues(self, n: int = 5) -> List[Anomaly]:
+        """
+        最も重篤な異常を n 件返す。
+
+        「何が問題か」を即座に把握するためのエントリポイント。
+        各 Anomaly の .description, .location, .suggestion でドリルダウン。
+        """
+        return self.all_anomalies[:n]
+
+    def explain(self, max_issues: int = 5) -> str:
+        """
+        「何が問題で、どこにあって、どう直すか」を人間が読める形で返す。
+
+        scan(text) → profile.explain() の2ステップで完結する。
+        大学1年生がこれだけ読めば次のアクションがわかる。
+
+        Returns:
+            説明文字列。汚染なしなら「問題なし」。
+        """
+        if self.is_clean():
+            return "✅ 問題なし: テキストに汚染は検出されませんでした。"
+
+        lines = []
+
+        # 概要
+        icon = '⚠️' if self.overall < 40 else '❌'
+        lines.append(f"{icon} 汚染スコア: {self.overall}/100")
+        lines.append("")
+
+        # 軸ごとの状況（汚染ありのみ）
+        for ax in self.worst_axes:
+            lines.append(f"■ {ax.name} ({ax.score}/100, {ax.count}件)")
+
+            # この軸のトップ異常を表示
+            shown = 0
+            for a in ax.anomalies:
+                if shown >= 3:
+                    remaining = len(ax.anomalies) - shown
+                    if remaining > 0:
+                        lines.append(f"    ...他 {remaining}件")
+                    break
+
+                lines.append(f"  {a.location}: {a.description}")
+                if a.snippet:
+                    lines.append(f"         → {a.snippet[:60]}")
+                shown += 1
+
+            # 修正アクション
+            if ax.anomalies:
+                lines.append(f"  💡 {ax.anomalies[0].suggestion}")
+            lines.append("")
+
+        return "\n".join(lines)
+
+    def locate(self, detector_name: str) -> List[Anomaly]:
+        """
+        特定の検出器の異常だけを取り出す。
+
+        >>> profile.locate('duplicate')
+        [Anomaly(detector='duplicate', line_no=5, ...), ...]
+        """
+        return [
+            a for a in self.all_anomalies
+            if a.detector == detector_name
+        ]
+
+    def summary_dict(self) -> dict:
+        """プログラムから扱いやすい辞書形式で返す"""
+        return {
+            'overall': self.overall,
+            'is_clean': self.is_clean(),
+            'text_length': self.text_length,
+            'anomaly_count': self.anomaly_count,
+            'axes': {
+                ax.name: {'score': ax.score, 'count': ax.count, 'label': ax.label}
+                for ax in self.axes
+            },
+            'primary_issue': self.primary_issue,
+        }
 
     def __str__(self) -> str:
         return self.report()
