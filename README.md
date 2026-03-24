@@ -24,6 +24,17 @@ pip install japhrase
 ```python
 from japhrase import PhraseExtracter
 
+text = """
+ChatGPTの登場により生成AIが注目を集めている。
+生成AIはテキストだけでなく画像生成にも使われる。
+大規模言語モデルは生成AIの中核技術である。
+生成AIの倫理的課題について議論が活発化している。
+企業における生成AIの導入事例が増加している。
+""" * 5  # 繰り返してフレーズを統計的に検出しやすくする
+
+# 文のリストに分割して渡す（文字列を直接渡すとファイルパスと解釈される）
+sentences = [s.strip() for s in text.split('。') if s.strip()]
+
 extractor = PhraseExtracter(min_count=2, max_length=10, min_length=2)
 df = extractor.extract(sentences)
 ```
@@ -44,7 +55,7 @@ df = extractor.extract(sentences)
 
 ```python
 extractor = PhraseExtracter(min_count=2, use_pmi=True)
-df = extractor.extract(sentences)
+df = extractor.extract(sentences)  # ↑ で作った sentences をそのまま使う
 ```
 
 ```
