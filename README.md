@@ -135,7 +135,51 @@ pip install japhrase[all]             # 全部入り
 
 Python 3.8+
 
-## ドキュメント
+## 使い方を調べる
+
+### CLI
+
+```bash
+japhrase --help                     # コマンド一覧
+japhrase extract --help             # フレーズ抽出の引数とオプション
+japhrase stats --help               # 統計出力の形式指定
+japhrase check --help               # 文書品質チェック
+japhrase detect-habits --help       # 書き癖検出
+```
+
+### Python
+
+全クラス・全関数に docstring がある。`help()` で引数・戻り値・使用例が出る。
+
+```python
+# フレーズ抽出
+from japhrase import PhraseExtracter
+help(PhraseExtracter)               # クラス全体
+help(PhraseExtracter.extract)       # 個別メソッド
+help(PhraseExtracter.preset)        # プリセットの使い方
+
+# 統計エンジン
+from japhrase import DistributionComparator, CollocationScorer
+from japhrase import StylometryAnalyzer, ComplexityAnalyzer, TemporalAnalyzer
+help(DistributionComparator)        # 2テキスト間の分布比較
+help(CollocationScorer)             # 語の結びつきの強さ（6指標）
+help(StylometryAnalyzer)            # 語彙多様性（7指標）
+help(ComplexityAnalyzer)            # テキスト複雑度
+help(TemporalAnalyzer)              # 時系列分析
+
+# 汚染検出
+from japhrase.contamination import scan, quick_check, compare, batch_scan
+help(scan)                          # 8軸汚染スキャン
+help(quick_check)                   # True/False だけ返す最小API
+
+# 執筆ワークフロー
+from japhrase.applied import PreflightChecker, EPDashboard, PartHealthReport
+help(PreflightChecker)              # 公開前品質ゲート
+help(EPDashboard)                   # 話数間推移ダッシュボード
+help(PartHealthReport)              # A〜E 健康診断
+```
+
+### ドキュメント
 
 | ドキュメント | 内容 |
 |-----------|------|
