@@ -8,7 +8,10 @@ __copyright__ = "Copyright 2023"
 
 from abc import ABC, abstractmethod
 from typing import List, Optional
-import requests
+try:
+    import requests
+except ImportError:
+    requests = None
 import time
 import logging
 from pathlib import Path

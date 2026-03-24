@@ -11,7 +11,12 @@ from typing import Dict, List, Any, Optional, Callable
 from pathlib import Path
 from dataclasses import dataclass, field
 from enum import Enum
-import networkx as nx
+try:
+    import networkx as nx
+    _HAS_NETWORKX = True
+except ImportError:
+    nx = None
+    _HAS_NETWORKX = False
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = logging.getLogger(__name__)

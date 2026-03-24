@@ -11,7 +11,11 @@ from collections import Counter
 import re
 import logging
 from typing import List, Dict, Any, Optional, Union
-from tqdm import tqdm
+try:
+    from tqdm import tqdm
+except ImportError:
+    def tqdm(iterable, **kwargs):
+        return iterable
 
 from .constants import DEFAULT_REMOVES, DEFAULT_UNNECESSARY
 from .patterns import get_positive_patterns, get_negative_patterns

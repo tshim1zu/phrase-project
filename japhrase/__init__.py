@@ -25,7 +25,10 @@ from .patterns import get_positive_patterns, get_negative_patterns
 # 新機能
 from .evaluation import UnsupervisedEvaluator, SupervisedEvaluator
 from .optimization import UnsupervisedOptimizer, SupervisedOptimizer
-from .similarity import SimilarityAnalyzer
+try:
+    from .similarity import SimilarityAnalyzer
+except ImportError:
+    SimilarityAnalyzer = None
 from .segmenter import TextSegmenter, segment_text
 from .writing_assistant import (
     KWICAnalyzer,
@@ -38,14 +41,18 @@ from .writing_tools import (
     EditorConfigGenerator,
     SelfRecommender
 )
-from .workflow import (
-    WorkflowDefinition,
-    WorkflowEngine,
-    TaskRegistry,
-    TaskDefinition,
-    TaskResult,
-    TaskStatus
-)
+try:
+    from .workflow import (
+        WorkflowDefinition,
+        WorkflowEngine,
+        TaskRegistry,
+        TaskDefinition,
+        TaskResult,
+        TaskStatus
+    )
+except ImportError:
+    WorkflowDefinition = WorkflowEngine = TaskRegistry = None
+    TaskDefinition = TaskResult = TaskStatus = None
 from .use_cases import WritingWorkflow
 from .config import JaphraseConfig
 from .checker import QualityChecker
@@ -118,8 +125,11 @@ from .stats_utils import compute_stats_data
 from .stats_report import render_stats_html
 # 書き癖検出
 from .writing_habit_detector import WritingHabitDetector
-# ドキュメント ベクトル化
-from .document_vectorizer import DocumentVectorizer, VectorizationResult
+# ドキュメント ベクトル化（sklearn が必要）
+try:
+    from .document_vectorizer import DocumentVectorizer, VectorizationResult
+except ImportError:
+    DocumentVectorizer = VectorizationResult = None
 # テキストマイニング・計量文学モジュール
 from .dialogue_analyzer import DialogueAnalyzer, analyze_dialogue
 from .orthography_checker import OrthographyVariantDetector, check_orthography

@@ -12,8 +12,15 @@ import numpy as np
 import pandas as pd
 from typing import List, Tuple, Optional, Any
 import logging
-from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
-from sklearn.decomposition import NMF
+try:
+    from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
+    from sklearn.decomposition import NMF
+    _HAS_SKLEARN = True
+except ImportError:
+    TfidfVectorizer = None
+    CountVectorizer = None
+    NMF = None
+    _HAS_SKLEARN = False
 
 logger = logging.getLogger(__name__)
 
