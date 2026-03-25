@@ -10,7 +10,7 @@
 pip install japhrase
 ```
 
-日本語テキストを入れると、繰り返し出現するフレーズを頻度で見つけ出す。MeCab も辞書も外部 AI も不要。
+日本語テキストを入れると、繰り返し出現する **可変長フレーズ** を頻度で見つけ出す。MeCab のような形態素解析器は単語単位で区切るが、japhrase は「機械学習」「自然言語処理」のような複合語・フレーズを丸ごと検出する。辞書も外部 AI も不要。
 
 **2つの使い方がある:**
 
@@ -45,7 +45,7 @@ print(df[["seqchar", "freq"]].head(3).to_string(index=False))
       ている  12.0
 ```
 
-テキストを渡すだけ。「機械学習」「自然言語処理」が辞書なしで見つかった。「ている」のようなノイズも混ざる — `use_pmi=True` を追加すると消える（→ [仕組み](#仕組み--n-gram--pmi--分岐エントロピー)）。
+テキストを渡すだけ。「機械学習の」「自然言語処理」が辞書なしで見つかった。「機械学習**の**」のように助詞が付くのは N-gram ベースの特徴 — `use_pmi=True` や `use_branching_entropy=True` を追加するとフレーズの境界が正確になる（→ [仕組み](#仕組み--n-gram--pmi--分岐エントロピー)）。「ている」のようなノイズも PMI で消える。
 
 **次のステップ:** [デモで全機能を体験する](#デモ2行で全機能体験) → [自分の用途に合わせて使う](#テキスト分析として使う)
 
@@ -60,6 +60,8 @@ print(df[["seqchar", "freq"]].head(3).to_string(index=False))
 | `length` | フレーズの文字数 |
 
 ```python
+# ↑ の pe, df を使う
+
 # 上位10フレーズ
 print(df[["seqchar", "freq"]].head(10))
 
@@ -90,8 +92,10 @@ pe = PhraseExtractor.preset('sns')     # SNS/Twitter向け
 pe = PhraseExtractor.preset('news')    # ニュース記事向け
 pe = PhraseExtractor.preset('report')  # 論文/レポート向け
 
-# テキストファイルから読み込んで抽出 → CSV保存
-df = pe.extract("input.txt")           # ファイルパスを渡せば自動で読み込み
+# ファイルから読み込む場合:
+# df = pe.extract("input.txt")
+# テキストを直接渡す場合:
+df = pe.extract("あなたのテキスト。" * 50)
 pe.export_csv(df, "keywords.csv")      # Excelで開ける
 ```
 
@@ -293,13 +297,15 @@ for key, p in result.profiles.items():
 3章: スコア=0/100
 ```
 
-### その他の執筆支援
+### さらに使える機能
 
-| 機能 | 何をするか |
-|------|----------|
-| **TextVariantDetector** | 表記ゆれ検出（サーバー/サーバ、出来る/できる） |
-| **PhraseExtractor.preset('novel')** | 小説に最適化したフレーズ抽出 |
-| **japhrase.applied** | 公開前品質ゲート・話数間推移・キャラ文体指紋 |
+| 機能 | 何をするか | 使い方 |
+|------|----------|--------|
+| **TextVariantDetector** | 表記ゆれ検出 | サーバー/サーバ、出来る/できる を自動発見 |
+| **PhraseExtractor.preset('novel')** | 小説向け抽出 | 繰り返し表現・情緒的フレーズに最適化 |
+| **japhrase.applied** | 執筆ワークフロー | 公開前品質ゲート・話数間推移・キャラ文体指紋 |
+
+各機能の詳細: `help(TextVariantDetector)` / `help(japhrase.applied)` で確認。
 
 ---
 
