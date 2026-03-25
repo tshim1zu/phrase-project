@@ -62,6 +62,70 @@ README はユーザーとの最初で最後の接点。PyPI で10秒見て去る
 - [ ] `AdaptiveTuner` のテスト追加
 - [ ] show_params() の出力例を README に追加
 
+## 英語対応: `lang='en'`
+
+japhraseを1パッケージで日英両対応にする。`pip install japhrase` だけで英語も使える。
+
+### ユーザーAPI
+
+```python
+from japhrase import PhraseExtractor
+
+# 日本語（デフォルト、従来通り）
+pe = PhraseExtractor()
+df = pe.extract("日本語テキスト")
+
+# 英語
+pe = PhraseExtractor(lang='en')
+df = pe.extract("Machine learning is transforming natural language processing. Machine learning models require large datasets.")
+```
+
+### 設計
+
+| | `lang='ja'`（現行） | `lang='en'` |
+|---|---|---|
+| トークン化 | 文字N-gram | 単語N-gram（`split()` ベース） |
+| N-gramの単位 | 連続N文字 | 連続N単語 |
+| PMI | 文字間の共起 | 単語間の共起 |
+| 分岐エントロピー | 次の文字の多様性 | 次の単語の多様性 |
+| 前処理 | removes/unnecessary で文字除去 | lowercase + punctuation strip |
+
+### 変更が必要なファイル
+
+| ファイル | 変更内容 |
+|---------|---------|
+| `extracter.py` | `__init__` に `lang` 引数追加。`scan_ngram` を文字/単語で分岐 |
+| `extracter.py` | `calculate_pmi` を文字/単語で分岐 |
+| `extracter.py` | `branching_entropy` を文字/単語で分岐 |
+| `extracter.py` | PRESETS に英語用プリセット追加（`'en_default'`, `'en_academic'`） |
+| `constants.py` | 英語用の REMOVES / UNNECESSARY（句読点・ストップワード） |
+
+### 変更不要（言語非依存で既に動く）
+
+- `stylometry.py` — 語彙多様性（文字ベースで計算、そのまま動く）
+- `complexity_metrics.py` — 圧縮率・情報率（バイト列ベース）
+- `contamination/` — 8軸検出（エンコーディング・構造・重複は言語無関係）
+- `distribution_comparator.py` — Counter を受け取るだけ
+- `collocation_scorer.py` — フレーズと頻度を受け取るだけ
+- `temporal_analyzer.py` — テキストリストを受け取るだけ
+- `similarity.py` — N-gram Jaccard / Levenshtein / コサイン
+
+### 実装順序
+
+1. `extracter.py` に `lang` 引数追加 + 単語トークナイザ
+2. 英語用テスト + デモデータ
+3. PRESETS に英語プリセット
+4. README に英語使用例追加
+5. 6ラウンドレビュー → リリース
+
+### 注意
+
+- パッケージ名 `japhrase` は変えない（既にPyPIに公開済み）
+- description は `"Japanese & English"` に更新
+- 外部依存の追加は不要（`split()` で十分。nltk/spacy に依存しない）
+
+---
+
 ## 優先度: 高
 
 ### CLI を v0.3 全機能に対応させる
