@@ -78,6 +78,24 @@ PRESETS = {
         'threshold_originality': 0.5,
         'description': 'デフォルト設定（汎用的なバランス型）',
     },
+    # --- English presets (word-level N-gram) ---
+    'en_default': {
+        'min_count': 3,
+        'max_length': 5,
+        'min_length': 2,
+        'threshold_originality': 0.5,
+        'lang': 'en',
+        'description': 'English default (general-purpose)',
+    },
+    'en_academic': {
+        'min_count': 3,
+        'max_length': 6,
+        'min_length': 2,
+        'threshold_originality': 0.6,
+        'use_pmi': True,
+        'lang': 'en',
+        'description': 'English academic (multi-word terms)',
+    },
 }
 
 
@@ -131,15 +149,16 @@ class PhraseExtracter:
         use_branching_entropy=False,
         pmi_weight=1.0,
         entropy_weight=1.0,
+        lang="ja",
     ):
         """
         Parameters:
             min_count (int): フレーズ出現回数の最小閾値
-            max_length (int): フレーズの最大文字数
-            min_length (int): フレーズの最小文字数
+            max_length (int): フレーズの最大文字数（lang='en' の場合は最大単語数）
+            min_length (int): フレーズの最小文字数（lang='en' の場合は最小単語数）
             weight_freq (float): 頻度への重み
             weight_len (float): 長さへの重み
-            removes (str): 走査前に除去する文字
+            removes (str): 走査前に除去する文字（lang='en' では未使用）
             unnecessary (list): 走査後に除去する文字列
             threshold_originality (float): 類似フレーズの除去閾値
             size_sentence (int): 一度にスキャンする配列のサイズ
@@ -152,7 +171,11 @@ class PhraseExtracter:
             use_branching_entropy (bool): 分岐エントロピーを使用するかどうか
             pmi_weight (float): PMIの重み係数
             entropy_weight (float): エントロピーの重み係数
+            lang (str): 言語 ('ja' or 'en')。'en' では単語レベルN-gramに切り替わる
         """
+        from .tokenizers import get_tokenizer
+        self._tokenizer = get_tokenizer(lang)
+        self.lang = lang
         self.min_count = min_count
         self.weight_freq = weight_freq
         self.weight_len = weight_len
@@ -173,7 +196,12 @@ class PhraseExtracter:
         self.entropy_weight = entropy_weight
 
     def make_ngrampieces(self, sentences: List[str]) -> List[str]:
-        """文章リストからN-gramフレーズを生成"""
+        """文章リストからN-gramフレーズを生成
+
+        lang='ja': 文字レベルN-gram（従来動作）
+        lang='en': 単語レベルN-gram（tokenizers.py 経由）
+        """
+        tok = self._tokenizer
         max_length = self.max_length
         if max_length == -1:
             max_length = len(sentences) // 2
@@ -181,15 +209,14 @@ class PhraseExtracter:
 
         phrases = []
         for a_sentence in sentences:
-            for x in self.removes:
-                a_sentence = a_sentence.replace(x, "")
+            a_sentence = tok.clean(a_sentence, self.removes)
+            tokens = tok.tokenize(a_sentence)
 
-            for char_length in range(1, max_length + 1):
-                for i, c in enumerate(a_sentence):
-                    if i + char_length - 1 < len(a_sentence):
-                        phr = "".join(a_sentence[i:i+char_length])
-                        if len(phr) >= min_length:
-                            phrases.append(phr)
+            for ngram_len in range(min_length, max_length + 1):
+                for i in range(len(tokens) - ngram_len + 1):
+                    phr = tok.join(tokens[i:i + ngram_len])
+                    if phr:
+                        phrases.append(phr)
         return phrases
 
     def count_characters(self, phrases: List[str]) -> pd.DataFrame:
@@ -1186,7 +1213,7 @@ class PhraseExtracter:
     @property
     def params(self) -> Dict[str, Any]:
         """現在のパラメータを dict で返す。"""
-        return {
+        d = {
             'min_count': self.min_count,
             'max_length': self.max_length - 1,  # 内部は +1 なので戻す
             'min_length': self.min_length,
@@ -1194,6 +1221,9 @@ class PhraseExtracter:
             'use_pmi': self.use_pmi,
             'use_branching_entropy': self.use_branching_entropy,
         }
+        if self.lang != 'ja':
+            d['lang'] = self.lang
+        return d
 
     def show_params(self):
         """現在のパラメータを表示する（コピペ用コード付き）。"""
@@ -1273,7 +1303,7 @@ class PhraseExtracter:
         init_params = {k: v for k, v in params.items()
                        if k in ('min_count', 'max_length', 'min_length',
                                 'threshold_originality', 'use_pmi',
-                                'use_branching_entropy')}
+                                'use_branching_entropy', 'lang')}
         instance = cls(**init_params)
         instance._tune_history = data.get('tune_history', [])
         print(f"📂 パラメータを復元: {path}")

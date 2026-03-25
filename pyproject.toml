@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "japhrase"
 version = "0.3.13"
-description = "Pure-math text intelligence engine for Japanese — vocabulary richness, contamination detection, writing habit analysis, character voice fingerprinting"
+description = "Pure-math phrase extraction for Japanese & English — no dictionary, no LLM. Vocabulary richness, contamination detection, writing habit analysis."
 readme = {file = "README.md", content-type = "text/markdown"}
 requires-python = ">=3.8"
 license = {text = "MIT"}
@@ -16,9 +16,9 @@ maintainers = [
     {name = "Takeshi SHIMIZU", email = "shim1zu@hotmail.com"}
 ]
 keywords = [
-    "nlp", "japanese", "text-analysis", "stylometry", "contamination-detection",
-    "writing-quality", "vocabulary-richness", "phrase-extraction", "japanese-nlp",
-    "computational-linguistics",
+    "nlp", "japanese", "english", "text-analysis", "stylometry", "contamination-detection",
+    "writing-quality", "vocabulary-richness", "phrase-extraction", "collocation",
+    "computational-linguistics", "pmi", "n-gram",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -41,6 +41,7 @@ classifiers = [
     "Topic :: Text Processing :: Linguistic",
     "Topic :: Scientific/Engineering :: Information Analysis",
     "Natural Language :: Japanese",
+    "Natural Language :: English",
 ]
 dependencies = [
     "numpy>=1.20.0,<3.0",

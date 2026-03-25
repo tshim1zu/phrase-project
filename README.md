@@ -1,6 +1,6 @@
 # japhrase
 
-**辞書もLLMも使わずに、テキストからフレーズを見つける。**
+**辞書もLLMも使わずに、テキストからフレーズを見つける。** Finds phrases in Japanese & English text — no dictionary, no LLM.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
@@ -10,12 +10,13 @@
 pip install japhrase
 ```
 
-日本語テキストを入れると、繰り返し出現する **可変長フレーズ** を頻度で見つけ出す。MeCab のような形態素解析器は単語単位で区切るが、japhrase は「機械学習」「自然言語処理」のような複合語・フレーズを丸ごと検出する。辞書も外部 AI も不要。
+テキストを入れると、繰り返し出現する **可変長フレーズ** を頻度で見つけ出す。日本語（文字レベル）にも英語（単語レベル）にも対応。MeCab のような形態素解析器は単語単位で区切るが、japhrase は「機械学習」「natural language processing」のような複合語・フレーズを丸ごと検出する。辞書も外部 AI も不要。
 
 **2つの使い方がある:**
 
 - **テキストを分析したい人**（研究者・マーケター）→ [テキスト分析として使う](#テキスト分析として使う)
 - **文章を書く/直す人**（作家・編集者・ライター）→ [執筆支援として使う](#執筆支援として使う)
+- **English speakers** → [English](#english)
 
 ---
 
@@ -455,28 +456,86 @@ pytest
 
 ## English
 
-**japhrase** extracts phrases from Japanese text using statistics alone — no dictionary, no morphological analyzer, no LLM.
+**japhrase** extracts recurring phrases from text using statistics — no dictionary, no morphological analyzer, no LLM. Works with both Japanese and English.
 
 ```bash
 pip install japhrase
 ```
 
+### English text
+
 ```python
 from japhrase import PhraseExtractor
 
-pe = PhraseExtractor(verbose=0)
+text = """Machine learning is transforming natural language processing.
+Natural language processing relies on machine learning models.
+Deep learning is a subset of machine learning.
+Machine learning engineers are in high demand.
+The field of machine learning continues to grow rapidly.
+Natural language processing has made significant advances.
+Deep learning requires large computational resources.
+Machine learning applications span many industries.""" * 3
+
+pe = PhraseExtractor(lang='en', verbose=0)
+df = pe.extract(text)
+print(df[["seqchar", "freq"]].head(2).to_string(index=False))
+```
+
+```
+                    seqchar  freq
+           machine learning  18.0
+natural language processing   9.0
+```
+
+"machine learning" appears 18 times, "natural language processing" 9 times — found without any dictionary.
+
+`lang='en'` switches to word-level N-grams. No external NLP library needed.
+
+Add `use_pmi=True` to filter noise (function words, accidental co-occurrences):
+
+```python
+pe = PhraseExtractor(lang='en', use_pmi=True, verbose=0)
+```
+
+Presets for English:
+
+```python
+pe = PhraseExtractor.preset('en_default')    # General-purpose
+pe = PhraseExtractor.preset('en_academic')   # Academic multi-word terms (PMI enabled)
+```
+
+### Japanese text
+
+```python
+from japhrase import PhraseExtractor
+
+pe = PhraseExtractor(verbose=0)  # lang='ja' is the default
 df = pe.extract("機械学習の応用が広がっている。自然言語処理は機械学習の重要な分野だ。" * 10)
 print(df[["seqchar", "freq"]].head())
 ```
 
-**How it works:** N-grams find recurring character sequences. PMI (pointwise mutual information) filters out meaningless combinations — "機械学習" scores high because its components co-occur far more than chance predicts, while "ている" scores low. Branching entropy then identifies natural phrase boundaries.
+For Japanese, japhrase uses character-level N-grams to find phrases without word boundaries — no MeCab or dictionary required.
 
-**Two use cases:**
+### How it works
 
-- **Text analysis** (researchers, marketers): keyword extraction, distribution comparison (JSD), collocation scoring (6 metrics), vocabulary richness (7 metrics), temporal analysis
-- **Writing support** (authors, editors): writing habit detection, contamination scanning (encoding errors, duplicates, bracket mismatches), complexity metrics, quality gates
+N-grams find recurring sequences. PMI (pointwise mutual information) filters out meaningless combinations — "machine learning" scores high because its words co-occur far more than chance predicts, while "is the" scores low. Branching entropy refines phrase boundaries.
 
-Pure math, no external AI. Python 3.8+, numpy/scipy.
+### All features work in both languages
+
+| Feature | What it does |
+|---------|-------------|
+| **PhraseExtractor** | Phrase/keyword extraction |
+| **StylometryAnalyzer** | Vocabulary richness (Hapax ratio, MATTR, Simpson's D) |
+| **ComplexityAnalyzer** | Text complexity (compression ratio, information rate) |
+| **DistributionComparator** | Compare vocabulary between two texts (JSD, keyness) |
+| **CollocationScorer** | Measure word association strength (PMI, t-score, Log-Dice) |
+| **TemporalAnalyzer** | Track vocabulary changes over time |
+| **SimilarityAnalyzer** | Detect duplicates / measure text similarity |
+| **contamination.scan()** | Detect encoding errors, duplicates, bracket mismatches |
+| **WritingHabitDetector** | Find unconscious repetition patterns |
+| **auto_tune=True** | Optimize parameters for your specific text |
+
+Pure math, no external AI. Python 3.8+.
 
 ---
 
