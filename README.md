@@ -87,7 +87,7 @@ print(f"PMI={cs.pmi:.1f}  t-score={cs.t_score:.1f}  Log-Dice={cs.log_dice:.1f}")
 ```
 
 ```
-PMI=3.6  t-score=6.1  Log-Dice=13.9
+PMI=3.5  t-score=6.1  Log-Dice=13.8
 ```
 
 ### テキストの複雑度を測る
@@ -101,7 +101,7 @@ print(f"圧縮率={r['compression_ratio']:.3f}  情報率={r['information_rate']
 ```
 
 ```
-圧縮率=0.709  情報率=0.984
+圧縮率=0.869  情報率=0.961
 ```
 
 ### テキストの汚染を検出
@@ -153,7 +153,7 @@ ChatGPTの登場により生成AIが注目を集めている。
 企業における生成AIの導入事例が増加している。
 """ * 5  # 繰り返してフレーズを統計的に検出しやすくする
 
-# 文のリストに分割して渡す（文字列を直接渡すとファイルパスと解釈される）
+# 文のリストに分割して渡す（文字列を直接渡してもよい）
 sentences = [s.strip() for s in text.split('。') if s.strip()]
 
 extractor = PhraseExtractor(min_count=2, max_length=10, min_length=2)
@@ -362,9 +362,9 @@ cs = scorer.score_phrase('生成AI', 45, text)
 
 ```
 「生成AI」:
-  PMI = 3.6      ← 意味的に結合している（偶然ではない）
+  PMI = 3.5      ← 意味的に結合している（偶然ではない）
   t-score = 6.1  ← 高頻度で安定した結合
-  Log-Dice = 13.9 ← コーパスサイズに依存しない結合度
+  Log-Dice = 13.8 ← コーパスサイズに依存しない結合度
 ```
 
 | 指標 | 何に強いか |
@@ -492,7 +492,8 @@ print(profile.explain())
 ```python
 from japhrase.contamination import batch_scan, compare
 
-batch_scan({"1章": t1, "2章": t2, "3章": t3}).contaminated_keys  # → ['2章']
+result = batch_scan({"1章": t1, "2章": t2, "3章": t3})
+result.contaminated_keys  # → 汚染スコアが閾値(10)を超えたキーのリスト
 compare(text_a, text_b).report()                                  # → 比較レポート
 ```
 
