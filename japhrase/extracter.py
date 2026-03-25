@@ -81,6 +81,26 @@ PRESETS = {
 }
 
 
+def _user_params_path():
+    """ユーザー固有パラメータの保存先パスを返す。"""
+    from pathlib import Path
+    return Path.home() / '.japhrase' / 'params.json'
+
+
+def _load_user_params():
+    """~/.japhrase/params.json が存在すれば読み込んで dict を返す。"""
+    import json
+    p = _user_params_path()
+    if p.exists():
+        try:
+            with open(p, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            return data.get('params', {})
+        except Exception:
+            return {}
+    return {}
+
+
 class PhraseExtracter:
     """
     日本語テキストから頻出フレーズを抽出するクラス
@@ -93,6 +113,11 @@ class PhraseExtracter:
     使用例:
         >>> extractor = PhraseExtracter(min_count=6, max_length=16)
         >>> df_result = extractor.get_dfphrase(sentences)
+
+    チューニング済みパラメータがあれば自動で使われる:
+        >>> pe = PhraseExtractor()    # ~/.japhrase/params.json を自動読み込み
+        >>> pe.tune(texts)            # チューニング → 自動保存
+        >>> pe.show_params()          # パラメータ確認
     """
 
     # 列名
@@ -106,64 +131,79 @@ class PhraseExtracter:
 
     def __init__(
         self,
-        min_count=2,
-        max_length=16,
-        min_length=2,
+        min_count=None,
+        max_length=None,
+        min_length=None,
         weight_freq=1.0,
         weight_len=1.0,
         removes=DEFAULT_REMOVES,
         unnecessary=DEFAULT_UNNECESSARY,
-        threshold_originality=0.5,
+        threshold_originality=None,
         size_sentence=5000,
         knowns=None,
         selection=0,
         verbose=1,
         positive=None,
         negative=None,
-        use_pmi=False,
-        use_branching_entropy=False,
+        use_pmi=None,
+        use_branching_entropy=None,
         pmi_weight=1.0,
         entropy_weight=1.0,
     ):
         """
         Parameters:
-            min_count (int): フレーズ出現回数の最小閾値
-            max_length (int): フレーズの最大文字数
-            min_length (int): フレーズの最小文字数
+            min_count (int): フレーズ出現回数の最小閾値（None=ユーザーJSON or デフォルト2）
+            max_length (int): フレーズの最大文字数（None=ユーザーJSON or デフォルト16）
+            min_length (int): フレーズの最小文字数（None=ユーザーJSON or デフォルト2）
             weight_freq (float): 頻度への重み
             weight_len (float): 長さへの重み
             removes (str): 走査前に除去する文字
             unnecessary (list): 走査後に除去する文字列
-            threshold_originality (float): 類似フレーズの除去閾値
+            threshold_originality (float): 類似フレーズの除去閾値（None=ユーザーJSON or デフォルト0.5）
             size_sentence (int): 一度にスキャンする配列のサイズ
             knowns (list): 既知語のリスト
             selection (int): セレクション機能の有無（0:無効, 1:有効）
             verbose (int): 進捗表示レベル
             positive (dict): ポジティブフィルター（Noneの場合はデフォルト使用）
             negative (dict): ネガティブフィルター（Noneの場合はデフォルト使用）
-            use_pmi (bool): PMI（自己相互情報量）を使用するかどうか
-            use_branching_entropy (bool): 分岐エントロピーを使用するかどうか
+            use_pmi (bool): PMI（自己相互情報量）を使用するかどうか（None=ユーザーJSON or False）
+            use_branching_entropy (bool): 分岐エントロピーを使用するかどうか（None=ユーザーJSON or False）
             pmi_weight (float): PMIの重み係数
             entropy_weight (float): エントロピーの重み係数
         """
-        self.min_count = min_count
+        # ユーザー固有パラメータを読み込み（存在すれば）
+        _up = _load_user_params()
+        _defaults = {
+            'min_count': 2, 'max_length': 16, 'min_length': 2,
+            'threshold_originality': 0.5, 'use_pmi': False,
+            'use_branching_entropy': False,
+        }
+
+        def _resolve(arg_val, key):
+            """引数が明示指定されていればそれを、なければユーザーJSON、なければデフォルト。"""
+            if arg_val is not None:
+                return arg_val
+            return _up.get(key, _defaults[key])
+
+        self.min_count = _resolve(min_count, 'min_count')
         self.weight_freq = weight_freq
         self.weight_len = weight_len
-        self.max_length = max_length + 1  # 指定された数よりも１つ多く数えて処理
-        self.min_length = min_length
+        self.max_length = _resolve(max_length, 'max_length') + 1  # 内部は +1
+        self.min_length = _resolve(min_length, 'min_length')
         self.removes = removes
         self.unnecessary = unnecessary
         self.knowns = knowns if knowns is not None else []
         self.size_sentence = size_sentence
-        self.threshold_originality = threshold_originality
+        self.threshold_originality = _resolve(threshold_originality, 'threshold_originality')
         self.selection = selection
         self.verbose = verbose
         self.positive_filter = positive if positive is not None else get_positive_patterns()
         self.negative_filter = negative if negative is not None else get_negative_patterns()
-        self.use_pmi = use_pmi
-        self.use_branching_entropy = use_branching_entropy
+        self.use_pmi = _resolve(use_pmi, 'use_pmi')
+        self.use_branching_entropy = _resolve(use_branching_entropy, 'use_branching_entropy')
         self.pmi_weight = pmi_weight
         self.entropy_weight = entropy_weight
+        self._from_user_params = bool(_up) and min_count is None
 
     def make_ngrampieces(self, sentences: List[str]) -> List[str]:
         """文章リストからN-gramフレーズを生成"""
@@ -1173,6 +1213,9 @@ class PhraseExtracter:
             'n_trials': n_trials,
             'params': self.params,
         })
+
+        # ユーザー固有パラメータとして自動保存
+        self.save_params(str(_user_params_path()))
 
         return self
 
