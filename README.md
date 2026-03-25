@@ -10,7 +10,7 @@
 pip install japhrase
 ```
 
-日本語テキストを入れると、繰り返し出現するフレーズが統計で出てくる。MeCab も辞書も外部 AI も不要。
+日本語テキストを入れると、繰り返し出現するフレーズを頻度で見つけ出す。MeCab も辞書も外部 AI も不要。
 
 **2つの使い方がある:**
 
@@ -35,17 +35,19 @@ text = """機械学習の応用が広がっている。
 
 pe = PhraseExtractor(verbose=0)
 df = pe.extract(text)
-print(df[["seqchar", "freq"]].head(3))
+print(df[["seqchar", "freq"]].head(3).to_string(index=False))
 ```
 
 ```
-      seqchar  freq
-0       機械学習の  15.0
-1      自然言語処理   6.0
-2         ている  12.0
+  seqchar  freq
+    機械学習の  15.0
+   自然言語処理   6.0
+      ている  12.0
 ```
 
-テキストを渡すだけ。「機械学習」「自然言語処理」が辞書なしで見つかった。「ている」のようなノイズも混ざる — PMI を有効にすると消える（→ [仕組み](#仕組み--n-gram--pmi--分岐エントロピー)）。
+テキストを渡すだけ。「機械学習」「自然言語処理」が辞書なしで見つかった。「ている」のようなノイズも混ざる — `use_pmi=True` を追加すると消える（→ [仕組み](#仕組み--n-gram--pmi--分岐エントロピー)）。
+
+**次のステップ:** [デモで全機能を体験する](#デモ2行で全機能体験) → [自分の用途に合わせて使う](#テキスト分析として使う)
 
 ### 結果の使い方
 
@@ -88,7 +90,8 @@ pe = PhraseExtractor.preset('sns')     # SNS/Twitter向け
 pe = PhraseExtractor.preset('news')    # ニュース記事向け
 pe = PhraseExtractor.preset('report')  # 論文/レポート向け
 
-df = pe.extract("あなたのテキストをここに入れる")
+# テキストファイルから読み込んで抽出 → CSV保存
+df = pe.extract("input.txt")           # ファイルパスを渡せば自動で読み込み
 pe.export_csv(df, "keywords.csv")      # Excelで開ける
 ```
 
@@ -112,6 +115,9 @@ pe.save_params("my_params.json")         # 保存して次回から再利用
 from japhrase import DistributionComparator
 from collections import Counter
 
+# PhraseExtractor の結果から Counter を作ることもできる:
+# freq_a = Counter(dict(zip(df_a["seqchar"], df_a["freq"])))
+
 comp = DistributionComparator()
 result = comp.compare(
     Counter({"騎士": 10, "剣": 8, "王城": 5}),
@@ -133,7 +139,8 @@ from japhrase import CollocationScorer
 
 text = "機械学習の応用が広がっている。機械学習の技術が進んでいる。" * 50
 scorer = CollocationScorer()
-# score_phrase(フレーズ, そのフレーズの出現回数, テキスト全文)
+# score_phrase(フレーズ, 出現回数, テキスト全文)
+# 出現回数は df["freq"] から取れる。ここでは直接指定:
 cs = scorer.score_phrase("機械学習", 100, text)
 print(f"PMI={cs.pmi:.1f}  t-score={cs.t_score:.1f}  Log-Dice={cs.log_dice:.1f}")
 ```
@@ -382,7 +389,9 @@ df = pe.extract(text)  # ↑ 第1層と同じ text
 print(df[["seqchar", "freq"]].head(4).to_string(index=False))
 ```
 
-N-gram が広く拾い → PMI がノイズを落とし → 分岐エントロピーが切れ目を正確にする。この3層が japhrase のコア。
+この例文では第2層と同じ結果になる。分岐エントロピーの効果は、フレーズの境界が曖昧な長文（小説など）で大きくなる。
+
+**まとめ:** N-gram が広く拾い → PMI がノイズを落とし → 分岐エントロピーが切れ目を正確にする。この3層が japhrase のコア。
 
 ---
 
