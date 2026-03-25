@@ -219,12 +219,15 @@ df = pe.extract(texts, auto_tune=True)
 # チューニング後のパラメータを確認（コピペ用コード付き）
 pe.show_params()
 
-# パラメータを保存・次回復元
+# 気に入ったら保存（明示的 — 勝手にファイルは作らない）
 pe.save_params("my_params.json")
+
+# 次回はこれで復元
 pe = PhraseExtractor.load_params("my_params.json")
+df = pe.extract(new_texts)
 ```
 
-`auto_tune=True` を付けるだけ。Optunaがあればベイズ最適化、なければヒューリスティック推定。パラメータはJSON保存で次回復元できる。
+`auto_tune=True` を付けるだけ。Optunaがあればベイズ最適化、なければヒューリスティック推定。ファイルシステムには一切触らない — 保存はユーザーが `save_params()` を呼んだ時だけ。
 
 ---
 
