@@ -3,25 +3,15 @@ include README.md
 include LICENSE
 include pyproject.toml
 include requirements.txt
-include CHANGELOG.md
 
 # Documentation
 recursive-include docs *.md
-recursive-include docs *.txt
-
-# Examples and test data
-recursive-include examples *.py
-recursive-include examples *.ipynb
-recursive-include examples *.yaml
-recursive-include examples/data *.tsv
-recursive-include examples/workflows *.yaml
 
 # Tests
 recursive-include tests *.py
 
-# Configuration files
+# Configuration
 include pytest.ini
-include .gitignore
 
 # Exclude unnecessary files
 global-exclude __pycache__

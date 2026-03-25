@@ -4,29 +4,24 @@ __pycache__/
 *$py.class
 *.so
 .Python
+
+# Build / Distribution
 build/
-develop-eggs/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
 *.egg-info/
-.installed.cfg
 *.egg
+*.whl
+*.tar.gz
 MANIFEST
+pip-wheel-metadata/
+pip-log.txt
+pip-delete-this-directory.txt
 
 # Virtual environments
 venv/
 env/
 ENV/
-.venv
+.venv/
 .test-venv/
 
 # Testing
@@ -51,116 +46,62 @@ dmypy.json
 *.swo
 *~
 
-# Claude settings cache and internal docs
-.claude/
+# OS
+.DS_Store
+Thumbs.db
+nul
 
 # Secrets
 .env
 *.env
+!requirements*.txt
 
-# 黒歴史（ローカル参照用、リポジトリには載せない）
+# Claude / AI tooling
+.claude/
+CLAUDE.md
+.claude.md
+claude.md
+
+# Local-only docs (not for repo)
 TATTOO.md
+comment.md
+TODO_APPLIED_FEATURES.md
+TODO_STATS_ENHANCEMENT.md
+*.personal
 
-# E2E テストノートブック（ユーザー初見コードの再現テスト）
+# E2E test notebooks (local validation only)
 e2e_notebooks/
 test.ipynb
 test copy.ipynb
 
-# 内部計画ドキュメント
-TODO_APPLIED_FEATURES.md
-TODO_STATS_ENHANCEMENT.md
-
-# スクリーンショット等の一時ファイル
+# Screenshots / temp files
 res.png
+*tmpclaude*-cwd
 
-# ビルド成果物
-dist/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Build/Distribution
-*.whl
-*.tar.gz
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Project specific - 分析結果・実験データは完全に除外
-.experiments/
-experiments/results/
-experiments/data/
-examples/data/
-examples/workflows/
-scripts/generated_data/
-results/
-data/
-!requirements*.txt
-!LICENSE.txt
-
-# 個人設定・機密ファイル・内部ドキュメント
-CLAUDE.md
-.claude.md
-claude.md
-comment.md
-*.personal
-DAILY_SUMMARY_*.md
-ROBUSTNESS_*.md
-DOCUMENT_VECTORIZER_*.md
-WRITING_ASSISTANT_*.md
-COMFY_*.md
-README_ROBUSTNESS_*.md
-
-# ComfyUI・分析関連
-comfy_*.py
-*comfy*
-*analysis*
-*comparison*
-scripts/generate_*.py
-scripts/run_*.py
-scripts/batch_*.py
-scripts/find_*.py
-
-# Data files (CSV, Excel)
+# Data files
 *.csv
 *.xls
 *.xlsx
-
-# JSON (but keep config files)
 *.json
-!package.json
-!pyproject.toml
-
-# Test files (temporary/sample data)
-test_phrases.csv
-test_workflow_sample.txt
-
-# Test fixtures — 小説テキストの痕跡を残さない
-# テスト用の実テキスト（JP/EN）は gitignore。テストコード(.py)はトラック。
-tests/fixtures/novel_*.txt
-tests/fixtures/scene_*.txt
-tests/fixtures/manuscript_*.txt
-tests/fixtures/draft_*.txt
+*.db
 
 # Jupyter
 .ipynb_checkpoints/
 */.ipynb_checkpoints/
 
-nul
+# Experiments / scripts / results (removed from tracking)
+experiments/
+scripts/
+results/
+data/
+examples/data/
 
-*.db
+# Test fixtures (real novel text must not leak)
+tests/fixtures/novel_*.txt
+tests/fixtures/scene_*.txt
+tests/fixtures/manuscript_*.txt
+tests/fixtures/draft_*.txt
+tests/fixtures/*.json
 
-examples/data/*
-*tmpclaude*-cwd
-scripts/*
-
-# Ensure pytest cache is excluded (if not already covered above)
-.pytest_cache/
-
-# Ensure build artifacts are excluded
-build/
-dist/
-*.egg-info/
-
-# nmf-prompt-generator is maintained independently
+# nmf-prompt-generator (independent project)
 nmf-prompt-generator/
