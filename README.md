@@ -88,8 +88,7 @@ pe = PhraseExtractor.preset('sns')     # SNS/Twitter向け
 pe = PhraseExtractor.preset('news')    # ニュース記事向け
 pe = PhraseExtractor.preset('report')  # 論文/レポート向け
 
-text = "あなたのテキストデータ。" * 50  # 自分のデータに置き換える
-df = pe.extract(text)
+df = pe.extract("あなたのテキストをここに入れる")
 pe.export_csv(df, "keywords.csv")      # Excelで開ける
 ```
 
@@ -253,7 +252,7 @@ phrase  count
   た。しか     10
 ```
 
-「しかし」の多用が検出された。高頻度 × 低PMI = 意味のない繰り返し = 癖。
+「。し」=「しかし」の文頭パターン、「た。しか」=「〜た。しかし」の接続パターン。N-gram ベースなので句読点を含む断片として検出される。繰り返しパターンが数字で見える。
 
 ### 原稿の汚染を検出
 
@@ -358,7 +357,7 @@ PMI（自己相互情報量）は「偶然一緒に現れる確率」と「実�
 
 ```python
 pe = PhraseExtractor(min_count=3, min_length=2, max_length=8, use_pmi=True, verbose=0)
-df = pe.extract(text)  # 上と同じ text を使う
+df = pe.extract(text)  # ↑ 第1層と同じ text
 print(df[["seqchar", "freq"]].head(4).to_string(index=False))
 ```
 
@@ -379,7 +378,7 @@ ChatGPTの登   5.0
 ```python
 pe = PhraseExtractor(min_count=3, min_length=2, max_length=8,
                      use_pmi=True, use_branching_entropy=True, verbose=0)
-df = pe.extract(text)  # 上と同じ text を使う
+df = pe.extract(text)  # ↑ 第1層と同じ text
 print(df[["seqchar", "freq"]].head(4).to_string(index=False))
 ```
 
@@ -451,7 +450,7 @@ pip install japhrase
 from japhrase import PhraseExtractor
 
 pe = PhraseExtractor(verbose=0)
-df = pe.extract("Your Japanese text here." * 10)
+df = pe.extract("機械学習の応用が広がっている。自然言語処理は機械学習の重要な分野だ。" * 10)
 print(df[["seqchar", "freq"]].head())
 ```
 
