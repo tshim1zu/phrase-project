@@ -227,7 +227,7 @@ pe = PhraseExtractor.load_params("my_params.json")
 df = pe.extract(new_texts)
 ```
 
-`auto_tune=True` を付けるだけ。Optunaがあればベイズ最適化、なければヒューリスティック推定。ファイルシステムには一切触らない — `save_params("パス")` を呼ばない限り何も保存されない。保存先はユーザーが決める（デフォルトの保存先は存在しない）。
+`auto_tune=True` を付けるだけ。Optunaがあればベイズ最適化、なければヒューリスティック推定。最適化されたパラメータはJSONに保存・復元できる。
 
 ---
 
