@@ -106,9 +106,9 @@ class PhraseExtracter:
 
     def __init__(
         self,
-        min_count=6,
+        min_count=2,
         max_length=16,
-        min_length=4,
+        min_length=2,
         weight_freq=1.0,
         weight_len=1.0,
         removes=DEFAULT_REMOVES,

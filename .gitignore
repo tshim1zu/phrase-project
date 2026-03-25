@@ -51,12 +51,8 @@ dmypy.json
 *.swo
 *~
 
-# Claude settings cache (but keep documentation)
-.claude/**/*
-!.claude/internal_docs/
-!.claude/plans/
-!.claude/internal_docs/*.md
-!.claude/plans/*.md
+# Claude settings cache and internal docs
+.claude/
 
 # Secrets
 .env
@@ -68,6 +64,17 @@ TATTOO.md
 # E2E テストノートブック（ユーザー初見コードの再現テスト）
 e2e_notebooks/
 test.ipynb
+test copy.ipynb
+
+# 内部計画ドキュメント
+TODO_APPLIED_FEATURES.md
+TODO_STATS_ENHANCEMENT.md
+
+# スクリーンショット等の一時ファイル
+res.png
+
+# ビルド成果物
+dist/
 
 # OS
 .DS_Store
