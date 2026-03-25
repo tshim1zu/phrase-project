@@ -206,29 +206,25 @@ text_1 と text_2 は類似（0.17）、text_3 は完全に別（0.0）。
 ### パラメータ自動最適化（あなたのテキストに合わせてチューニング）
 
 ```python
-from japhrase import AdaptiveTuner
+from japhrase import PhraseExtractor
 
-# プリセットで開始（テキストがまだない状態）
-tuner = AdaptiveTuner(preset='novel')
+pe = PhraseExtractor()
 
-# テキストを蓄積するほど、パラメータが自動で最適化される
-tuner.feed(["第1章のテキスト...", "第2章のテキスト...", ...])
+# いつもの抽出
+df = pe.extract(texts)
 
-# 現在の最適パラメータでフレーズ抽出
-df = tuner.extract("分析したいテキスト")
+# テキストに合わせて自動チューニング → 抽出（フラグ1個追加するだけ）
+df = pe.extract(texts, auto_tune=True)
 
-# 手動でOptuna最適化を実行（蓄積テキストが多いほど精度が上がる）
-tuner.tune(n_trials=50)
+# チューニング後のパラメータを確認（コピペ用コード付き）
+pe.show_params()
 
-# 現在のパラメータを確認（コピペ用コードも表示される）
-tuner.show_params()
-
-# パラメータを保存・復元
-tuner.save("my_params.json")
-tuner = AdaptiveTuner.load("my_params.json")
+# パラメータを保存・次回復元
+pe.save_params("my_params.json")
+pe = PhraseExtractor.load_params("my_params.json")
 ```
 
-蓄積ゼロ → プリセットで動く。テキストが増える → 自動チューニングが走る → あなたのコーパスに最適化されたパラメータになる。Optunaがなくてもヒューリスティック推定で動く。
+`auto_tune=True` を付けるだけ。Optunaがあればベイズ最適化、なければヒューリスティック推定。パラメータはJSON保存で次回復元できる。
 
 ---
 

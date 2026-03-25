@@ -1065,7 +1065,9 @@ class PhraseExtracter:
 
         return df, metadata
 
-    def extract(self, input_data: Union[str, List[str]], column: str = None, encoding: str = 'auto') -> pd.DataFrame:
+    def extract(self, input_data: Union[str, List[str]], column: str = None,
+                encoding: str = 'auto', auto_tune: bool = False,
+                tune_trials: int = 15) -> pd.DataFrame:
         """
         ファイルパスまたは文字列リストからフレーズを抽出
 
@@ -1073,6 +1075,8 @@ class PhraseExtracter:
             input_data (str or List[str]): 入力ファイルパスまたはテキストのリスト
             column (str): CSV/TSVの場合の列名（input_dataがファイルパスの場合のみ有効）
             encoding (str): 文字エンコーディング ('auto'で自動検出、デフォルト: 'auto')
+            auto_tune (bool): Trueならテキストに合わせてパラメータを自動最適化してから抽出
+            tune_trials (int): auto_tune時のOptuna試行回数（デフォルト15）
 
         Returns:
             pandas.DataFrame: 抽出されたフレーズ
@@ -1084,6 +1088,8 @@ class PhraseExtracter:
             >>> # 文字列リストから直接抽出
             >>> texts = ["テキスト1", "テキスト2", "テキスト3"]
             >>> df = extractor.extract(texts)
+            >>> # テキストに合わせて自動チューニング
+            >>> df = extractor.extract(texts, auto_tune=True)
         """
         from .utils import read_file
         from pathlib import Path
@@ -1111,7 +1117,213 @@ class PhraseExtracter:
                 f"実際の型: {type(input_data)}"
             )
 
+        if auto_tune:
+            self.tune(sentences, n_trials=tune_trials)
+
         return self.get_dfphrase(sentences)
+
+    # ------------------------------------------------------------------ #
+    #  パラメータ最適化 API
+    # ------------------------------------------------------------------ #
+
+    def tune(self, texts: Union[str, List[str]], n_trials: int = 30,
+             verbose: Optional[int] = None) -> 'PhraseExtracter':
+        """渡されたテキストに合わせてパラメータを自動最適化する。
+
+        Optunaがあればベイズ最適化、なければヒューリスティック推定。
+        最適化後、このインスタンスのパラメータが更新される。
+
+        Args:
+            texts: チューニングに使うテキスト（文字列 or リスト）
+            n_trials: Optuna試行回数（デフォルト30）
+            verbose: 進捗表示（None=self.verbose を使用）
+
+        Returns:
+            self（チェーン呼び出し用）
+
+        使用例:
+            >>> pe = PhraseExtractor()
+            >>> pe.tune(my_texts).extract(my_texts)
+            >>> pe.show_params()
+        """
+        if isinstance(texts, str):
+            import re as _re
+            texts = [s.strip() for s in _re.split(r'[。！？\n]+', texts) if s.strip()]
+
+        if verbose is None:
+            verbose = self.verbose
+
+        try:
+            best = self._tune_optuna(texts, n_trials, verbose)
+        except ImportError:
+            best = self._tune_heuristic(texts, verbose)
+
+        # パラメータを更新
+        for k, v in best.items():
+            if hasattr(self, k):
+                if k == 'max_length':
+                    self.max_length = v + 1  # 内部は +1 で保持
+                else:
+                    setattr(self, k, v)
+
+        if not hasattr(self, '_tune_history'):
+            self._tune_history = []
+        self._tune_history.append({
+            'corpus_size': len(texts),
+            'n_trials': n_trials,
+            'params': self.params,
+        })
+
+        return self
+
+    @property
+    def params(self) -> Dict[str, Any]:
+        """現在のパラメータを dict で返す。"""
+        return {
+            'min_count': self.min_count,
+            'max_length': self.max_length - 1,  # 内部は +1 なので戻す
+            'min_length': self.min_length,
+            'threshold_originality': self.threshold_originality,
+            'use_pmi': self.use_pmi,
+            'use_branching_entropy': self.use_branching_entropy,
+        }
+
+    def show_params(self):
+        """現在のパラメータを表示する（コピペ用コード付き）。"""
+        p = self.params
+        tuned = hasattr(self, '_tune_history') and len(self._tune_history) > 0
+        print("=" * 55)
+        print("  PhraseExtractor — 現在のパラメータ")
+        print("=" * 55)
+        if tuned:
+            h = self._tune_history[-1]
+            print(f"  チューニング済み ({h['corpus_size']}テキスト, {h['n_trials']}試行)")
+        else:
+            print("  未チューニング（デフォルト or プリセット）")
+        print()
+        for k, v in p.items():
+            if isinstance(v, float):
+                print(f"    {k:30s} = {v:.4f}")
+            else:
+                print(f"    {k:30s} = {v}")
+        print()
+        # コピペ用
+        parts = []
+        for k, v in p.items():
+            if k in ('use_pmi', 'use_branching_entropy') and not v:
+                continue
+            parts.append(f"{k}={v:.4f}" if isinstance(v, float) else f"{k}={v!r}")
+        print(f"  コピペ用:")
+        print(f"    PhraseExtractor({', '.join(parts)})")
+        print("=" * 55)
+
+    def save_params(self, path: str):
+        """パラメータをJSONファイルに保存する。
+
+        Args:
+            path: 保存先ファイルパス
+
+        使用例:
+            >>> pe = PhraseExtractor()
+            >>> pe.tune(texts)
+            >>> pe.save_params("my_params.json")
+        """
+        import json
+        from pathlib import Path as _Path
+        _Path(path).parent.mkdir(parents=True, exist_ok=True)
+        data = {
+            'params': self.params,
+            'tune_history': getattr(self, '_tune_history', []),
+        }
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        if self.verbose:
+            print(f"💾 パラメータを保存: {path}")
+
+    @classmethod
+    def load_params(cls, path: str) -> 'PhraseExtracter':
+        """JSONファイルからパラメータを復元して新インスタンスを作る。
+
+        Args:
+            path: JSONファイルパス
+
+        Returns:
+            復元された PhraseExtracter
+
+        使用例:
+            >>> pe = PhraseExtractor.load_params("my_params.json")
+            >>> df = pe.extract(texts)
+        """
+        import json
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        params = data['params']
+        # extract 用のパラメータのみ渡す（use_pmi等も含む）
+        init_params = {k: v for k, v in params.items()
+                       if k in ('min_count', 'max_length', 'min_length',
+                                'threshold_originality', 'use_pmi',
+                                'use_branching_entropy')}
+        instance = cls(**init_params)
+        instance._tune_history = data.get('tune_history', [])
+        print(f"📂 パラメータを復元: {path}")
+        return instance
+
+    def _tune_optuna(self, texts, n_trials, verbose):
+        """Optunaによるベイズ最適化。"""
+        import optuna
+        if verbose == 0:
+            optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+        from .evaluation import UnsupervisedEvaluator
+        evaluator = UnsupervisedEvaluator()
+
+        param_ranges = {
+            'min_count': (2, max(3, min(20, len(texts) // 10))),
+            'max_length': (4, 24),
+            'min_length': (2, 8),
+            'threshold_originality': (0.1, 0.9),
+        }
+
+        def objective(trial):
+            params = {}
+            for name, (lo, hi) in param_ranges.items():
+                if name == 'threshold_originality':
+                    params[name] = trial.suggest_float(name, lo, hi)
+                else:
+                    params[name] = trial.suggest_int(name, lo, hi)
+            try:
+                ext = PhraseExtracter(verbose=0, **params)
+                df = ext.get_dfphrase(texts)
+                if len(df) == 0:
+                    return 0.0
+                return evaluator.evaluate(df['seqchar'].tolist(), texts, df)
+            except Exception:
+                return 0.0
+
+        study = optuna.create_study(
+            direction='maximize',
+            sampler=optuna.samplers.TPESampler(seed=42),
+        )
+        study.optimize(objective, n_trials=n_trials,
+                       show_progress_bar=(verbose >= 1))
+
+        if verbose >= 1:
+            print(f"✅ Optuna最適化完了 ({n_trials}試行, スコア={study.best_value:.4f})")
+        return study.best_params
+
+    def _tune_heuristic(self, texts, verbose):
+        """Optunaなしのヒューリスティック推定。"""
+        from .parameter_optimizer import ParameterOptimizer
+        optimizer = ParameterOptimizer()
+        rec = optimizer.recommend_parameters(texts)
+        best = {
+            'min_count': rec.min_count,
+            'max_length': rec.max_length,
+            'min_length': rec.min_length,
+        }
+        if verbose >= 1:
+            print(f"✅ ヒューリスティック推定完了 (Optunaなし)")
+        return best
 
     def export_csv(self, df, filepath: str, encoding: str = 'utf-8-sig'):
         """
