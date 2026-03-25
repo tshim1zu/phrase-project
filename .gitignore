@@ -65,6 +65,10 @@ dmypy.json
 # 黒歴史（ローカル参照用、リポジトリには載せない）
 TATTOO.md
 
+# E2E テストノートブック（ユーザー初見コードの再現テスト）
+e2e_notebooks/
+test.ipynb
+
 # OS
 .DS_Store
 Thumbs.db
