@@ -9,8 +9,8 @@ japhrase 自己デモンストレーション
     >>> import japhrase
     >>> japhrase.demo()           # 全機能のデモを順に実行
 
-    >>> from japhrase import PhraseExtracter
-    >>> PhraseExtracter.demo()    # フレーズ抽出だけデモ
+    >>> from japhrase import PhraseExtractor
+    >>> PhraseExtractor.demo()    # フレーズ抽出だけデモ
 """
 
 # ─── 共通の例文 ──────────────────────────────────────────
@@ -60,7 +60,7 @@ def _explain(text):
 
 def demo_phrase_extracter():
     """フレーズ抽出のデモ"""
-    _header("フレーズ抽出 — PhraseExtracter")
+    _header("フレーズ抽出 — PhraseExtractor")
     _explain("""
 テキストから、辞書を使わずに頻出フレーズを統計で見つけます。
 N-gram（連続するN文字の断片）の出現頻度を数え、
@@ -73,8 +73,8 @@ PMI（自己相互情報量）で「意味のある結合」だけを残しま�
     print(f"    ...（他 {len(SAMPLE_SENTENCES) - 3} 文）× 5回繰り返し")
     print()
 
-    from japhrase import PhraseExtracter
-    ext = PhraseExtracter(min_count=2, max_length=10, min_length=2, verbose=0)
+    from japhrase import PhraseExtractor
+    ext = PhraseExtractor(min_count=2, max_length=10, min_length=2, verbose=0)
     df = ext.extract(SAMPLE_SENTENCES * 5)
 
     print("  【結果】")
@@ -90,8 +90,8 @@ PMI（自己相互情報量）で「意味のある結合」だけを残しま�
 テキスト中で繰り返されていれば統計的に検出できます。
 
 次のステップ:
-  help(PhraseExtracter)          # 全パラメータの説明
-  PhraseExtracter.preset('news') # プリセットを使う
+  help(PhraseExtractor)          # 全パラメータの説明
+  PhraseExtractor.preset('news') # プリセットを使う
 """)
 
 
@@ -318,5 +318,5 @@ def demo_all():
     print("  デモ完了。")
     print()
     print("  各機能の詳細は help() で確認できます。")
-    print("  例: help(PhraseExtracter), help(scan)")
+    print("  例: help(PhraseExtractor), help(scan)")
     print("=" * 60)

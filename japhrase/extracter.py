@@ -116,7 +116,7 @@ class PhraseExtracter:
         threshold_originality=0.5,
         size_sentence=5000,
         knowns=None,
-        selection=1,
+        selection=0,
         verbose=1,
         positive=None,
         negative=None,
@@ -1090,8 +1090,18 @@ class PhraseExtracter:
 
         # 入力がファイルパスか文字列リストかを判定
         if isinstance(input_data, str):
-            # ファイルパスとして扱う
-            sentences = read_file(input_data, column, encoding)
+            # ファイルが存在すればファイルとして読む
+            # 存在しなければテキストとして扱う（文で分割）
+            if Path(input_data).is_file():
+                sentences = read_file(input_data, column, encoding)
+            else:
+                # テキストを文に分割（。！？改行で区切る）
+                import re
+                sentences = [s.strip() for s in re.split(r'[。！？\n]+', input_data) if s.strip()]
+                if not sentences:
+                    sentences = [input_data]
+                if self.verbose:
+                    logger.info(f"テキストを{len(sentences)}文に分割しました")
         elif isinstance(input_data, (list, tuple, pd.Series)):
             # 文字列リストとして扱う
             sentences = input_data

@@ -12,13 +12,15 @@ SNSトレンド分析、ニュース話題抽出、頻出キーワード発見�
 詳細は POSITIONING.md を参照してください。
 """
 
-__version__ = "0.3.7"
+__version__ = "0.3.8"
 __author__ = "Takeshi SHIMIZU"
 __copyright__ = "Copyright 2023-2026"
 __license__ = "MIT"
 __email__ = "shim1zu@hotmail.com"
 
 from .extracter import PhraseExtracter, extracter, PRESETS
+# 正しい綴りをメインに、旧綴りも後方互換で残す
+PhraseExtractor = PhraseExtracter
 from .constants import FIRST_KANJI, DEFAULT_REMOVES, DEFAULT_UNNECESSARY
 from .patterns import get_positive_patterns, get_negative_patterns
 
@@ -166,6 +168,7 @@ from .temporal_analyzer import (
 
 __all__ = [
     'PhraseExtracter',
+    'PhraseExtractor',  # エイリアス（Extractor でも Extracter でも動く）
     'extracter',  # 後方互換性のため
     'PRESETS',
     'FIRST_KANJI',

@@ -18,7 +18,7 @@ pip install japhrase
 ### フレーズ抽出（辞書なし・形態素解析なし）
 
 ```python
-from japhrase import PhraseExtracter
+from japhrase import PhraseExtractor
 
 text = """ChatGPTの登場により生成AIが注目を集めている。
 生成AIはテキストだけでなく画像生成にも使われる。
@@ -27,7 +27,7 @@ text = """ChatGPTの登場により生成AIが注目を集めている。
 企業における生成AIの導入事例が増加している。""" * 5
 
 sentences = [s.strip() for s in text.split("。") if s.strip()]
-df = PhraseExtracter(min_count=2, min_length=2, max_length=10, selection=0, verbose=0).extract(sentences)
+df = PhraseExtractor(min_count=2, min_length=2, max_length=10, selection=0, verbose=0).extract(sentences)
 print(df[["seqchar", "freq"]].head())
 ```
 
@@ -143,7 +143,7 @@ japhrase.run_demo()
 たとえば生成 AI に関する記事を入力すると：
 
 ```python
-from japhrase import PhraseExtracter
+from japhrase import PhraseExtractor
 
 text = """
 ChatGPTの登場により生成AIが注目を集めている。
@@ -156,7 +156,7 @@ ChatGPTの登場により生成AIが注目を集めている。
 # 文のリストに分割して渡す（文字列を直接渡すとファイルパスと解釈される）
 sentences = [s.strip() for s in text.split('。') if s.strip()]
 
-extractor = PhraseExtracter(min_count=2, max_length=10, min_length=2)
+extractor = PhraseExtractor(min_count=2, max_length=10, min_length=2)
 df = extractor.extract(sentences)
 ```
 
@@ -175,7 +175,7 @@ df = extractor.extract(sentences)
 ここで PMI（自己相互情報量）を使う。PMI は「2つの要素が偶然一緒に現れる確率」と「実際に一緒に現れた頻度」の比を測る。
 
 ```python
-extractor = PhraseExtracter(min_count=2, use_pmi=True)
+extractor = PhraseExtractor(min_count=2, use_pmi=True)
 df = extractor.extract(sentences)  # ↑ で作った sentences をそのまま使う
 ```
 
@@ -195,7 +195,7 @@ PMI を有効にすることで、**意味的に結合したフレーズだけ�
 さらに分岐エントロピーを加えると、フレーズの自然な切れ目を特定できる。「あるフレーズの次にどんな文字が来るか」の多様性を測り、多様性が急に上がる位置をフレーズの境界とみなす。
 
 ```python
-extractor = PhraseExtracter(min_count=3, use_pmi=True, use_branching_entropy=True)
+extractor = PhraseExtractor(min_count=3, use_pmi=True, use_branching_entropy=True)
 df = extractor.extract(sentences)
 ```
 
@@ -206,10 +206,10 @@ N-gram が「繰り返されているもの」を広く拾い、PMI が「意味
 テキスト種別ごとに最適化されたパラメータセット（Optuna による実験的最適化済み）。
 
 ```python
-extractor = PhraseExtracter.preset('sns')     # SNS/Twitter（短文・高頻度）
-extractor = PhraseExtracter.preset('news')    # ニュース（専門用語重視）
-extractor = PhraseExtracter.preset('novel')   # 小説（繰り返し表現・長め）
-extractor = PhraseExtracter.preset('report')  # 論文/レポート（定型・学術用語）
+extractor = PhraseExtractor.preset('sns')     # SNS/Twitter（短文・高頻度）
+extractor = PhraseExtractor.preset('news')    # ニュース（専門用語重視）
+extractor = PhraseExtractor.preset('novel')   # 小説（繰り返し表現・長め）
+extractor = PhraseExtractor.preset('report')  # 論文/レポート（定型・学術用語）
 ```
 
 ## デモで全機能を体験する
@@ -230,7 +230,7 @@ japhrase.run_demo()
 ╚══════════════════════════════════════════════════════════╝
 
 ============================================================
-  フレーズ抽出 — PhraseExtracter
+  フレーズ抽出 — PhraseExtractor
 ============================================================
   テキストから、辞書を使わずに頻出フレーズを統計で見つけます。
 
@@ -287,8 +287,8 @@ japhrase.run_demo()
 個別にデモもできる:
 
 ```python
-from japhrase import PhraseExtracter
-PhraseExtracter.demo()         # フレーズ抽出だけ
+from japhrase import PhraseExtractor
+PhraseExtractor.demo()         # フレーズ抽出だけ
 ```
 
 ```python
@@ -304,7 +304,7 @@ CollocationScorer.demo()       # コロケーション分析
 ## ファイルからの読み込み
 
 ```python
-df = PhraseExtracter.from_file("input.txt")
+df = PhraseExtractor.from_file("input.txt")
 # エンコーディング自動検出（UTF-8 / Shift-JIS / EUC-JP）
 ```
 
@@ -528,10 +528,10 @@ japhrase detect-habits --help       # 書き癖検出
 
 ```python
 # フレーズ抽出
-from japhrase import PhraseExtracter
-help(PhraseExtracter)               # クラス全体
-help(PhraseExtracter.extract)       # 個別メソッド
-help(PhraseExtracter.preset)        # プリセットの使い方
+from japhrase import PhraseExtractor
+help(PhraseExtractor)               # クラス全体
+help(PhraseExtractor.extract)       # 個別メソッド
+help(PhraseExtractor.preset)        # プリセットの使い方
 
 # 統計エンジン
 from japhrase import DistributionComparator, CollocationScorer
@@ -559,17 +559,17 @@ help(PartHealthReport)              # A〜E 健康診断
 #### ファイルから抽出
 
 ```python
-from japhrase import PhraseExtracter
+from japhrase import PhraseExtractor
 
-df = PhraseExtracter.from_file("input.txt")                          # テキスト
-df = PhraseExtracter.from_file("data.csv", column="text")            # CSV（列指定）
-df = PhraseExtracter.from_file("input.txt", min_count=10, max_length=20)  # パラメータ指定
+df = PhraseExtractor.from_file("input.txt")                          # テキスト
+df = PhraseExtractor.from_file("data.csv", column="text")            # CSV（列指定）
+df = PhraseExtractor.from_file("input.txt", min_count=10, max_length=20)  # パラメータ指定
 ```
 
 #### パラメータ
 
 ```python
-extractor = PhraseExtracter(
+extractor = PhraseExtractor(
     min_count=6,                # 最小出現回数（小さいと計算時間が増える）
     max_length=16,              # フレーズの最大文字数
     min_length=4,               # フレーズの最小文字数
@@ -597,13 +597,13 @@ extractor.export_excel(df, "output.xlsx")   # Excel（要 pip install japhrase[e
 
 ```python
 # メモリ不足 → バッチサイズを小さくする
-extractor = PhraseExtracter(size_sentence=1000)
+extractor = PhraseExtractor(size_sentence=1000)
 
 # 処理が遅い → min_count を上げる / max_length を下げる
-extractor = PhraseExtracter(min_count=20, max_length=10)
+extractor = PhraseExtractor(min_count=20, max_length=10)
 
 # 結果が多すぎる → 類似度閾値を上げる
-extractor = PhraseExtracter(threshold_originality=0.8)
+extractor = PhraseExtractor(threshold_originality=0.8)
 ```
 
 ## テスト
