@@ -163,6 +163,8 @@ from .temporal_analyzer import (
     TermTrend,
     BurstInterval,
 )
+# Phase 3: 適応型パラメータチューナー
+from .adaptive_tuner import AdaptiveTuner
 
 __all__ = [
     'PhraseExtracter',
@@ -299,6 +301,8 @@ __all__ = [
     'BurstInterval',
     # デモ
     'run_demo',
+    # 適応型チューナー
+    'AdaptiveTuner',
 ]
 
 

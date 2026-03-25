@@ -1,5 +1,13 @@
 # japhrase TODO
 
+## UX 最大化（次回リリースで対応）
+
+- [x] README 全コードブロックがコピペで即動く（3ラウンド検証済み v0.3.11）
+- [x] GitHub/PyPI のフェンスドコードブロックにコピーボタン自動表示（マークダウン仕様で対応済み）
+- [x] `AdaptiveTuner` — Optuna ベースの動的パラメータ最適化（v0.3.12 予定）
+- [ ] `AdaptiveTuner` のテスト追加
+- [ ] `AdaptiveTuner` を README に追加（コピペで動く使用例）
+
 ## 優先度: 高
 
 ### CLI を v0.3 全機能に対応させる
@@ -32,18 +40,9 @@ japhrase health <file1> <file2> ...      # PartHealthReport
 - 出力形式は text（デフォルト）/ json / csv を共通オプションで選べる
 - `japhrase --help` のトップレベルヘルプで全コマンドの一覧と一行説明が見える
 
-### docs/USAGE.md を v0.3 に対応させる
+### docs/ を v0.3 に合わせて再構築
 
-現状は v0.2 のまま。以下が未記載:
-- DistributionComparator / CollocationScorer の使い方
-- StylometryAnalyzer の新指標（Hapax, MATTR, Heaps等）
-- ComplexityAnalyzer / TemporalAnalyzer の使い方
-- contamination パッケージ（scan, compare, batch_scan, quick_check）
-- applied パッケージ（PreflightChecker, EPDashboard, PartHealthReport 等）
-
-### docs/API_REFERENCE.md を v0.3 に対応させる
-
-新クラス・新メソッドの記載がない。
+v0.2 の docs/ は削除済み（README に統合）。必要に応じて docs/CHANGELOG.md を更新。
 
 ## 優先度: 中
 
@@ -52,12 +51,9 @@ japhrase health <file1> <file2> ...      # PartHealthReport
 v0.3 の変更で既存テスト 13件が fail している。
 stylometry.py の analyze_full() の返り値構造変更が主因。
 
-### examples/ に v0.3 のデモを追加する
+### examples/ を復活させるか検討
 
-- contamination_demo.py
-- distribution_compare_demo.py
-- stylometry_demo.py
-- temporal_demo.py
+examples/ は削除済み。各クラスに .demo() があるので不要かもしれない。
 
 ## 優先度: 低
 
