@@ -1,15 +1,13 @@
 """
 japhrase - 日本語テキストから頻出フレーズを検出
 
-N-gramベースの頻度分析により、テキスト中で頻繁に出現するフレーズを検出します。
-SNSトレンド分析、ニュース話題抽出、頻出キーワード発見などに適しています。
+N-gramベースの頻度分析とPMI（自己相互情報量）により、
+辞書やLLMに依存せずテキスト中の頻出フレーズを検出します。
 
 使用例:
-    >>> from japhrase import PhraseExtracter
-    >>> extractor = PhraseExtracter(min_count=6, max_length=16)
-    >>> df_result = extractor.get_dfphrase(sentences)
-
-詳細は POSITIONING.md を参照してください。
+    >>> from japhrase import PhraseExtractor
+    >>> pe = PhraseExtractor()
+    >>> df = pe.extract('テキスト文字列、またはファイルパス')
 """
 
 __version__ = "0.3.10"
