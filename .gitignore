@@ -95,6 +95,10 @@ scripts/
 results/
 data/
 examples/data/
+examples/debug_*.py
+examples/cooccurrence_debug.py
+examples/writing_habit_quick_test.py
+examples/analysis_*.json
 
 # Test fixtures (real novel text must not leak)
 tests/fixtures/novel_*.txt

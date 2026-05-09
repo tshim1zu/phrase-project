@@ -261,37 +261,39 @@ class AdaptiveTuner:
     # ------------------------------------------------------------------ #
 
     def _tune_optuna(self, n_trials: int, verbose: int) -> Dict[str, Any]:
-        """Optunaによるベイズ最適化。"""
+        """Optunaによるベイズ最適化（全パラメータ対象）。"""
         import optuna
 
         if verbose == 0:
             optuna.logging.set_verbosity(optuna.logging.WARNING)
 
-        from .evaluation import UnsupervisedEvaluator
-        evaluator = UnsupervisedEvaluator()
-
-        param_ranges = {
-            'min_count': (2, max(3, min(20, len(self._corpus) // 10))),
-            'max_length': (4, 24),
-            'min_length': (2, 8),
-            'threshold_originality': (0.1, 0.9),
-        }
+        texts = self._corpus
+        n = len(texts)
+        total_chars = max(1, sum(len(t) for t in texts))
 
         def objective(trial):
-            params = {}
-            for name, (lo, hi) in param_ranges.items():
-                if name == 'threshold_originality':
-                    params[name] = trial.suggest_float(name, lo, hi)
-                else:
-                    params[name] = trial.suggest_int(name, lo, hi)
-
+            use_pmi     = trial.suggest_categorical('use_pmi',             [True, False])
+            use_entropy = trial.suggest_categorical('use_branching_entropy',[True, False])
+            params = dict(
+                min_count             = trial.suggest_int(  'min_count',             2, max(3, min(20, n // 10))),
+                max_length            = trial.suggest_int(  'max_length',            5, 24),
+                min_length            = trial.suggest_int(  'min_length',            2, 6),
+                threshold_originality = trial.suggest_float('threshold_originality', 0.3, 0.9),
+                weight_freq           = trial.suggest_float('weight_freq',           0.5, 3.0),
+                weight_len            = trial.suggest_float('weight_len',            0.5, 3.0),
+                use_pmi               = use_pmi,
+                use_branching_entropy = use_entropy,
+                pmi_weight     = trial.suggest_float('pmi_weight',     0.1, 5.0, log=True) if use_pmi     else 1.0,
+                entropy_weight = trial.suggest_float('entropy_weight', 0.1, 5.0, log=True) if use_entropy else 1.0,
+                verbose=0,
+            )
             try:
-                ext = PhraseExtracter(verbose=0, **params)
-                df = ext.get_dfphrase(self._corpus)
-                if len(df) == 0:
+                df = PhraseExtracter(**params).get_dfphrase(texts)
+                if df.empty or len(df) < 3:
                     return 0.0
-                phrases = df['seqchar'].tolist()
-                return evaluator.evaluate(phrases, self._corpus, df)
+                # 「フレーズが取れた量」を直接最大化:
+                # freq × length × originality の総和 / テキスト文字数
+                return float((df['freq'] * df['length'] * df['originality']).sum() / total_chars)
             except Exception:
                 return 0.0
 
@@ -302,9 +304,14 @@ class AdaptiveTuner:
         study.optimize(objective, n_trials=n_trials, show_progress_bar=(verbose >= 1))
 
         self._state.best_score = study.best_value
-        best = study.best_params
         if verbose >= 1:
             print(f"✅ Optuna最適化完了 ({n_trials}試行, スコア={study.best_value:.4f})")
+
+        best = dict(study.best_params)
+        if not best.get('use_pmi', False):
+            best['pmi_weight'] = 1.0
+        if not best.get('use_branching_entropy', False):
+            best['entropy_weight'] = 1.0
         return best
 
     def _tune_heuristic(self, verbose: int) -> Dict[str, Any]:

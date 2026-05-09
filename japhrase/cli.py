@@ -672,6 +672,11 @@ def stats_report(
         sys.exit(1)
 
 
+@cli.command()
+@click.argument('input_file', type=click.Path(exists=True), metavar='INPUT_FILE')
+@click.option('--phrase', required=True, help='検索するフレーズ')
+@click.option('-o', '--output', type=click.Path(), help='検索結果出力先')
+@click.option('--context', type=int, default=2, help='前後の文脈行数 (デフォルト: 2)')
 def kwic(input_file, phrase, output, context):
     """
     フレーズの出現箇所を文脈付きで検索 (KWIC: Keyword in Context)

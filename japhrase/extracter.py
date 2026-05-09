@@ -645,7 +645,7 @@ class PhraseExtracter:
     def get_dfphrase(self, sentences: List[str]) -> pd.DataFrame:
         """Extract phrases from texts and return a DataFrame."""
         if sentences is None or len(sentences) == 0:
-            raise ValueError("Input text is empty.")
+            raise ValueError("入力テキストが空です")
 
         sentences = np.array(sentences).reshape(-1,)
 
@@ -1214,13 +1214,19 @@ class PhraseExtracter:
     def params(self) -> Dict[str, Any]:
         """現在のパラメータを dict で返す。"""
         d = {
-            'min_count': self.min_count,
-            'max_length': self.max_length - 1,  # 内部は +1 なので戻す
-            'min_length': self.min_length,
+            'min_count':             self.min_count,
+            'max_length':            self.max_length - 1,  # 内部は +1 なので戻す
+            'min_length':            self.min_length,
             'threshold_originality': self.threshold_originality,
-            'use_pmi': self.use_pmi,
+            'weight_freq':           self.weight_freq,
+            'weight_len':            self.weight_len,
+            'use_pmi':               self.use_pmi,
             'use_branching_entropy': self.use_branching_entropy,
         }
+        if self.use_pmi:
+            d['pmi_weight'] = self.pmi_weight
+        if self.use_branching_entropy:
+            d['entropy_weight'] = self.entropy_weight
         if self.lang != 'ja':
             d['lang'] = self.lang
         return d
@@ -1310,34 +1316,37 @@ class PhraseExtracter:
         return instance
 
     def _tune_optuna(self, texts, n_trials, verbose):
-        """Optunaによるベイズ最適化。"""
+        """Optunaによるベイズ最適化（全パラメータ対象）。"""
         import optuna
         if verbose == 0:
             optuna.logging.set_verbosity(optuna.logging.WARNING)
 
-        from .evaluation import UnsupervisedEvaluator
-        evaluator = UnsupervisedEvaluator()
-
-        param_ranges = {
-            'min_count': (2, max(3, min(20, len(texts) // 10))),
-            'max_length': (4, 24),
-            'min_length': (2, 8),
-            'threshold_originality': (0.1, 0.9),
-        }
+        n = len(texts)
+        total_chars = max(1, sum(len(t) for t in texts))
 
         def objective(trial):
-            params = {}
-            for name, (lo, hi) in param_ranges.items():
-                if name == 'threshold_originality':
-                    params[name] = trial.suggest_float(name, lo, hi)
-                else:
-                    params[name] = trial.suggest_int(name, lo, hi)
+            use_pmi     = trial.suggest_categorical('use_pmi',             [True, False])
+            use_entropy = trial.suggest_categorical('use_branching_entropy',[True, False])
+            params = dict(
+                min_count             = trial.suggest_int(  'min_count',             2, max(3, min(20, n // 10))),
+                max_length            = trial.suggest_int(  'max_length',            5, 24),
+                min_length            = trial.suggest_int(  'min_length',            2, 6),
+                threshold_originality = trial.suggest_float('threshold_originality', 0.3, 0.9),
+                weight_freq           = trial.suggest_float('weight_freq',           0.5, 3.0),
+                weight_len            = trial.suggest_float('weight_len',            0.5, 3.0),
+                use_pmi               = use_pmi,
+                use_branching_entropy = use_entropy,
+                pmi_weight     = trial.suggest_float('pmi_weight',     0.1, 5.0, log=True) if use_pmi     else 1.0,
+                entropy_weight = trial.suggest_float('entropy_weight', 0.1, 5.0, log=True) if use_entropy else 1.0,
+                verbose=0,
+            )
             try:
-                ext = PhraseExtracter(verbose=0, **params)
-                df = ext.get_dfphrase(texts)
-                if len(df) == 0:
+                df = PhraseExtracter(**params).get_dfphrase(texts)
+                if df.empty or len(df) < 3:
                     return 0.0
-                return evaluator.evaluate(df['seqchar'].tolist(), texts, df)
+                # 「フレーズが取れた量」を直接最大化:
+                # freq × length × originality の総和 / テキスト文字数
+                return float((df['freq'] * df['length'] * df['originality']).sum() / total_chars)
             except Exception:
                 return 0.0
 
@@ -1345,12 +1354,17 @@ class PhraseExtracter:
             direction='maximize',
             sampler=optuna.samplers.TPESampler(seed=42),
         )
-        study.optimize(objective, n_trials=n_trials,
-                       show_progress_bar=(verbose >= 1))
+        study.optimize(objective, n_trials=n_trials, show_progress_bar=(verbose >= 1))
 
         if verbose >= 1:
             print(f"✅ Optuna最適化完了 ({n_trials}試行, スコア={study.best_value:.4f})")
-        return study.best_params
+
+        best = dict(study.best_params)
+        if not best.get('use_pmi', False):
+            best['pmi_weight'] = 1.0
+        if not best.get('use_branching_entropy', False):
+            best['entropy_weight'] = 1.0
+        return best
 
     def _tune_heuristic(self, texts, verbose):
         """Optunaなしのヒューリスティック推定。"""
