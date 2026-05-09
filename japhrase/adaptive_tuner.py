@@ -269,37 +269,28 @@ class AdaptiveTuner:
 
         texts = self._corpus
         n = len(texts)
-        total_chars = max(1, sum(len(t) for t in texts))
 
         def objective(trial):
-            use_pmi     = trial.suggest_categorical('use_pmi',             [True, False])
-            use_entropy = trial.suggest_categorical('use_branching_entropy',[True, False])
+            # 重要度検証済み: weight_freq/weight_len/use_branching_entropy は <2% → 除外
+            use_pmi = trial.suggest_categorical('use_pmi', [True, False])
             params = dict(
                 min_count             = trial.suggest_int(  'min_count',             2, max(3, min(20, n // 10))),
                 max_length            = trial.suggest_int(  'max_length',            5, 24),
                 min_length            = trial.suggest_int(  'min_length',            2, 6),
                 threshold_originality = trial.suggest_float('threshold_originality', 0.3, 0.9),
-                weight_freq           = trial.suggest_float('weight_freq',           0.5, 3.0),
-                weight_len            = trial.suggest_float('weight_len',            0.5, 3.0),
                 use_pmi               = use_pmi,
-                use_branching_entropy = use_entropy,
-                pmi_weight     = trial.suggest_float('pmi_weight',     0.1, 5.0, log=True) if use_pmi     else 1.0,
-                entropy_weight = trial.suggest_float('entropy_weight', 0.1, 5.0, log=True) if use_entropy else 1.0,
+                pmi_weight            = trial.suggest_float('pmi_weight', 0.1, 5.0, log=True) if use_pmi else 1.0,
                 verbose=0,
             )
             try:
                 df = PhraseExtracter(**params).get_dfphrase(texts)
                 if df.empty or len(df) < 3:
                     return 0.0
-                # 3文字以上のみ対象（2文字以下はほぼ助詞・語尾）
                 content = df[df['length'] >= 3]
                 if len(content) < 2:
                     return 0.0
-                # mean を使う（sum だとゴミを大量に取る戦略が勝つ）
                 quality = float((content['freq'] * content['length'] * content['originality']).mean())
-                # 件数ボーナス（20件でサチュレート）
-                count_factor = min(len(content), 20) / 20.0
-                return quality * count_factor
+                return quality * min(len(content), 20) / 20.0
             except Exception:
                 return 0.0
 
@@ -316,8 +307,6 @@ class AdaptiveTuner:
         best = dict(study.best_params)
         if not best.get('use_pmi', False):
             best['pmi_weight'] = 1.0
-        if not best.get('use_branching_entropy', False):
-            best['entropy_weight'] = 1.0
         return best
 
     def _tune_heuristic(self, verbose: int) -> Dict[str, Any]:

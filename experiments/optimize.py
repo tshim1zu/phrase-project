@@ -42,20 +42,16 @@ def load_texts(paths: list[Path]) -> list[str]:
 
 
 def objective(trial: optuna.Trial, texts: list[str]) -> float:
-    use_pmi     = trial.suggest_categorical('use_pmi',             [True, False])
-    use_entropy = trial.suggest_categorical('use_branching_entropy',[True, False])
+    # 重要度検証済み: weight_freq/weight_len/use_branching_entropy は <2% → 除外
+    use_pmi = trial.suggest_categorical('use_pmi', [True, False])
 
     params = dict(
         min_count             = trial.suggest_int(  'min_count',             2,   20),
         max_length            = trial.suggest_int(  'max_length',            5,   24),
         min_length            = trial.suggest_int(  'min_length',            2,    6),
         threshold_originality = trial.suggest_float('threshold_originality', 0.3, 0.9),
-        weight_freq           = trial.suggest_float('weight_freq',           0.5, 3.0),
-        weight_len            = trial.suggest_float('weight_len',            0.5, 3.0),
         use_pmi               = use_pmi,
-        use_branching_entropy = use_entropy,
-        pmi_weight     = trial.suggest_float('pmi_weight',     0.1, 5.0, log=True) if use_pmi     else 1.0,
-        entropy_weight = trial.suggest_float('entropy_weight', 0.1, 5.0, log=True) if use_entropy else 1.0,
+        pmi_weight            = trial.suggest_float('pmi_weight', 0.1, 5.0, log=True) if use_pmi else 1.0,
         verbose=0,
     )
 
