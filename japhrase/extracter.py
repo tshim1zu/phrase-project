@@ -1322,14 +1322,16 @@ class PhraseExtracter:
             optuna.logging.set_verbosity(optuna.logging.WARNING)
 
         n = len(texts)
+        # min_count 上限: 文字数に比例させ探索範囲を適切に絞る
+        # 5000文字ごとに+1、上限15（例: 25k文字→5, 400k文字→15）
+        total_chars = sum(len(t) for t in texts)
+        min_count_max = max(3, min(15, total_chars // 5000))
 
         def objective(trial):
-            # min_length の下限を 3 に固定（ドメイン知識: 2文字は助詞・語尾）
-            # → min_length が支配的でなくなり、残りのパラメータが有効に働く
             use_pmi     = trial.suggest_categorical('use_pmi',             [True, False])
             use_entropy = trial.suggest_categorical('use_branching_entropy',[True, False])
             params = dict(
-                min_count             = trial.suggest_int(  'min_count',             2, max(3, min(20, n // 10))),
+                min_count             = trial.suggest_int(  'min_count',             2, min_count_max),
                 max_length            = trial.suggest_int(  'max_length',            5, 24),
                 min_length            = trial.suggest_int(  'min_length',            3, 6),
                 threshold_originality = trial.suggest_float('threshold_originality', 0.3, 0.9),

@@ -41,14 +41,12 @@ def load_texts(paths: list[Path]) -> list[str]:
     return lines
 
 
-def objective(trial: optuna.Trial, texts: list[str]) -> float:
-    # min_length の下限を 3 に固定（ドメイン知識: 2文字は助詞・語尾）
-    # → 残りのパラメータ（weight_freq, weight_len, PMI等）が有効に機能する
+def objective(trial: optuna.Trial, texts: list[str], min_count_max: int) -> float:
     use_pmi     = trial.suggest_categorical('use_pmi',             [True, False])
     use_entropy = trial.suggest_categorical('use_branching_entropy',[True, False])
 
     params = dict(
-        min_count             = trial.suggest_int(  'min_count',             2,   20),
+        min_count             = trial.suggest_int(  'min_count',             2, min_count_max),
         max_length            = trial.suggest_int(  'max_length',            5,   24),
         min_length            = trial.suggest_int(  'min_length',            3,    6),
         threshold_originality = trial.suggest_float('threshold_originality', 0.3, 0.9),
@@ -73,7 +71,9 @@ def objective(trial: optuna.Trial, texts: list[str]) -> float:
 
 def run(text_paths: list[Path], n_trials: int, db_path: Path, resume: bool) -> optuna.Study:
     texts = load_texts(text_paths)
-    print(f"データ: {len(texts)} 行 ({sum(len(t) for t in texts):,} 文字)")
+    total_chars = sum(len(t) for t in texts)
+    min_count_max = max(3, min(15, total_chars // 5000))
+    print(f"データ: {len(texts)} 行 ({total_chars:,} 文字)  min_count 探索範囲: [2, {min_count_max}]")
 
     storage = f'sqlite:///{db_path}' if db_path else None
     if not resume and db_path and db_path.exists():
@@ -88,7 +88,7 @@ def run(text_paths: list[Path], n_trials: int, db_path: Path, resume: bool) -> o
     )
 
     study.optimize(
-        lambda t: objective(t, texts),
+        lambda t: objective(t, texts, min_count_max),
         n_trials=n_trials,
         show_progress_bar=True,
     )
