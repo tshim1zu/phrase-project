@@ -42,29 +42,31 @@ def load_texts(paths: list[Path]) -> list[str]:
 
 
 def objective(trial: optuna.Trial, texts: list[str]) -> float:
-    # 重要度検証済み: weight_freq/weight_len/use_branching_entropy は <2% → 除外
-    use_pmi = trial.suggest_categorical('use_pmi', [True, False])
+    # min_length の下限を 3 に固定（ドメイン知識: 2文字は助詞・語尾）
+    # → 残りのパラメータ（weight_freq, weight_len, PMI等）が有効に機能する
+    use_pmi     = trial.suggest_categorical('use_pmi',             [True, False])
+    use_entropy = trial.suggest_categorical('use_branching_entropy',[True, False])
 
     params = dict(
         min_count             = trial.suggest_int(  'min_count',             2,   20),
         max_length            = trial.suggest_int(  'max_length',            5,   24),
-        min_length            = trial.suggest_int(  'min_length',            2,    6),
+        min_length            = trial.suggest_int(  'min_length',            3,    6),
         threshold_originality = trial.suggest_float('threshold_originality', 0.3, 0.9),
+        weight_freq           = trial.suggest_float('weight_freq',           0.5, 3.0),
+        weight_len            = trial.suggest_float('weight_len',            0.5, 3.0),
         use_pmi               = use_pmi,
-        pmi_weight            = trial.suggest_float('pmi_weight', 0.1, 5.0, log=True) if use_pmi else 1.0,
+        use_branching_entropy = use_entropy,
+        pmi_weight     = trial.suggest_float('pmi_weight',     0.1, 5.0, log=True) if use_pmi     else 1.0,
+        entropy_weight = trial.suggest_float('entropy_weight', 0.1, 5.0, log=True) if use_entropy else 1.0,
         verbose=0,
     )
 
     try:
         df = PhraseExtracter(**params).get_dfphrase(texts)
-        if df.empty or len(df) < 3:
+        if df.empty or len(df) < 2:
             return 0.0
-        content = df[df['length'] >= 3]
-        if len(content) < 2:
-            return 0.0
-        quality = float((content['freq'] * content['length'] * content['originality']).mean())
-        count_factor = min(len(content), 20) / 20.0
-        return quality * count_factor
+        quality = float((df['freq'] * df['length'] * df['originality']).mean())
+        return quality * min(len(df), 20) / 20.0
     except Exception:
         return 0.0
 
