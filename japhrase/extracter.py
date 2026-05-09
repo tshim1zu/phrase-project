@@ -1344,9 +1344,15 @@ class PhraseExtracter:
                 df = PhraseExtracter(**params).get_dfphrase(texts)
                 if df.empty or len(df) < 3:
                     return 0.0
-                # 「フレーズが取れた量」を直接最大化:
-                # freq × length × originality の総和 / テキスト文字数
-                return float((df['freq'] * df['length'] * df['originality']).sum() / total_chars)
+                # 3文字以上のみ対象（2文字以下はほぼ助詞・語尾）
+                content = df[df['length'] >= 3]
+                if len(content) < 2:
+                    return 0.0
+                # mean を使う（sum だとゴミを大量に取る戦略が勝つ）
+                quality = float((content['freq'] * content['length'] * content['originality']).mean())
+                # 件数ボーナス（20件でサチュレート）
+                count_factor = min(len(content), 20) / 20.0
+                return quality * count_factor
             except Exception:
                 return 0.0
 

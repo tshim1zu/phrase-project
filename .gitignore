@@ -90,7 +90,9 @@ res.png
 */.ipynb_checkpoints/
 
 # Experiments / scripts / results (removed from tracking)
-experiments/
+experiments/data/
+experiments/results/
+experiments/__pycache__/
 scripts/
 results/
 data/
