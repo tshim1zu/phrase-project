@@ -41,21 +41,24 @@ def load_texts(paths: list[Path]) -> list[str]:
     return lines
 
 
-def objective(trial: optuna.Trial, texts: list[str], min_count_max: int) -> float:
-    use_pmi     = trial.suggest_categorical('use_pmi',             [True, False])
-    use_entropy = trial.suggest_categorical('use_branching_entropy',[True, False])
+def objective(trial: optuna.Trial, texts: list[str], min_count_max: int, is_ja: bool) -> float:
+    min_count  = trial.suggest_int(  'min_count',             2, min_count_max)
+    max_length = trial.suggest_int(  'max_length',            6, 16)
+    min_length = trial.suggest_int(  'min_length',            3,  4)
+    threshold  = trial.suggest_float('threshold_originality', 0.3, 0.8)
+    weight_freq = trial.suggest_float('weight_freq', 0.5, 3.0)
+    weight_len  = trial.suggest_float('weight_len',  0.5, 3.0)
+    use_pmi = trial.suggest_categorical('use_pmi', [True, False]) if is_ja else False
+    pmi_weight = trial.suggest_float('pmi_weight', 0.1, 5.0, log=True) if use_pmi else 1.0
+    use_entropy = trial.suggest_categorical('use_branching_entropy', [True, False])
+    entropy_weight = trial.suggest_float('entropy_weight', 0.1, 5.0, log=True) if use_entropy else 1.0
 
     params = dict(
-        min_count             = trial.suggest_int(  'min_count',             2, min_count_max),
-        max_length            = trial.suggest_int(  'max_length',            5,   24),
-        min_length            = trial.suggest_int(  'min_length',            3,    6),
-        threshold_originality = trial.suggest_float('threshold_originality', 0.3, 0.9),
-        weight_freq           = trial.suggest_float('weight_freq',           0.5, 3.0),
-        weight_len            = trial.suggest_float('weight_len',            0.5, 3.0),
-        use_pmi               = use_pmi,
-        use_branching_entropy = use_entropy,
-        pmi_weight     = trial.suggest_float('pmi_weight',     0.1, 5.0, log=True) if use_pmi     else 1.0,
-        entropy_weight = trial.suggest_float('entropy_weight', 0.1, 5.0, log=True) if use_entropy else 1.0,
+        min_count=min_count, max_length=max_length, min_length=min_length,
+        threshold_originality=threshold,
+        weight_freq=weight_freq, weight_len=weight_len,
+        use_pmi=use_pmi, pmi_weight=pmi_weight,
+        use_branching_entropy=use_entropy, entropy_weight=entropy_weight,
         verbose=0,
     )
 
@@ -73,7 +76,11 @@ def run(text_paths: list[Path], n_trials: int, db_path: Path, resume: bool) -> o
     texts = load_texts(text_paths)
     total_chars = sum(len(t) for t in texts)
     min_count_max = max(3, min(15, total_chars // 5000))
-    print(f"データ: {len(texts)} 行 ({total_chars:,} 文字)  min_count 探索範囲: [2, {min_count_max}]")
+    sample = ''.join(texts[:100])
+    ja_ratio = sum(1 for c in sample if '぀' <= c <= '鿿') / max(len(sample), 1)
+    is_ja = ja_ratio > 0.1
+    lang_label = 'ja' if is_ja else 'en'
+    print(f"データ: {len(texts)} 行 ({total_chars:,} 文字)  言語: {lang_label}  min_count: [2, {min_count_max}]")
 
     storage = f'sqlite:///{db_path}' if db_path else None
     if not resume and db_path and db_path.exists():
@@ -88,7 +95,7 @@ def run(text_paths: list[Path], n_trials: int, db_path: Path, resume: bool) -> o
     )
 
     study.optimize(
-        lambda t: objective(t, texts, min_count_max),
+        lambda t: objective(t, texts, min_count_max, is_ja),
         n_trials=n_trials,
         show_progress_bar=True,
     )
