@@ -16,6 +16,7 @@ def _iter_phrase_occurrences(
     context_chars: int,
     max_samples: int,
 ):
+    """フレーズの出現位置と前後文脈を上限件数まで収集する。"""
     samples = []
     for line_idx, line in enumerate(texts):
         if phrase not in line:

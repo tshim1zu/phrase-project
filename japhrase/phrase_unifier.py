@@ -17,6 +17,7 @@ class PhraseUnifier:
     """フレーズの統一を実行"""
 
     def __init__(self):
+        """表記統一マッピングと適用履歴を初期化する。"""
         self.unification_map = {}  # variant → primary のマッピング
         self.unification_history = []
 
@@ -204,6 +205,7 @@ class InteractiveUnifier:
     """対話的に表記ゆれを統一"""
 
     def __init__(self, detector, unifier):
+        """候補検出器と表記統一器を保持する。"""
         self.detector = detector
         self.unifier = unifier
 

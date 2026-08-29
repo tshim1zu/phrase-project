@@ -43,6 +43,7 @@ class TaskDefinition:
     params: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
+        """依存タスクが未指定の場合は空のリストへ正規化する。"""
         if self.depends_on is None:
             self.depends_on = []
 
@@ -66,6 +67,7 @@ class WorkflowDefinition:
         description: str = "",
         tasks: Optional[List[Dict[str, Any]]] = None
     ):
+        """名前と説明を保持し、指定されたタスク定義を登録する。"""
         self.name = name
         self.description = description
         self.tasks: Dict[str, TaskDefinition] = {}
@@ -175,6 +177,7 @@ class TaskRegistry:
     """タスク実行関数のレジストリ"""
 
     def __init__(self):
+        """タスク種別から実行関数を引く空のレジストリを初期化する。"""
         self.tasks: Dict[str, Callable] = {}
 
     def register(self, task_type: str, func: Callable):
@@ -250,6 +253,7 @@ class WorkflowEngine:
     """ワークフロー実行エンジン"""
 
     def __init__(self, registry: Optional[TaskRegistry] = None):
+        """タスクレジストリへ組み込み処理を登録し、結果領域を初期化する。"""
         self.registry = registry or TaskRegistry()
         self.registry.register_builtin_tasks()
         self.results: Dict[str, TaskResult] = {}

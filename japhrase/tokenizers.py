@@ -34,6 +34,7 @@ class JapaneseTokenizer:
         return text
 
     def unit_name(self) -> str:
+        """日本語トークンの単位名を返す。"""
         return "文字"
 
 
@@ -54,6 +55,7 @@ class EnglishTokenizer:
     })
 
     def __init__(self, remove_stopwords: bool = False):
+        """トークン化時にストップワードを除くか設定する。"""
         self.remove_stopwords = remove_stopwords
 
     def tokenize(self, text: str) -> List[str]:
@@ -75,6 +77,7 @@ class EnglishTokenizer:
         return text
 
     def unit_name(self) -> str:
+        """英語トークンの単位名を返す。"""
         return "word"
 
 

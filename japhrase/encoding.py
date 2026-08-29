@@ -59,6 +59,7 @@ class EncodingDetector:
     }
 
     def __init__(self):
+        """直近の検出結果とエンコーディング試行履歴を初期化する。"""
         self.last_detection = None
         self.last_confidence = 0.0
         self.trials = []  # 試行ログ

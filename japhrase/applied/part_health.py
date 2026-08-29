@@ -52,6 +52,7 @@ class HealthGrade:
     improvement_priorities: List[str]
 
     def report(self) -> str:
+        """各診断セクションと改善優先度を整形したレポートを返す。"""
         lines = [
             "=" * 72,
             f"【Part 健康診断レポート】 {self.part_label}",
@@ -82,6 +83,7 @@ class HealthGrade:
 
 
 def _score_to_grade(score: float) -> str:
+    """0〜100のスコアをA〜Eの健康度評価へ変換する。"""
     if score >= 85:
         return 'A'
     elif score >= 70:
@@ -112,6 +114,7 @@ class PartHealthReport:
     }
 
     def __init__(self):
+        """健康診断を構成する各種分析器を初期化する。"""
         self.dashboard = EPDashboard()
         self.habit_detector = HabitDriftDetector()
         self.char_stylometry = CharacterStylometry()

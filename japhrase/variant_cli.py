@@ -21,6 +21,7 @@ class VariantCLI:
     """表記ゆれ検出・統一の CLI"""
 
     def __init__(self):
+        """表記ゆれ検出器・統一器・対話操作器を初期化する。"""
         self.detector = TextVariantDetector(similarity_threshold=0.70)
         self.unifier = PhraseUnifier()
         self.interactive_unifier = InteractiveUnifier(self.detector, self.unifier)

@@ -331,6 +331,7 @@ class HabitDriftDetector:
 
     @staticmethod
     def _linear_trend(values: List[int]) -> float:
+        """値列に対する最小二乗直線の傾きを返す。"""
         if len(values) < 2:
             return 0.0
         x = np.arange(len(values), dtype=float)

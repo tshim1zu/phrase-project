@@ -113,6 +113,7 @@ class PositionTracker:
     """⓶ 位置情報の信頼性強化"""
 
     def __init__(self):
+        """位置の変更対応表と修正履歴を初期化する。"""
         self.modification_map = {}  # {original_pos: new_pos}
         self.history = []
 
@@ -166,6 +167,7 @@ class CachingAnalyzer:
     """⓪ キャッシング機構"""
 
     def __init__(self, cache_size: int = 128):
+        """最大件数を指定して結果キャッシュとアクセス統計を初期化する。"""
         self.cache_size = cache_size
         self.cache = {}
         self.access_count = Counter()
@@ -220,6 +222,7 @@ class StreamingAnalyzer:
     """⓫ ストリーミング処理対応"""
 
     def __init__(self, chunk_size: int = 5000):
+        """テキスト分割に使用する最大チャンクサイズを設定する。"""
         self.chunk_size = chunk_size
 
     def stream_text_chunks(self, text: str) -> List[Dict[str, Any]]:
@@ -272,6 +275,7 @@ class MetricsCollector:
     """⓬ 構造化ログ・メトリクス"""
 
     def __init__(self):
+        """操作別メトリクスと開始時刻の記録領域を初期化する。"""
         self.metrics = defaultdict(list)
         self.start_times = {}
 

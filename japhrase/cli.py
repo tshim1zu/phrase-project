@@ -43,6 +43,7 @@ PRESET_CHOICES = list(PRESETS.keys()) + ["auto"]
 
 
 def _resolve_preset_name(preset: Optional[str], texts: List[str]) -> Optional[str]:
+    """自動指定ならテキストからプリセット名を推定して返す。"""
     if preset == "auto":
         return PhraseExtracter.infer_preset_name(texts)
     return preset
@@ -55,6 +56,7 @@ def _build_extractor(
     verbose: bool,
     texts: List[str],
 ) -> PhraseExtracter:
+    """設定値とCLI上書きを反映したフレーズ抽出器を構築する。"""
     preset_name = final_params.get("preset")
     if preset_name:
         preset_name = _resolve_preset_name(preset_name, texts)
@@ -120,6 +122,7 @@ def _apply_incremental_state(
     state_path: Optional[str],
     resume: bool,
 ) -> Optional[IncrementalPhraseState]:
+    """増分状態を必要に応じて復元・更新し、指定パスへ保存する。"""
     if not state_path:
         return None
 

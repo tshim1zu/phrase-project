@@ -173,6 +173,7 @@ class DistributionComparator:
 
         # KL divergence（ゼロ回避）
         def _kl(a: np.ndarray, b: np.ndarray) -> float:
+            """確率が正の要素についてKLダイバージェンスを計算する。"""
             mask = a > 0
             return float(np.sum(a[mask] * np.log2(a[mask] / b[mask])))
 

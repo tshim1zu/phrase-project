@@ -314,6 +314,7 @@ def run_demo():
 
 # 各クラスに .demo() クラスメソッドを付与
 def _attach_demos():
+    """利用可能な分析クラスへデモ実行用クラスメソッドを付与する。"""
     from .demo import (
         demo_phrase_extracter, demo_stylometry, demo_complexity,
         demo_distribution, demo_collocation, demo_contamination,

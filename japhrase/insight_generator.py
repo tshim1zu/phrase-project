@@ -29,6 +29,7 @@ class InsightGenerator:
     """自動インサイト生成"""
 
     def __init__(self):
+        """生成済みインサイトを保持する空のリストを初期化する。"""
         self.insights = []
 
     def generate_insights(

@@ -164,6 +164,7 @@ class EPDashboard:
     JSD_TOO_FAR = 0.50      # これ以上 = 急激な変化
 
     def __init__(self):
+        """ダッシュボードで使用する各種分析器を初期化する。"""
         self.temporal = TemporalAnalyzer()
         self.comparator = DistributionComparator()
         self.complexity = ComplexityAnalyzer()
@@ -279,16 +280,19 @@ class EPDashboard:
         )
 
     def _tokenize(self, text: str) -> List[str]:
+        """空白を除いたテキストを文字2-gramへ分割する。"""
         import re
         clean = re.sub(r'\s+', '', text)
         return [clean[i:i + 2] for i in range(len(clean) - 1)]
 
     def _text_to_freq(self, text: str):
+        """テキストの文字2-gram頻度分布を返す。"""
         from collections import Counter
         return Counter(self._tokenize(text))
 
     @staticmethod
     def _linear_trend(values: List[float]) -> float:
+        """値列に対する最小二乗直線の傾きを返す。"""
         if len(values) < 2:
             return 0.0
         x = np.arange(len(values), dtype=float)

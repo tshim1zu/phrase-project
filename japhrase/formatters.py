@@ -23,6 +23,7 @@ class BaseFormatter(ABC):
     """全フォーマッターの基底クラス"""
 
     def __init__(self):
+        """抽出結果に付随するメタデータ辞書を初期化する。"""
         self.metadata = {}
 
     @staticmethod

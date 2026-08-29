@@ -54,6 +54,7 @@ class ContaminationScanner:
         compression_high: float = 0.85,
         language_mix_threshold: float = 0.3,
     ):
+        """各汚染検出器へ渡す閾値とウィンドウ設定を保持する。"""
         self.params = {
             'similarity_threshold': duplicate_threshold,
             'window_size': repetition_window,
@@ -107,6 +108,7 @@ class ContaminationScanner:
                 results[name] = []
 
         def _axis(name: str, display_name: str) -> AxisScore:
+            """検出結果から表示名付きの軸スコアを構築する。"""
             anomalies = results.get(name, [])
             return AxisScore(
                 name=display_name,
