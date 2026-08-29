@@ -46,12 +46,25 @@ class TunerState:
     history: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict:
+        """状態をJSON保存可能な辞書へ変換する。
+
+        Returns:
+            ``description`` を除いたパラメータを含む状態辞書。
+        """
         d = asdict(self)
         d['params'] = {k: v for k, v in d['params'].items() if k != 'description'}
         return d
 
     @classmethod
     def from_dict(cls, d: dict) -> 'TunerState':
+        """保存済みの状態辞書からインスタンスを復元する。
+
+        Args:
+            d: ``TunerState`` の各フィールドを持つ辞書。
+
+        Returns:
+            復元された状態。
+        """
         return cls(**d)
 
 
@@ -196,6 +209,7 @@ class AdaptiveTuner:
         print()
         print("  コピペ用:")
         def _fmt(k, v):
+            """パラメータをコンストラクタ引数形式へ整形する。"""
             if isinstance(v, float):
                 return f"{k}={v:.4f}"
             return f"{k}={v!r}"
@@ -275,6 +289,7 @@ class AdaptiveTuner:
         is_ja = ja_ratio > 0.1
 
         def objective(trial):
+            """Optuna試行のパラメータを評価して品質スコアを返す。"""
             min_count  = trial.suggest_int(  'min_count',             2, min_count_max)
             max_length = trial.suggest_int(  'max_length',            6, 16)
             min_length = trial.suggest_int(  'min_length',            3,  4)
@@ -338,16 +353,19 @@ class AdaptiveTuner:
         return best
 
     def _save_state(self):
+        """保存先が設定されている場合に現在の状態を書き出す。"""
         if self._storage_path:
             self.save(str(self._storage_path))
 
     def _load_state(self):
+        """保存先に存在するJSONから現在の状態を復元する。"""
         if self._storage_path and self._storage_path.exists():
             with open(self._storage_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             self._state = TunerState.from_dict(data)
 
     def __repr__(self):
+        """プリセット、蓄積数、調整回数を含む表現を返す。"""
         s = self._state
         return (f"AdaptiveTuner(preset='{s.preset_origin}', "
                 f"texts={s.texts_fed}, tuned={s.tune_count}x)")
