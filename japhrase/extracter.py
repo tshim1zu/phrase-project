@@ -15,6 +15,15 @@ try:
     from tqdm import tqdm
 except ImportError:
     def tqdm(iterable, **kwargs):
+        """Fallback implementation of tqdm for progress bar when not installed.
+        
+        Args:
+            iterable: Iterable to wrap (returned as-is if tqdm not available).
+            **kwargs: Additional keyword arguments (ignored).
+        
+        Returns:
+            The input iterable unchanged.
+        """
         return iterable
 
 from .constants import DEFAULT_REMOVES, DEFAULT_UNNECESSARY
@@ -240,7 +249,25 @@ class PhraseExtracter:
     def count_knowns(self, sentences: List[str]) -> pd.DataFrame:
         """既知語を必ずカウント"""
         def count_all(sent, target):
+            """Count all non-overlapping occurrences of target substring in sentence.
+            
+            Args:
+                sent: Sentence string to search in.
+                target: Substring to count.
+            
+            Returns:
+                Integer count of all occurrences of target in sent.
+            """
             def find_all(a_str, sub):
+                """Find all start positions of substring in string.
+                
+                Args:
+                    a_str: String to search in.
+                    sub: Substring to find.
+                
+                Returns:
+                    List of starting positions of all occurrences of sub in a_str.
+                """
                 start = 0
                 while True:
                     start = a_str.find(sub, start)
@@ -483,6 +510,14 @@ class PhraseExtracter:
     def select_pattern(self, sr, pattern, colname):
         """正規表現パターンへの完全一致判定"""
         def equal_search(s):
+            """Check if string exactly matches the entire regex pattern match.
+            
+            Args:
+                s: String to test against pattern.
+            
+            Returns:
+                Boolean indicating if s equals the pattern match span.
+            """
             res = re.search(pattern, s)
             if res:
                 st, ed = res.span()[0], res.span()[1]
@@ -503,6 +538,14 @@ class PhraseExtracter:
     def contains_pattern(self, sr, pattern, colname="contains"):
         """正規表現パターンに一致するものを含む場合にTrue"""
         def equal_search(s):
+            """Extract the substring matching the regex pattern.
+            
+            Args:
+                s: String to search in.
+            
+            Returns:
+                The matched substring if pattern matches, None otherwise.
+            """
             res = re.search(pattern, s)
             if res:
                 st, ed = res.span()[0], res.span()[1]
@@ -604,6 +647,14 @@ class PhraseExtracter:
     def remove_similar(self, df_tmp: pd.DataFrame) -> pd.DataFrame:
         """類似度を計算して独自性のあるフレーズのみを残す"""
         def get_originality(i):
+            """Calculate maximum similarity of phrase at index i with earlier phrases.
+            
+            Args:
+                i: Index of the phrase in df_tmp to analyze.
+            
+            Returns:
+                Float value representing maximum similarity with preceding phrases.
+            """
             phrase = df_tmp.loc[i, self.clm_seqchar]
             max_similarity = 0.0
             for j in range(i):
@@ -1326,6 +1377,14 @@ class PhraseExtracter:
         }
 
         def objective(trial):
+            """Objective function for Optuna hyperparameter optimization trial.
+            
+            Args:
+                trial: Optuna trial object for suggesting parameters.
+            
+            Returns:
+                Float score to optimize (minimize or maximize depending on study direction).
+            """
             params = {}
             for name, (lo, hi) in param_ranges.items():
                 if name == 'threshold_originality':
@@ -1443,10 +1502,31 @@ class PhraseExtracter:
             ]
 
         def gen_sentence(word, n_word_in_sent, pi):
+            """Generate a synthetic sentence by randomly sampling words with given distribution.
+            
+            Args:
+                word: Array of words to sample from.
+                n_word_in_sent: Number of words to include in generated sentence.
+                pi: Probability distribution over words.
+            
+            Returns:
+                Generated sentence as concatenated string of sampled words.
+            """
             sentence = "".join(np.random.choice(word, n_word_in_sent, p=pi/sum(pi)))
             return sentence
 
         def gen_sentences(num_sentence, word, n_word_in_sent, pi):
+            """Generate multiple synthetic sentences using random word sampling.
+            
+            Args:
+                num_sentence: Number of sentences to generate.
+                word: Array of words to sample from.
+                n_word_in_sent: Number of words per sentence.
+                pi: Probability distribution over words.
+            
+            Returns:
+                List of generated sentences.
+            """
             sentences = []
             for i in range(num_sentence):
                 sentence = gen_sentence(word, n_word_in_sent, pi)

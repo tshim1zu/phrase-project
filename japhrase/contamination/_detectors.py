@@ -44,6 +44,19 @@ _CONTROL = re.compile(r'[\x01-\x08\x0b\x0c\x0e-\x1f\x7f]')
 
 
 def detect_encoding(text: str, lines: List[str], **kw) -> List[Anomaly]:
+    """Detect encoding errors (mojibake and invalid control characters).
+    
+    Scans each line for invalid UTF-8 sequences, corrupted character patterns,
+    and forbidden control characters.
+    
+    Args:
+        text: Full text content (unused in this detector).
+        lines: Text split into lines.
+        **kw: Additional keyword arguments (unused).
+    
+    Returns:
+        List of Anomaly objects for detected encoding issues.
+    """
     anomalies = []
     for i, line in enumerate(lines):
         for m in _MOJIBAKE.finditer(line):
@@ -93,6 +106,21 @@ def detect_structural(
     empty_line_ratio_error: float = 0.6,
     **kw,
 ) -> List[Anomaly]:
+    """Detect structural anomalies (brackets, merge markers, metadata, blank lines).
+    
+    Checks for unmatched brackets, version control merge markers, metadata leaks,
+    work annotations, excessive blank lines, and abnormally long lines.
+    
+    Args:
+        text: Full text content.
+        lines: Text split into lines.
+        empty_line_ratio_warn: Threshold ratio for warning on empty lines (default 0.4).
+        empty_line_ratio_error: Threshold ratio for error on empty lines (default 0.6).
+        **kw: Additional keyword arguments (unused).
+    
+    Returns:
+        List of Anomaly objects for detected structural issues.
+    """
     anomalies = []
     n_lines = len(lines)
 
@@ -211,6 +239,22 @@ def detect_duplicate(
     reference_text: Optional[str] = None,
     **kw,
 ) -> List[Anomaly]:
+    """Detect exact and near-duplicate paragraphs.
+    
+    Identifies duplicate and near-duplicate paragraphs within the text,
+    and optionally compares against a reference text.
+    
+    Args:
+        text: Full text content.
+        lines: Text split into lines.
+        min_length: Minimum paragraph length to consider for duplication detection (default 20).
+        similarity_threshold: Jaccard similarity threshold for near-duplicate detection (default 0.9).
+        reference_text: Optional reference text to compare against for cross-text duplication.
+        **kw: Additional keyword arguments (unused).
+    
+    Returns:
+        List of Anomaly objects for detected duplicate paragraphs.
+    """
     anomalies = []
 
     # 段落分割
@@ -252,6 +296,15 @@ def detect_duplicate(
 
 
 def _split_paragraphs(lines, min_length=20):
+    """Split lines into paragraphs by blank lines.
+    
+    Args:
+        lines: Text split into lines.
+        min_length: Minimum paragraph length to include (default 20).
+    
+    Returns:
+        List of tuples (start_line_no, paragraph_text) for paragraphs meeting min_length.
+    """
     paragraphs = []
     current, start = [], 0
     for i, line in enumerate(lines):
@@ -274,9 +327,27 @@ def _split_paragraphs(lines, min_length=20):
 
 
 def _detect_near_duplicates(paragraphs, anomalies, threshold):
+    """Detect near-duplicate paragraphs using Jaccard similarity on 3-grams.
+    
+    Args:
+        paragraphs: List of (line_no, paragraph_text) tuples.
+        anomalies: List to append detected Anomaly objects to.
+        threshold: Jaccard similarity threshold for near-duplicate detection.
+    
+    Returns:
+        None (modifies anomalies list in place).
+    """
     ng = 3
 
     def _ngrams(s):
+        """Extract n-grams (character substrings of length ng) from input string.
+        
+        Args:
+            s: Input string to extract n-grams from.
+        
+        Returns:
+            Set of n-grams (character substrings of length 3 after whitespace removal).
+        """
         s = re.sub(r'\s+', '', s)
         return set(s[i:i+ng] for i in range(len(s)-ng+1))
 
@@ -310,6 +381,22 @@ def detect_repetition(
     max_repeat: int = 3,
     **kw,
 ) -> List[Anomaly]:
+    """Detect abnormal phrase repetition within short windows.
+    
+    Identifies phrases that repeat excessively within a short text window,
+    indicating potential stylistic issues or copy-paste errors.
+    
+    Args:
+        text: Full text content.
+        lines: Text split into lines (unused in this detector).
+        window_size: Character window size for repetition detection (default 500).
+        min_phrase_len: Minimum phrase length to check for repetition (default 4).
+        max_repeat: Maximum acceptable repetition count per window (default 3).
+        **kw: Additional keyword arguments (unused).
+    
+    Returns:
+        List of Anomaly objects for detected phrase repetition.
+    """
     anomalies = []
     clean = re.sub(r'\s+', '', text)
     if len(clean) < window_size:
@@ -350,6 +437,23 @@ def detect_distribution(
     reference_text: Optional[str] = None,
     **kw,
 ) -> List[Anomaly]:
+    """Detect character distribution anomalies and foreign vocabulary concentration.
+    
+    Identifies segments with significantly different character distributions (using JSD)
+    or unusual concentration of vocabulary patterns, suggesting copy-paste or encoding issues.
+    
+    Args:
+        text: Full text content.
+        lines: Text split into lines (unused in this detector).
+        segment_size: Character window size for distribution analysis (default 300).
+        jsd_threshold: Jensen-Shannon divergence threshold for distribution discontinuity (default 0.35).
+        foreign_threshold: Ratio threshold for foreign vocabulary concentration (default 0.3).
+        reference_text: Optional reference text to compare overall distribution against.
+        **kw: Additional keyword arguments (unused).
+    
+    Returns:
+        List of Anomaly objects for detected distribution anomalies.
+    """
     anomalies = []
     clean = re.sub(r'\s+', '', text)
     if len(clean) < segment_size * 2:
@@ -417,6 +521,15 @@ def detect_distribution(
 
 
 def _jsd_from_counters(a: Counter, b: Counter) -> float:
+    """Calculate Jensen-Shannon divergence between two character frequency distributions.
+    
+    Args:
+        a: Counter object of character frequencies (first distribution).
+        b: Counter object of character frequencies (second distribution).
+    
+    Returns:
+        Jensen-Shannon divergence as a float in [0.0, 1.0].
+    """
     keys = sorted(set(a.keys()) | set(b.keys()))
     p = np.array([a.get(k, 0) for k in keys], dtype=float)
     q = np.array([b.get(k, 0) for k in keys], dtype=float)
@@ -444,6 +557,22 @@ def detect_complexity(
     compression_high: float = 0.85,
     **kw,
 ) -> List[Anomaly]:
+    """Detect complexity anomalies via zlib compression rate analysis.
+    
+    Identifies segments with unusually low compression (repetitive patterns) or
+    high compression (random/high-entropy data), which may indicate data issues.
+    
+    Args:
+        text: Full text content.
+        lines: Text split into lines (unused in this detector).
+        segment_size: Character window size for compression analysis (default 300).
+        compression_low: Compression ratio threshold for low complexity (default 0.15).
+        compression_high: Compression ratio threshold for high complexity (default 0.85).
+        **kw: Additional keyword arguments (unused).
+    
+    Returns:
+        List of Anomaly objects for detected compression anomalies.
+    """
     anomalies = []
     clean = re.sub(r'\n{3,}', '\n\n', text)
     if len(clean) < segment_size:
@@ -520,6 +649,20 @@ def detect_consistency(
     reference_text: Optional[str] = None,
     **kw,
 ) -> List[Anomaly]:
+    """Detect orthographic inconsistencies (punctuation and character representation).
+    
+    Identifies mixing of full-width and half-width punctuation, kanji/hiragana variations,
+    and katakana long-vowel inconsistencies indicating poor editorial review.
+    
+    Args:
+        text: Full text content.
+        lines: Text split into lines (unused in this detector).
+        reference_text: Optional reference text to compare punctuation style against.
+        **kw: Additional keyword arguments (unused).
+    
+    Returns:
+        List of Anomaly objects for detected inconsistencies.
+    """
     anomalies = []
 
     # --- 句読点の揺れ ---
