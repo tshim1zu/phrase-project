@@ -1,0 +1,11 @@
+name: "Simple Test Workflow"
+description: "Basic workflow for testing"
+
+tasks:
+  - id: test_extract
+    type: extract
+    input: test_workflow_sample.txt
+    output: test_phrases.csv
+    params:
+      min_count: 2
+      max_length: 20

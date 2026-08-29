@@ -19,37 +19,39 @@ logger = logging.getLogger(__name__)
 
 
 # デフォルトの文法パターン定義
+# [^\s。、！？!?] で句読点を超えないよう制限（文境界を跨がない）
+_JP = r'[^\s。、！？!?]'
 DEFAULT_GRAMMAR_PATTERNS = {
     # 過去形パターン
-    'past_datta': r'(\S{1,15}だった)',
-    'past_ta': r'(\S{1,15}[^い]た)',
+    'past_datta': rf'({_JP}{{1,15}}だった)',
+    'past_ta': rf'({_JP}{{1,15}}[^い]た)',
 
     # 進行形パターン
-    'progressive_teita': r'(\S{1,15}ていた)',
-    'progressive_teiru': r'(\S{1,15}ている)',
+    'progressive_teita': rf'({_JP}{{1,15}}ていた)',
+    'progressive_teiru': rf'({_JP}{{1,15}}ている)',
 
     # 完了形パターン
-    'completed_ta': r'(\S{1,15}してしまった)',
-    'completed_chatta': r'(\S{1,15}ちゃった)',
+    'completed_ta': rf'({_JP}{{1,15}}してしまった)',
+    'completed_chatta': rf'({_JP}{{1,15}}ちゃった)',
 
     # 存在・状態パターン
-    'existence_dearu': r'(\S{1,15}である)',
-    'existence_desu': r'(\S{1,15}です)',
+    'existence_dearu': rf'({_JP}{{1,15}}である)',
+    'existence_desu': rf'({_JP}{{1,15}}です)',
 
     # 意志・推量パターン
-    'will_darou': r'(\S{1,15}だろう)',
-    'will_deshou': r'(\S{1,15}でしょう)',
+    'will_darou': rf'({_JP}{{1,15}}だろう)',
+    'will_deshou': rf'({_JP}{{1,15}}でしょう)',
 
     # 否定パターン
-    'negative_nai': r'(\S{1,15}ない)',
-    'negative_nakatta': r'(\S{1,15}なかった)',
+    'negative_nai': rf'({_JP}{{1,15}}ない)',
+    'negative_nakatta': rf'({_JP}{{1,15}}なかった)',
 
     # 可能・受身パターン
-    'passive_reru': r'(\S{1,15}[らりれろ]れる)',
-    'potential_eru': r'(\S{1,15}[えける]る)',
+    'passive_reru': rf'({_JP}{{1,15}}[らりれろ]れる)',
+    'potential_eru': rf'({_JP}{{1,15}}[えける]る)',
 
     # 使役パターン
-    'causative_seru': r'(\S{1,15}[させせ]る)',
+    'causative_seru': rf'({_JP}{{1,15}}[させせ]る)',
 }
 
 

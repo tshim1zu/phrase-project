@@ -248,8 +248,14 @@ class AbstractBodyChecker:
         if len(self.body_phrases) == 0:
             return pd.DataFrame(columns=['phrase', 'freq_body', 'status'])
 
-        abstract_phrase_set = set(self.abstract_phrases['seqchar'].values)
-        body_phrase_set = set(self.body_phrases['seqchar'].values)
+        abstract_phrase_set = (
+            set(self.abstract_phrases['seqchar'].values)
+            if 'seqchar' in self.abstract_phrases.columns else set()
+        )
+        body_phrase_set = (
+            set(self.body_phrases['seqchar'].values)
+            if 'seqchar' in self.body_phrases.columns else set()
+        )
 
         added = body_phrase_set - abstract_phrase_set
 

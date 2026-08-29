@@ -320,7 +320,7 @@ def _attach_demos():
         demo_preflight,
     )
     _pairs = [
-        (PhraseExtracter, demo_phrase_extracter),
+        # PhraseExtracter は独自の demo(**kwargs) メソッドを持つため除外
         (StylometryAnalyzer, demo_stylometry),
         (ComplexityAnalyzer, demo_complexity),
         (DistributionComparator, demo_distribution),
