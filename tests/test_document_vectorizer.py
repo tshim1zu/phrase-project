@@ -14,7 +14,10 @@ import numpy as np
 
 from japhrase import DocumentVectorizer
 from japhrase.document_vectorizer import DocumentVectorizer as DV
-from japhrase.vectorization_utils import build_document_term_matrix, _PhraseAnalyzer
+from japhrase.vectorization_utils import (
+    build_document_term_matrix, _PhraseAnalyzer, _CharRemover, HybridVectorizer,
+    extract_pmi_filtered_phrases,
+)
 
 
 TEXT_CAT = "猫が好きだ。猫はかわいい。今日も猫を見た。猫と遊んだ。" * 8
@@ -158,3 +161,80 @@ class TestPhraseAnalyzerOverlapCounting:
 
         analyzer = _PhraseAnalyzer(['aa'])
         assert len(analyzer('aaaa')) == expected_freq
+
+
+class TestHighPmiPreprocessingMatchesVocabularySource:
+    """high_pmiのvocabularyはPhraseExtracterがDEFAULT_REMOVES文字を除去した上で
+    作られるため、_PhraseAnalyzerも同じ除去を検索前に行う必要がある"""
+
+    def test_char_remover_strips_configured_chars(self):
+        remover = _CharRemover('.')
+        assert remover('猫.犬.猫.犬.') == '猫犬猫犬'
+
+    def test_analyzer_without_preprocess_misses_phrase_across_removed_char(self):
+        # 除去文字を挟むフレーズは、前処理なしでは生テキストから見つからない
+        analyzer = _PhraseAnalyzer(['猫犬'])
+        assert analyzer('猫.犬.') == []
+
+    def test_analyzer_with_preprocess_finds_phrase_across_removed_char(self):
+        analyzer = _PhraseAnalyzer(['猫犬'], preprocess=_CharRemover('.'))
+        assert analyzer('猫.犬.') == ['猫犬']
+
+    def test_high_pmi_matrix_not_zero_when_phrase_crosses_removed_chars(self):
+        """レビュー指摘の再現ケース: '.'を挟んだ繰り返しテキストでも
+        high_pmiの特徴行列がゼロにならないこと"""
+        text = "猫.犬." * 10
+        texts = [text, text]
+        matrix, _, feature_names, _ = build_document_term_matrix(
+            texts,
+            feature_mode='high_pmi',
+            min_count=3,
+            pmi_threshold=0.0,
+            verbose=0,
+        )
+        assert len(feature_names) > 0
+        assert (matrix != 0).sum() > 0
+
+
+class TestHybridVectorizerIsReusable:
+    """hybridの result.vectorizer がhybrid特徴空間全体をtransformできること
+    （tfidf部分だけを保持していると、nmf_model.transform()と列数が合わなくなる）"""
+
+    def test_transform_matches_nmf_input_dimension(self):
+        vectorizer = DocumentVectorizer(
+            n_topics=2, feature_mode='hybrid', min_count=3, pmi_threshold=5.0, verbose=0
+        )
+        result = vectorizer.from_texts([TEXT_CAT, TEXT_DOG], labels=['cat', 'dog'])
+
+        new_matrix = result.vectorizer.transform(["猫と犬が好きだ。"])
+        assert new_matrix.shape[1] == result.topic_term_matrix.shape[1]
+
+        # nmf_model.transform()にそのまま渡せること（列数不一致でエラーにならない）
+        topic_vec = result.nmf_model.transform(new_matrix.toarray())
+        assert topic_vec.shape == (1, 2)
+
+    def test_hybrid_vectorizer_is_picklable(self):
+        import pickle
+
+        vectorizer = DocumentVectorizer(
+            n_topics=2, feature_mode='hybrid', min_count=3, pmi_threshold=5.0, verbose=0
+        )
+        result = vectorizer.from_texts([TEXT_CAT, TEXT_DOG], labels=['cat', 'dog'])
+
+        restored = pickle.loads(pickle.dumps(result))
+        restored_matrix = restored.vectorizer.transform(["猫と犬が好きだ。"])
+        assert restored_matrix.shape[1] == restored.topic_term_matrix.shape[1]
+
+    def test_hybrid_vectorizer_falls_back_to_tfidf_only(self):
+        # low_pmi語彙が見つからない場合でも、result.vectorizerはtfidf部分のみを
+        # 正しくtransformできること
+        from sklearn.feature_extraction.text import TfidfVectorizer
+
+        vectorizer = HybridVectorizer(
+            tfidf_vectorizer=TfidfVectorizer(analyzer='char', ngram_range=(2, 3)),
+            pmi_vectorizer=None,
+        )
+        matrix = vectorizer.fit_transform([TEXT_CAT, TEXT_DOG])
+        assert matrix.shape[1] == len(vectorizer.get_feature_names_out())
+        transformed = vectorizer.transform(["猫が好きだ。"])
+        assert transformed.shape[1] == matrix.shape[1]

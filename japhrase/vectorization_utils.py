@@ -12,6 +12,8 @@ import numpy as np
 import pandas as pd
 from typing import List, Tuple, Optional, Any
 import logging
+
+from .constants import DEFAULT_REMOVES
 try:
     from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
     from sklearn.decomposition import NMF
@@ -23,6 +25,65 @@ except ImportError:
     _HAS_SKLEARN = False
 
 logger = logging.getLogger(__name__)
+
+
+class _CharRemover:
+    """指定文字を除去する、pickle可能な前処理コールable
+
+    PhraseExtracter.make_ngrampieces()はN-gram生成前にtok.clean()で
+    DEFAULT_REMOVES相当の文字（句読点等）を除去してから文字を連結する。
+    high_pmiモードのvocabularyはこの「除去済みテキスト」から作られるため、
+    _PhraseAnalyzerが元の生テキストをそのまま検索すると、除去文字を挟んで
+    生成されたフレーズ（例:"猫.犬"->"猫犬"）が見つからない。
+    このクラスで同じ除去処理を検索前に再現する。
+    """
+
+    def __init__(self, chars: str):
+        self.chars = chars
+
+    def __call__(self, text: str) -> str:
+        for ch in self.chars:
+            text = text.replace(ch, "")
+        return text
+
+
+class HybridVectorizer:
+    """tfidf空間とlow_pmi語彙空間を連結する合成vectorizer（hybridモード用）
+
+    DocumentVectorizerのVectorizationResultは「フィッティング済みvectorizer」を
+    保持する設計だが、hybridの特徴空間はtfidf_vectorizerとpmi_vectorizerの
+    2つを連結したものなので、どちらか一方だけを保持すると
+    transform(new_texts)がhybrid空間の一部しか再現できず、
+    そのままnmf_model.transform()に渡すと列数が合わずに失敗する。
+    このクラスは両方を保持し、fit_transform/transform/get_feature_names_out
+    を連結済みの1つのvectorizerであるかのように振る舞わせる。
+    """
+
+    def __init__(self, tfidf_vectorizer, pmi_vectorizer=None):
+        self.tfidf_vectorizer = tfidf_vectorizer
+        self.pmi_vectorizer = pmi_vectorizer
+
+    def _combine(self, tfidf_matrix, pmi_matrix):
+        if pmi_matrix is None:
+            return tfidf_matrix.tocsr()
+        from scipy.sparse import hstack
+        return hstack([tfidf_matrix, pmi_matrix]).tocsr()
+
+    def fit_transform(self, texts):
+        tfidf_matrix = self.tfidf_vectorizer.fit_transform(texts)
+        pmi_matrix = self.pmi_vectorizer.fit_transform(texts) if self.pmi_vectorizer is not None else None
+        return self._combine(tfidf_matrix, pmi_matrix)
+
+    def transform(self, texts):
+        tfidf_matrix = self.tfidf_vectorizer.transform(texts)
+        pmi_matrix = self.pmi_vectorizer.transform(texts) if self.pmi_vectorizer is not None else None
+        return self._combine(tfidf_matrix, pmi_matrix)
+
+    def get_feature_names_out(self):
+        names = [f"tfidf:{n}" for n in self.tfidf_vectorizer.get_feature_names_out()]
+        if self.pmi_vectorizer is not None:
+            names += [f"low_pmi:{n}" for n in self.pmi_vectorizer.get_feature_names_out()]
+        return np.array(names)
 
 
 class _PhraseAnalyzer:
@@ -37,12 +98,18 @@ class _PhraseAnalyzer:
 
     クロージャではなくクラスにしているのは、VectorizationResult.save()が
     fitted vectorizerをpickle保存するため（ローカル関数はpickle不可）。
+
+    preprocess: vocabulary生成時に適用された前処理があれば、検索前に
+    同じ前処理をdocに適用する（例: high_pmiモードの文字除去）。
     """
 
-    def __init__(self, vocabulary: List[str]):
+    def __init__(self, vocabulary: List[str], preprocess: Optional[_CharRemover] = None):
         self.vocabulary = vocabulary
+        self.preprocess = preprocess
 
     def __call__(self, doc: str) -> List[str]:
+        if self.preprocess is not None:
+            doc = self.preprocess(doc)
         tokens = []
         for phrase in self.vocabulary:
             count = self._count_overlapping(doc, phrase)
@@ -229,10 +296,15 @@ def build_document_term_matrix(
 
         metadata['vocabulary_size'] = len(vocabulary)
 
+        # high_pmiのvocabularyはPhraseExtracterがDEFAULT_REMOVES相当の文字を
+        # 除去した上で作られる（例:"猫.犬"->"猫犬"）ため、検索前に同じ除去を
+        # 再現する必要がある。low_pmi（WritingHabitDetector）は除去しないため不要。
+        preprocess = _CharRemover(DEFAULT_REMOVES) if feature_mode == 'high_pmi' else None
+
         # ステップ2-3: vocabularyのフレーズをそのまま数えるanalyzerでベクトル化
         # （既定のchar N-gram analyzerでは可変長フレーズがほぼ一致しない = 常にゼロ）
         vectorizer = TfidfVectorizer(
-            analyzer=_PhraseAnalyzer(vocabulary),
+            analyzer=_PhraseAnalyzer(vocabulary, preprocess=preprocess),
             vocabulary=vocabulary,
             min_df=min_df,
             max_df=max_df
@@ -253,9 +325,6 @@ def build_document_term_matrix(
             max_df=max_df
         )
         tfidf_matrix = tfidf_vectorizer.fit_transform(texts)
-        # tfidf側とlow_pmi側で同じ語が両方に入りうる（例:「猫が」）ため、
-        # get_topic_terms()等でどちらの特徴空間由来か区別できるよう名前空間を分ける
-        tfidf_names = [f"tfidf:{name}" for name in tfidf_vectorizer.get_feature_names_out()]
 
         pmi_vocabulary = extract_pmi_filtered_phrases(
             texts,
@@ -272,24 +341,22 @@ def build_document_term_matrix(
                 max_df=max_df
             )
             pmi_matrix = pmi_vectorizer.fit_transform(texts)
-            pmi_names = [f"low_pmi:{name}" for name in pmi_vectorizer.get_feature_names_out()]
 
-            from scipy.sparse import hstack
-            matrix_sparse = hstack([tfidf_matrix, pmi_matrix]).tocsr()
-            feature_names = tfidf_names + pmi_names
-            vectorizer = tfidf_vectorizer  # 参照用（transformには使わない）
-            metadata['vocabulary_size'] = len(pmi_names)
+            vectorizer = HybridVectorizer(tfidf_vectorizer, pmi_vectorizer)
+            matrix_sparse = vectorizer._combine(tfidf_matrix, pmi_matrix)
+            feature_names = vectorizer.get_feature_names_out().tolist()
+            metadata['vocabulary_size'] = len(pmi_vocabulary)
 
             if verbose:
                 logger.info(
-                    f"Hybrid mode: {len(tfidf_names)} tfidf features + "
-                    f"{len(pmi_names)} low_pmi features"
+                    f"Hybrid mode: {tfidf_matrix.shape[1]} tfidf features + "
+                    f"{pmi_matrix.shape[1]} low_pmi features"
                 )
         else:
             # low_pmiフレーズが見つからない場合は通常のtfidf空間のみにフォールバック
-            matrix_sparse = tfidf_matrix
-            feature_names = tfidf_names
-            vectorizer = tfidf_vectorizer
+            vectorizer = HybridVectorizer(tfidf_vectorizer, pmi_vectorizer=None)
+            matrix_sparse = vectorizer._combine(tfidf_matrix, None)
+            feature_names = vectorizer.get_feature_names_out().tolist()
             metadata['vocabulary_size'] = 'tfidf_only'
 
             if verbose:
