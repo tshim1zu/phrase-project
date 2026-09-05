@@ -48,7 +48,7 @@ class TestPresets:
         """Test creating extractor with sns preset"""
         extractor = PhraseExtracter.preset('sns')
         assert extractor.min_count == 6
-        assert extractor.max_length == 10  # +1 added internally
+        assert extractor.max_length == 9
         assert extractor.min_length == 5
         assert extractor.threshold_originality == 0.52
 
@@ -56,7 +56,7 @@ class TestPresets:
         """Test creating extractor with news preset"""
         extractor = PhraseExtracter.preset('news')
         assert extractor.min_count == 5
-        assert extractor.max_length == 11  # +1 added internally
+        assert extractor.max_length == 10
         assert extractor.min_length == 3
         assert extractor.threshold_originality == 0.64
 
@@ -64,7 +64,7 @@ class TestPresets:
         """Test creating extractor with default preset"""
         extractor = PhraseExtracter.preset('default')
         assert extractor.min_count == 6
-        assert extractor.max_length == 17  # +1 added internally
+        assert extractor.max_length == 16
         assert extractor.min_length == 4
         assert extractor.threshold_originality == 0.5
 
@@ -72,7 +72,7 @@ class TestPresets:
         """Test creating extractor with novel preset"""
         extractor = PhraseExtracter.preset('novel')
         assert extractor.min_count == 4
-        assert extractor.max_length == 17  # +1 added internally
+        assert extractor.max_length == 16
         assert extractor.min_length == 3
         assert extractor.threshold_originality == 0.6
 
@@ -80,7 +80,7 @@ class TestPresets:
         """Test creating extractor with report preset"""
         extractor = PhraseExtracter.preset('report')
         assert extractor.min_count == 10
-        assert extractor.max_length == 25  # +1 added internally
+        assert extractor.max_length == 24
         assert extractor.min_length == 4
         assert extractor.threshold_originality == 0.78
 
@@ -88,7 +88,7 @@ class TestPresets:
         """Test overriding preset parameters"""
         extractor = PhraseExtracter.preset('sns', min_count=10)
         assert extractor.min_count == 10  # overridden
-        assert extractor.max_length == 10  # from preset (+1)
+        assert extractor.max_length == 9  # from preset
         assert extractor.min_length == 5  # from preset
 
     def test_preset_invalid_name(self):
