@@ -102,10 +102,12 @@ class ComparisonResult:
 
     @property
     def score_a(self) -> int:
+        """テキストAの総合汚染スコアを返す。"""
         return self.profile_a.overall
 
     @property
     def score_b(self) -> int:
+        """テキストBの総合汚染スコアを返す。"""
         return self.profile_b.overall
 
     @property
@@ -119,6 +121,7 @@ class ComparisonResult:
         return 'A' if self.score_a <= self.score_b else 'B'
 
     def report(self) -> str:
+        """個別およびテキスト間の汚染度を比較レポートとして返す。"""
         lines = [
             "=" * 60,
             "【テキスト間汚染比較】",
@@ -222,6 +225,7 @@ class BatchResult:
         return [k for k, p in self.profiles.items() if not p.is_clean()]
 
     def report(self) -> str:
+        """各テキストの汚染度と問題概要を一覧レポートとして返す。"""
         lines = [
             "=" * 60,
             f"【一括汚染スキャン】 {len(self.profiles)}件",

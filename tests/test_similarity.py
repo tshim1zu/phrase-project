@@ -3,6 +3,8 @@
 similarity.pyのテスト
 """
 
+import builtins
+
 import pytest
 import pandas as pd
 import numpy as np
@@ -87,6 +89,20 @@ class TestSimilarityMethods:
         text2 = "これはテスト"
         similarity = analyzer.similarity_levenshtein(text1, text2)
         assert 0.5 < similarity < 1.0
+
+    def test_similarity_levenshtein_without_optional_dependency(self, monkeypatch):
+        """Levenshtein未導入時は純Python実装へフォールバックする。"""
+        real_import = builtins.__import__
+
+        def import_without_levenshtein(name, *args, **kwargs):
+            if name == "Levenshtein":
+                raise ImportError("blocked for fallback test")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", import_without_levenshtein)
+        analyzer = SimilarityAnalyzer(method='levenshtein')
+
+        assert analyzer.similarity_levenshtein("test", "text") == 0.75
 
     def test_get_ngrams(self):
         """N-gram抽出のテスト"""

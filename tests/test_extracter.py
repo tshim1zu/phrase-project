@@ -16,9 +16,9 @@ class TestPhraseExtracterInit:
         """デフォルトパラメータでインスタンス作成できることを確認"""
         extractor = PhraseExtracter()
         assert extractor is not None
-        assert extractor.min_count == 6
+        assert extractor.min_count == 2
         assert extractor.max_length == 16
-        assert extractor.min_length == 4
+        assert extractor.min_length == 2
 
     def test_create_instance_with_params(self):
         """カスタムパラメータでインスタンス作成できることを確認"""

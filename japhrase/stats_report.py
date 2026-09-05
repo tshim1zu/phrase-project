@@ -17,6 +17,7 @@ def _svg_bar_chart(
     height: int = 320,
     bar_color: str = "#2a9d8f",
 ) -> str:
+    """項目の値を棒グラフとして描画するSVG文字列を返す。"""
     if not items:
         return "<svg width=\"{0}\" height=\"{1}\"></svg>".format(width, height)
 
@@ -61,6 +62,7 @@ def _svg_bar_chart(
 
 
 def render_stats_html(stats_data: Dict, title: str = "Phrase Stats Report") -> str:
+    """統計データを要約・グラフ付きHTMLレポートへ整形する。"""
     summary = stats_data.get("summary", {})
     frequency = stats_data.get("frequency", {})
     length = stats_data.get("length", {})

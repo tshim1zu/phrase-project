@@ -302,6 +302,7 @@ class TextVariantDetector:
 
         # Jaccard 類似度
         def jaccard(s1: Set, s2: Set) -> float:
+            """2集合のJaccard類似度を返す。"""
             if not (s1 or s2):
                 return 0.0
             return len(s1 & s2) / len(s1 | s2)

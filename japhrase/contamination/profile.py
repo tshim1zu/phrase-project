@@ -58,6 +58,7 @@ class AxisScore:
 
     @property
     def label(self) -> str:
+        """軸スコアに対応する汚染レベル名を返す。"""
         if self.score == 0:
             return 'clean'
         elif self.score < 15:
@@ -90,6 +91,7 @@ class ContaminationProfile:
 
     @property
     def axes(self) -> List[AxisScore]:
+        """8つの汚染軸を定義順に返す。"""
         return [
             self.encoding, self.structural, self.duplicate,
             self.repetition, self.distribution, self.complexity,
@@ -129,6 +131,7 @@ class ContaminationProfile:
 
     @property
     def anomaly_count(self) -> int:
+        """全軸で検出された異常件数の合計を返す。"""
         return sum(ax.count for ax in self.axes)
 
     def is_clean(self, threshold: int = 10) -> bool:
@@ -239,6 +242,7 @@ class ContaminationProfile:
         }
 
     def __str__(self) -> str:
+        """人間向け汚染レポートを文字列表現として返す。"""
         return self.report()
 
     def report(self) -> str:

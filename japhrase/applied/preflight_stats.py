@@ -178,6 +178,7 @@ class PreflightChecker:
     }
 
     def __init__(self):
+        """プリフライトで使用する複雑度・文体分析器を初期化する。"""
         self.complexity = ComplexityAnalyzer()
         self.stylometry = StylometryAnalyzer()
 

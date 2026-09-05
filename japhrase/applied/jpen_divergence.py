@@ -73,6 +73,7 @@ class SeriesDivergence:
     best_ep: Optional[str]
 
     def report(self) -> str:
+        """EP群の翻訳ロスと指標差分を整形したレポートを返す。"""
         lines = [
             "=" * 72,
             "【JP↔EN 品質乖離レポート】",
@@ -141,6 +142,7 @@ class JPENDivergenceChecker:
     }
 
     def __init__(self):
+        """日英テキストの比較に使う複雑度・文体分析器を初期化する。"""
         self.complexity = ComplexityAnalyzer()
         self.stylometry = StylometryAnalyzer()
 
@@ -170,6 +172,7 @@ class JPENDivergenceChecker:
 
         # 差分（正規化: JP を基準にした相対変化）
         def _delta(jp_val, en_val):
+            """日本語側の値を基準に英語側の相対変化を返す。"""
             if jp_val == 0:
                 return 0.0
             return (en_val - jp_val) / abs(jp_val)

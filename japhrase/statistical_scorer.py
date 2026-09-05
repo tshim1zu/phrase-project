@@ -448,6 +448,7 @@ class PhraseTrustMetric:
     """フレーズ信頼度メトリクス"""
 
     def __init__(self, statistical_scorer: StatisticalScorer):
+        """信頼度計算に使用する統計スコアラーを保持する。"""
         self.scorer = statistical_scorer
 
     def calculate_trust_score(

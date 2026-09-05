@@ -161,8 +161,10 @@ class PromptOptimizer:
 
         for i, t1 in enumerate(sorted_tags):
             for t2 in sorted_tags[i + 1 :]:
-                # 包含関係チェック
-                if t1 in t2 and t1 != t2:
+                # 包含関係チェック（単語レベル: t1 の全単語が t2 に含まれる）
+                t1_words = set(t1.split())
+                t2_words = set(t2.split())
+                if t1_words and t1_words.issubset(t2_words) and t1 != t2:
                     issues.append(
                         {
                             'type': 'inclusion',
@@ -192,7 +194,7 @@ class PromptOptimizer:
         if open_count != close_count:
             issues.append(f"括弧の不一致: ( が {open_count}個, ) が {close_count}個")
 
-        if ',,' in prompt:
+        if ',,' in prompt or ', ,' in prompt:
             issues.append("カンマの連続(,,)が含まれています")
 
         if prompt.startswith(',') or prompt.endswith(','):
@@ -260,7 +262,7 @@ class PromptOptimizer:
         if token_count < 10:
             score -= 5
         elif token_count > 200:
-            score -= 10
+            score -= 25  # 過剰に長いプロンプトは大幅減点
         elif 50 <= token_count <= 150:
             score += 5  # ボーナス
 

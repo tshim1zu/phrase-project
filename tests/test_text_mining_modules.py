@@ -128,6 +128,7 @@ class TestStylometryAnalyzer:
             + result['hiragana_ratio']
             + result['katakana_ratio']
             + result.get('ascii_ratio', 0)
+            + result.get('other_ratio', 0)
         )
         assert 0.99 <= total_ratio <= 1.01
 

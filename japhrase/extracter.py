@@ -15,6 +15,15 @@ try:
     from tqdm import tqdm
 except ImportError:
     def tqdm(iterable, **kwargs):
+        """Fallback implementation of tqdm for progress bar when not installed.
+        
+        Args:
+            iterable: Iterable to wrap (returned as-is if tqdm not available).
+            **kwargs: Additional keyword arguments (ignored).
+        
+        Returns:
+            The input iterable unchanged.
+        """
         return iterable
 
 from .constants import DEFAULT_REMOVES, DEFAULT_UNNECESSARY
@@ -248,7 +257,25 @@ class PhraseExtracter:
     def count_knowns(self, sentences: List[str]) -> pd.DataFrame:
         """既知語を必ずカウント"""
         def count_all(sent, target):
+            """Count all non-overlapping occurrences of target substring in sentence.
+            
+            Args:
+                sent: Sentence string to search in.
+                target: Substring to count.
+            
+            Returns:
+                Integer count of all occurrences of target in sent.
+            """
             def find_all(a_str, sub):
+                """Find all start positions of substring in string.
+                
+                Args:
+                    a_str: String to search in.
+                    sub: Substring to find.
+                
+                Returns:
+                    List of starting positions of all occurrences of sub in a_str.
+                """
                 start = 0
                 while True:
                     start = a_str.find(sub, start)
@@ -492,6 +519,14 @@ class PhraseExtracter:
     def select_pattern(self, sr, pattern, colname):
         """正規表現パターンへの完全一致判定"""
         def equal_search(s):
+            """Check if string exactly matches the entire regex pattern match.
+            
+            Args:
+                s: String to test against pattern.
+            
+            Returns:
+                Boolean indicating if s equals the pattern match span.
+            """
             res = re.search(pattern, s)
             if res:
                 st, ed = res.span()[0], res.span()[1]
@@ -512,6 +547,14 @@ class PhraseExtracter:
     def contains_pattern(self, sr, pattern, colname="contains"):
         """正規表現パターンに一致するものを含む場合にTrue"""
         def equal_search(s):
+            """Extract the substring matching the regex pattern.
+            
+            Args:
+                s: String to search in.
+            
+            Returns:
+                The matched substring if pattern matches, None otherwise.
+            """
             res = re.search(pattern, s)
             if res:
                 st, ed = res.span()[0], res.span()[1]
@@ -613,6 +656,14 @@ class PhraseExtracter:
     def remove_similar(self, df_tmp: pd.DataFrame) -> pd.DataFrame:
         """類似度を計算して独自性のあるフレーズのみを残す"""
         def get_originality(i):
+            """Calculate maximum similarity of phrase at index i with earlier phrases.
+            
+            Args:
+                i: Index of the phrase in df_tmp to analyze.
+            
+            Returns:
+                Float value representing maximum similarity with preceding phrases.
+            """
             phrase = df_tmp.loc[i, self.clm_seqchar]
             max_similarity = 0.0
             for j in range(i):
@@ -654,7 +705,7 @@ class PhraseExtracter:
     def get_dfphrase(self, sentences: List[str]) -> pd.DataFrame:
         """Extract phrases from texts and return a DataFrame."""
         if sentences is None or len(sentences) == 0:
-            raise ValueError("Input text is empty.")
+            raise ValueError("入力テキストが空です")
 
         sentences = np.array(sentences).reshape(-1,)
 
@@ -1226,13 +1277,13 @@ class PhraseExtracter:
     def params(self) -> Dict[str, Any]:
         """現在のパラメータを dict で返す。"""
         d = {
-            'min_count': self.min_count,
-            'max_length': self.max_length,
-            'min_length': self.min_length,
-            'weight_freq': self.weight_freq,
-            'weight_len': self.weight_len,
+            'min_count':             self.min_count,
+            'max_length':            self.max_length,
+            'min_length':            self.min_length,
             'threshold_originality': self.threshold_originality,
-            'use_pmi': self.use_pmi,
+            'weight_freq':           self.weight_freq,
+            'weight_len':            self.weight_len,
+            'use_pmi':               self.use_pmi,
             'use_branching_entropy': self.use_branching_entropy,
             'pmi_weight': self.pmi_weight,
             'entropy_weight': self.entropy_weight,
@@ -1328,34 +1379,59 @@ class PhraseExtracter:
         return instance
 
     def _tune_optuna(self, texts, n_trials, verbose):
-        """Optunaによるベイズ最適化。"""
+        """Optunaによるベイズ最適化（全パラメータ対象）。"""
         import optuna
         if verbose == 0:
             optuna.logging.set_verbosity(optuna.logging.WARNING)
 
-        from .evaluation import UnsupervisedEvaluator
-        evaluator = UnsupervisedEvaluator()
-
-        param_ranges = {
-            'min_count': (2, max(3, min(20, len(texts) // 10))),
-            'max_length': (4, 24),
-            'min_length': (2, 8),
-            'threshold_originality': (0.1, 0.9),
-        }
+        total_chars = sum(len(t) for t in texts)
+        # min_count 上限: 5000文字ごとに+1、上限15
+        min_count_max = max(3, min(15, total_chars // 5000))
+        # 日本語判定: ひらがな・カタカナ・漢字が10%超なら ja
+        sample = ''.join(texts[:100])
+        ja_ratio = sum(1 for c in sample if '぀' <= c <= '鿿') / max(len(sample), 1)
+        is_ja = (ja_ratio > 0.1) or (self.lang == 'ja')
 
         def objective(trial):
-            params = {}
-            for name, (lo, hi) in param_ranges.items():
-                if name == 'threshold_originality':
-                    params[name] = trial.suggest_float(name, lo, hi)
-                else:
-                    params[name] = trial.suggest_int(name, lo, hi)
+            """Objective function for Optuna hyperparameter optimization trial.
+
+            Args:
+                trial: Optuna trial object for suggesting parameters.
+
+            Returns:
+                Float score to optimize (minimize or maximize depending on study direction).
+            """
+            # 抽出閾値: 範囲を絞って ranking パラメータが見えるようにする
+            min_count = trial.suggest_int(  'min_count',             2, min_count_max)
+            max_length = trial.suggest_int( 'max_length',            6, 16)   # 実用範囲に限定
+            min_length = trial.suggest_int( 'min_length',            3,  4)   # 3か4の2択
+            threshold  = trial.suggest_float('threshold_originality', 0.3, 0.8)
+
+            # ranking パラメータ
+            weight_freq = trial.suggest_float('weight_freq', 0.5, 3.0)
+            weight_len  = trial.suggest_float('weight_len',  0.5, 3.0)
+
+            # PMI: 日本語（文字N-gram）で効く。英語（単語N-gram）は固定
+            use_pmi = trial.suggest_categorical('use_pmi', [True, False]) if is_ja else False
+            pmi_weight = trial.suggest_float('pmi_weight', 0.1, 5.0, log=True) if use_pmi else 1.0
+
+            use_entropy = trial.suggest_categorical('use_branching_entropy', [True, False])
+            entropy_weight = trial.suggest_float('entropy_weight', 0.1, 5.0, log=True) if use_entropy else 1.0
+
+            params = dict(
+                min_count=min_count, max_length=max_length, min_length=min_length,
+                threshold_originality=threshold,
+                weight_freq=weight_freq, weight_len=weight_len,
+                use_pmi=use_pmi, pmi_weight=pmi_weight,
+                use_branching_entropy=use_entropy, entropy_weight=entropy_weight,
+                verbose=0,
+            )
             try:
-                ext = PhraseExtracter(verbose=0, **params)
-                df = ext.get_dfphrase(texts)
-                if len(df) == 0:
+                df = PhraseExtracter(**params).get_dfphrase(texts)
+                if df.empty or len(df) < 2:
                     return 0.0
-                return evaluator.evaluate(df['seqchar'].tolist(), texts, df)
+                quality = float((df['freq'] * df['length'] * df['originality']).mean())
+                return quality * min(len(df), 20) / 20.0
             except Exception:
                 return 0.0
 
@@ -1363,12 +1439,17 @@ class PhraseExtracter:
             direction='maximize',
             sampler=optuna.samplers.TPESampler(seed=42),
         )
-        study.optimize(objective, n_trials=n_trials,
-                       show_progress_bar=(verbose >= 1))
+        study.optimize(objective, n_trials=n_trials, show_progress_bar=(verbose >= 1))
 
         if verbose >= 1:
             print(f"✅ Optuna最適化完了 ({n_trials}試行, スコア={study.best_value:.4f})")
-        return study.best_params
+
+        best = dict(study.best_params)
+        if not best.get('use_pmi', False):
+            best['pmi_weight'] = 1.0
+        if not best.get('use_branching_entropy', False):
+            best['entropy_weight'] = 1.0
+        return best
 
     def _tune_heuristic(self, texts, verbose):
         """Optunaなしのヒューリスティック推定。"""
@@ -1461,10 +1542,31 @@ class PhraseExtracter:
             ]
 
         def gen_sentence(word, n_word_in_sent, pi):
+            """Generate a synthetic sentence by randomly sampling words with given distribution.
+            
+            Args:
+                word: Array of words to sample from.
+                n_word_in_sent: Number of words to include in generated sentence.
+                pi: Probability distribution over words.
+            
+            Returns:
+                Generated sentence as concatenated string of sampled words.
+            """
             sentence = "".join(np.random.choice(word, n_word_in_sent, p=pi/sum(pi)))
             return sentence
 
         def gen_sentences(num_sentence, word, n_word_in_sent, pi):
+            """Generate multiple synthetic sentences using random word sampling.
+            
+            Args:
+                num_sentence: Number of sentences to generate.
+                word: Array of words to sample from.
+                n_word_in_sent: Number of words per sentence.
+                pi: Probability distribution over words.
+            
+            Returns:
+                List of generated sentences.
+            """
             sentences = []
             for i in range(num_sentence):
                 sentence = gen_sentence(word, n_word_in_sent, pi)

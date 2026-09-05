@@ -44,6 +44,7 @@ SAMPLE_DIRTY = '正常な文章。\nâ€™ここに文字化け。\n「閉じ�
 
 
 def _header(title):
+    """デモの区切り線とタイトルを標準出力へ表示する。"""
     print()
     print("=" * 60)
     print(f"  {title}")
@@ -51,6 +52,7 @@ def _header(title):
 
 
 def _explain(text):
+    """説明文を行ごとにインデントして標準出力へ表示する。"""
     for line in text.strip().split('\n'):
         print(f"  {line}")
     print()

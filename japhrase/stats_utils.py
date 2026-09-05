@@ -13,6 +13,19 @@ import pandas as pd
 
 
 def resolve_phrase_column(df: pd.DataFrame) -> str:
+    """Resolve the name of the phrase column in a DataFrame.
+    
+    Checks for 'seqchar' or 'phrase' columns and returns the first found.
+    
+    Args:
+        df: DataFrame to search for phrase column.
+    
+    Returns:
+        Name of the phrase column ('seqchar' or 'phrase').
+    
+    Raises:
+        ValueError: If neither 'seqchar' nor 'phrase' column exists.
+    """
     if "seqchar" in df.columns:
         return "seqchar"
     if "phrase" in df.columns:
@@ -21,6 +34,19 @@ def resolve_phrase_column(df: pd.DataFrame) -> str:
 
 
 def resolve_frequency_column(df: pd.DataFrame) -> str:
+    """Resolve the name of the frequency column in a DataFrame.
+    
+    Checks for 'freq' or 'frequency' columns and returns the first found.
+    
+    Args:
+        df: DataFrame to search for frequency column.
+    
+    Returns:
+        Name of the frequency column ('freq' or 'frequency').
+    
+    Raises:
+        ValueError: If neither 'freq' nor 'frequency' column exists.
+    """
     if "freq" in df.columns:
         return "freq"
     if "frequency" in df.columns:
@@ -29,6 +55,16 @@ def resolve_frequency_column(df: pd.DataFrame) -> str:
 
 
 def ensure_length_column(df: pd.DataFrame) -> pd.DataFrame:
+    """Ensure DataFrame has a 'length' column with phrase lengths.
+    
+    Adds a 'length' column if missing, computed as character length of phrases.
+    
+    Args:
+        df: DataFrame to process (assumed to have phrase column).
+    
+    Returns:
+        DataFrame with 'length' column added (or unchanged if already present).
+    """
     if "length" in df.columns:
         return df
     phrase_col = resolve_phrase_column(df)
@@ -44,6 +80,22 @@ def compute_stats_data(
     top_n: int = 20,
     total_texts_override: Optional[int] = None,
 ) -> Dict:
+    """Compute comprehensive statistics on extracted phrases.
+    
+    Analyzes frequency, length, originality, and diversity of phrases,
+    optionally filtered to top-N by frequency.
+    
+    Args:
+        phrases_df: DataFrame with phrase data (or None/empty for empty result).
+        texts: List of source texts analyzed.
+        parameters: Dictionary of parameters used in phrase extraction.
+        top_n: Maximum number of phrases to include in top-N ranking (default 20).
+        total_texts_override: Override for total text count (uses len(texts) if None).
+    
+    Returns:
+        Dictionary with keys: status, timestamp, parameters, summary, frequency,
+        length, originality, diversity, top_phrases.
+    """
     if phrases_df is None or phrases_df.empty:
         return {
             "status": "empty",
@@ -137,6 +189,17 @@ def compute_stats_data(
 
 
 def flatten_stats_for_csv(stats_data: Dict) -> pd.DataFrame:
+    """Flatten hierarchical statistics dictionary to DataFrame rows for CSV export.
+    
+    Extracts key metrics from the stats_data dictionary and creates a flat
+    DataFrame suitable for CSV output.
+    
+    Args:
+        stats_data: Statistics dictionary from compute_stats_data().
+    
+    Returns:
+        DataFrame with columns 'metric' and 'value' containing summary statistics.
+    """
     rows = [
         {"metric": "total_phrases", "value": stats_data["summary"]["total_phrases"]},
         {"metric": "frequency_mean", "value": stats_data["frequency"].get("mean", 0)},

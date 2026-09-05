@@ -470,6 +470,7 @@ class StylometryAnalyzer:
 
     @staticmethod
     def _empty_advanced_diversity() -> Dict:
+        """分析対象がない場合の高度語彙多様性指標を返す。"""
         return {
             'total_tokens': 0, 'unique_types': 0,
             'hapax_legomena': 0, 'dis_legomena': 0,

@@ -46,6 +46,7 @@ class ChekhofGunDetector:
     MIN_APPEARANCES = 2             # 最小出現回数
 
     def __init__(self):
+        """既定のクラス定数を使う検出器を初期化する。"""
         pass
 
     def _calculate_unexpectedness(

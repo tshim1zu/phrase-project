@@ -195,6 +195,7 @@ class IncrementalAggregator:
     """インクリメンタル集約"""
 
     def __init__(self):
+        """フレーズ集計値と更新履歴を初期化する。"""
         self.aggregated = {}
         self.updates = []
 
@@ -238,6 +239,7 @@ class StreamingAnalyzer:
     """ストリーミング処理の統合分析"""
 
     def __init__(self, min_count: int = 3, chunk_size: int = 1000):
+        """抽出器・集約器と読み込みチャンクサイズを初期化する。"""
         self.extractor = StreamingPhraseExtracter(min_count=min_count)
         self.reader = None
         self.aggregator = IncrementalAggregator()

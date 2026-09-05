@@ -373,5 +373,6 @@ class CharacterStylometry:
         return segments
 
     def _text_to_freq(self, text: str) -> Counter:
+        """空白を除いた文字2-gramの頻度分布を返す。"""
         clean = re.sub(r'\s+', '', text)
         return Counter(clean[i:i + 2] for i in range(len(clean) - 1))
