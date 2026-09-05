@@ -51,31 +51,43 @@ class CooccurrenceAnalyzer:
         Returns:
             List[str]: コンテキスト（断片）のリスト
         """
-        contexts = []
+        if not target:
+            raise ValueError("target は空文字列にできません")
+
+        spans = []
         start = 0
         target_len = len(target)
         text_len = len(text)
-        
+
         while True:
             # ターゲットを検索
             idx = text.find(target, start)
             if idx == -1:
                 break
-            
+
             # ウィンドウ範囲を決定（テキストの範囲外に出ないようにクリップ）
             left = max(0, idx - self.window_size)
             right = min(text_len, idx + target_len + self.window_size)
-            
-            # コンテキストを切り出し
-            # 文脈を維持するため、改行などもそのまま含める
-            snippet = text[left:right]
-            
-            if snippet:
-                contexts.append(snippet)
-            
+            spans.append((left, right))
+
             # 次の検索開始位置
             start = idx + target_len
-            
+
+        # ターゲットが近距離で連続する場合、ウィンドウが重複しうる。
+        # 重複したまま別々のコンテキストとして数えると、同じ原文断片が
+        # 何度もコピーされ、共起頻度が実際より水増しされてしまうため、
+        # 重複・隣接するウィンドウはマージしてから切り出す。
+        spans.sort()
+        merged_spans = []
+        for left, right in spans:
+            if merged_spans and left <= merged_spans[-1][1]:
+                merged_spans[-1] = (merged_spans[-1][0], max(merged_spans[-1][1], right))
+            else:
+                merged_spans.append((left, right))
+
+        # 文脈を維持するため、改行などもそのまま含める
+        contexts = [text[left:right] for left, right in merged_spans if right > left]
+
         return contexts
 
     def analyze(

@@ -48,10 +48,26 @@ class TestExtractContext:
         contexts = analyzer.extract_context(SAMPLE_TEXT, '存在しない語')
         assert len(contexts) == 0
 
-    def test_context_count_matches_occurrences(self, analyzer):
+    def test_context_count_matches_occurrences_when_windows_dont_overlap(self):
+        small_window = CooccurrenceAnalyzer(
+            extractor=PhraseExtracter(min_count=2), window_size=1, min_cooccurrence=2
+        )
         text = "Xが登場する。Xが活動する。Xが消える。" * 10
-        contexts = analyzer.extract_context(text, 'X')
-        assert len(contexts) == 30  # 3 occurrences × 10 repetitions
+        contexts = small_window.extract_context(text, 'X')
+        assert len(contexts) == 30  # 3 occurrences × 10 repetitions, far apart
+
+    def test_overlapping_windows_are_merged_not_duplicated(self, analyzer):
+        """近距離のターゲットで生成されたウィンドウが重複する場合、
+        同じ原文断片が水増しカウントされないよう1つにマージされること"""
+        text = "Xが登場する。Xが活動する。Xが消える。" * 10
+        contexts = analyzer.extract_context(text, 'X')  # window_size=200 -> 全窓が重複
+        assert len(contexts) < 30
+        # マージされた断片の合計長は元テキストを超えない
+        assert sum(len(c) for c in contexts) <= len(text)
+
+    def test_empty_target_raises(self, analyzer):
+        with pytest.raises(ValueError):
+            analyzer.extract_context("何かのテキスト", "")
 
 
 class TestAnalyze:
@@ -92,3 +108,7 @@ class TestAnalyze:
     def test_empty_text_returns_empty(self, analyzer):
         df = analyzer.analyze("", '太郎')
         assert df.empty
+
+    def test_empty_target_raises(self, analyzer):
+        with pytest.raises(ValueError):
+            analyzer.analyze(SAMPLE_TEXT, "")

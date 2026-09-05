@@ -17,6 +17,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional, Union
+from collections import Counter
 import logging
 import pickle
 import json
@@ -311,78 +312,73 @@ class DocumentVectorizer:
 
         return result
 
-    @classmethod
     def from_files(
-        cls,
+        self,
         filepaths: List[str],
-        n_topics: int = 10,
-        feature_mode: str = 'tfidf',
         encoding: str = 'auto',
-        **kwargs
     ) -> VectorizationResult:
         """
         ファイルからドキュメントを読み込んでベクトル化
 
+        このインスタンスのコンストラクタ引数（n_topics, feature_mode,
+        pmi_threshold, min_count 等）がそのまま使われる。
+
         Parameters:
             filepaths (List[str]): ファイルパスのリスト
-            n_topics (int): トピック数
-            feature_mode (str): 特徴抽出モード
             encoding (str): ファイルエンコーディング（'auto'で自動検出）
-            **kwargs: DocumentVectorizerの他のパラメータ
 
         Returns:
             VectorizationResult: ベクトル化結果
         """
         texts = []
-        labels = []
-
         for filepath in filepaths:
-            # テキストを読み込む
             text_lines = read_file(filepath, encoding=encoding)
-            text = '\n'.join(text_lines)
-            texts.append(text)
+            texts.append('\n'.join(text_lines))
 
-            # ファイル名をラベルとして使用
-            label = Path(filepath).name
-            labels.append(label)
+        labels = self._make_unique_labels(filepaths)
 
-        # ベクトライザーを作成してフィッティング
-        vectorizer = cls(
-            n_topics=n_topics,
-            feature_mode=feature_mode,
-            **kwargs
-        )
+        return self.fit_transform(texts, labels)
 
-        return vectorizer.fit_transform(texts, labels)
-
-    @classmethod
     def from_texts(
-        cls,
+        self,
         texts: List[str],
         labels: Optional[List[str]] = None,
-        n_topics: int = 10,
-        feature_mode: str = 'tfidf',
-        **kwargs
     ) -> VectorizationResult:
         """
         テキストのリストからベクトル化
 
+        このインスタンスのコンストラクタ引数（n_topics, feature_mode,
+        pmi_threshold, min_count 等）がそのまま使われる。
+
         Parameters:
             texts (List[str]): テキストのリスト
             labels (Optional[List[str]]): ドキュメントラベル
-            n_topics (int): トピック数
-            feature_mode (str): 特徴抽出モード
-            **kwargs: DocumentVectorizerの他のパラメータ
 
         Returns:
             VectorizationResult: ベクトル化結果
         """
-        vectorizer = cls(
-            n_topics=n_topics,
-            feature_mode=feature_mode,
-            **kwargs
-        )
-        return vectorizer.fit_transform(texts, labels)
+        return self.fit_transform(texts, labels)
+
+    @staticmethod
+    def _make_unique_labels(filepaths: List[str]) -> List[str]:
+        """ファイルパスから一意なラベルを作る
+
+        通常はファイル名（basename）を使うが、同名ファイルが複数の
+        ディレクトリから渡された場合は与えられたパスそのものを使い、
+        それでも衝突する場合は連番を付けて区別する。
+        """
+        basenames = [Path(fp).name for fp in filepaths]
+        basename_counts = Counter(basenames)
+
+        labels = []
+        seen_counts: Dict[str, int] = {}
+        for filepath, basename in zip(filepaths, basenames):
+            label = basename if basename_counts[basename] == 1 else str(Path(filepath))
+            seen_counts[label] = seen_counts.get(label, 0) + 1
+            if seen_counts[label] > 1:
+                label = f"{label} ({seen_counts[label]})"
+            labels.append(label)
+        return labels
 
     def calculate_differences(
         self,

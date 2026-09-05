@@ -1065,8 +1065,6 @@ def vectorize(files, n_topics, output, feature_mode, pmi_threshold, min_count,
         click.echo("📖 ファイルを読み込み中...", err=True)
         result = vectorizer.from_files(
             list(files),
-            n_topics=n_topics,
-            feature_mode=feature_mode,
             encoding=encoding
         )
 
@@ -1113,6 +1111,17 @@ def vectorize(files, n_topics, output, feature_mode, pmi_threshold, min_count,
 
         # 可視化を生成（オプション）
         if visualize:
+            try:
+                import matplotlib  # noqa: F401
+                import seaborn  # noqa: F401
+            except ImportError:
+                click.echo(
+                    "❌ --visualize には matplotlib と seaborn が必要です。"
+                    " `pip install japhrase[viz]` を実行してください。",
+                    err=True
+                )
+                sys.exit(1)
+
             click.echo("\n🎨 可視化を生成中...", err=True)
 
             # ドキュメント-トピック ヒートマップ

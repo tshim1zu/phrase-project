@@ -25,6 +25,32 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+class _PhraseAnalyzer:
+    """固定vocabulary中の各フレーズが文書に出現する回数をトークンとして返すanalyzer
+
+    TfidfVectorizerの既定analyzer（analyzer='char' + ngram_range）は固定長の
+    文字N-gramしか生成できない。一方、PMIフィルタ由来のvocabularyは2〜15文字の
+    可変長フレーズであり、既定analyzerが生成するN-gramとほぼ一致しないため、
+    vocabulary側の特徴列がゼロのまま埋まってしまう。
+    このanalyzerはvocabularyのフレーズをそのまま文字列として数えるため、
+    vocabulary制限モード（low_pmi/high_pmi/hybrid）で正しく機能する。
+
+    クロージャではなくクラスにしているのは、VectorizationResult.save()が
+    fitted vectorizerをpickle保存するため（ローカル関数はpickle不可）。
+    """
+
+    def __init__(self, vocabulary: List[str]):
+        self.vocabulary = vocabulary
+
+    def __call__(self, doc: str) -> List[str]:
+        tokens = []
+        for phrase in self.vocabulary:
+            count = doc.count(phrase)
+            if count:
+                tokens.extend([phrase] * count)
+        return tokens
+
+
 def extract_pmi_filtered_phrases(
     texts: List[str],
     mode: str = 'low_pmi',
@@ -153,15 +179,14 @@ def build_document_term_matrix(
     Returns:
         Tuple: (行列, ベクトライザー, 特徴名, メタデータ)
     """
-    vocabulary = None
     metadata = {
         'feature_mode': feature_mode,
         'pmi_threshold': pmi_threshold,
         'min_count': min_count,
     }
 
-    # ステップ1: PMIフィルタリングで語彙を制限（必要な場合）
-    if feature_mode in ['low_pmi', 'high_pmi']:
+    if feature_mode in ('low_pmi', 'high_pmi'):
+        # ステップ1: PMIフィルタリングで語彙を制限
         if verbose:
             logger.info(f"PMI filtering mode: {feature_mode}")
 
@@ -183,48 +208,86 @@ def build_document_term_matrix(
 
         metadata['vocabulary_size'] = len(vocabulary)
 
+        # ステップ2-3: vocabularyのフレーズをそのまま数えるanalyzerでベクトル化
+        # （既定のchar N-gram analyzerでは可変長フレーズがほぼ一致しない = 常にゼロ）
+        vectorizer = TfidfVectorizer(
+            analyzer=_PhraseAnalyzer(vocabulary),
+            vocabulary=vocabulary,
+            min_df=min_df,
+            max_df=max_df
+        )
+        if verbose:
+            logger.info("Using TfidfVectorizer with phrase-counting analyzer (vocabulary restriction)")
+
+        matrix_sparse = vectorizer.fit_transform(texts)
+        feature_names = vectorizer.get_feature_names_out().tolist()
+
     elif feature_mode == 'hybrid':
-        # ハイブリッドモード：低PMIと全フレーズの複合
-        # ここでは簡略化のため、低PMIを優先する
-        vocabulary = extract_pmi_filtered_phrases(
+        # ハイブリッドモード：通常TF-IDF空間 + low_pmi語彙空間を連結する
+        tfidf_vectorizer = TfidfVectorizer(
+            analyzer=analyzer,
+            ngram_range=ngram_range,
+            max_features=max_features,
+            min_df=min_df,
+            max_df=max_df
+        )
+        tfidf_matrix = tfidf_vectorizer.fit_transform(texts)
+        tfidf_names = tfidf_vectorizer.get_feature_names_out().tolist()
+
+        pmi_vocabulary = extract_pmi_filtered_phrases(
             texts,
             mode='low_pmi',
             pmi_threshold=pmi_threshold,
             min_count=min_count
         )
-        if vocabulary is None:
-            vocabulary = None  # フォールバックして全語彙を使う
-        metadata['vocabulary_size'] = len(vocabulary) if vocabulary else 'all'
 
-    # ステップ2: ベクトライザーを構築
-    if feature_mode in ['tfidf', 'hybrid']:
+        if pmi_vocabulary:
+            pmi_vectorizer = TfidfVectorizer(
+                analyzer=_PhraseAnalyzer(pmi_vocabulary),
+                vocabulary=pmi_vocabulary,
+                min_df=min_df,
+                max_df=max_df
+            )
+            pmi_matrix = pmi_vectorizer.fit_transform(texts)
+            pmi_names = pmi_vectorizer.get_feature_names_out().tolist()
+
+            from scipy.sparse import hstack
+            matrix_sparse = hstack([tfidf_matrix, pmi_matrix]).tocsr()
+            feature_names = tfidf_names + pmi_names
+            vectorizer = tfidf_vectorizer  # 参照用（transformには使わない）
+            metadata['vocabulary_size'] = len(pmi_names)
+
+            if verbose:
+                logger.info(
+                    f"Hybrid mode: {len(tfidf_names)} tfidf features + "
+                    f"{len(pmi_names)} low_pmi features"
+                )
+        else:
+            # low_pmiフレーズが見つからない場合は通常のtfidf空間のみにフォールバック
+            matrix_sparse = tfidf_matrix
+            feature_names = tfidf_names
+            vectorizer = tfidf_vectorizer
+            metadata['vocabulary_size'] = 'tfidf_only'
+
+            if verbose:
+                logger.info("Hybrid mode: no low_pmi phrases found, falling back to tfidf only")
+
+    else:
+        # 通常のtfidfモード
         vectorizer = TfidfVectorizer(
             analyzer=analyzer,
             ngram_range=ngram_range,
-            vocabulary=vocabulary,
             max_features=max_features,
             min_df=min_df,
             max_df=max_df
         )
         if verbose:
             logger.info(f"Using TfidfVectorizer with analyzer={analyzer}, ngram_range={ngram_range}")
-    else:
-        # low_pmi, high_pmiモード
-        vectorizer = TfidfVectorizer(
-            analyzer=analyzer,
-            vocabulary=vocabulary,
-            min_df=min_df,
-            max_df=max_df
-        )
-        if verbose:
-            logger.info(f"Using TfidfVectorizer with vocabulary restriction")
 
-    # ステップ3: 行列を変換
-    matrix_sparse = vectorizer.fit_transform(texts)
+        matrix_sparse = vectorizer.fit_transform(texts)
+        feature_names = vectorizer.get_feature_names_out().tolist()
+
     matrix = matrix_sparse.toarray()
-
-    # ステップ4: 特徴名を取得
-    feature_names = vectorizer.get_feature_names_out().tolist()
 
     if verbose:
         logger.info(f"Document-term matrix shape: {matrix.shape}")
