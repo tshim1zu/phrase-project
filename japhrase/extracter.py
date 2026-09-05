@@ -129,10 +129,15 @@ class PhraseExtracter:
     clm_knowns = "knowns"
     clm_periodic = "periodic"
 
+    # lang='en'指定時、max_lengthが明示されなければこの値を使う
+    # （英語は単語レベルN-gramのため、文字レベル前提の既定値16語では
+    #   文丸ごとに近い長さまで候補が生成されてしまう）
+    _DEFAULT_MAX_LENGTH_BY_LANG = {"en": 5, "eng": 5, "english": 5}
+
     def __init__(
         self,
         min_count=2,
-        max_length=16,
+        max_length=None,
         min_length=2,
         weight_freq=1.0,
         weight_len=1.0,
@@ -154,7 +159,8 @@ class PhraseExtracter:
         """
         Parameters:
             min_count (int): フレーズ出現回数の最小閾値
-            max_length (int): フレーズの最大文字数（lang='en' の場合は最大単語数）
+            max_length (int): フレーズの最大文字数（lang='en' の場合は最大単語数）。
+                Noneの場合、lang='ja'なら16、lang='en'系なら5を使う。
             min_length (int): フレーズの最小文字数（lang='en' の場合は最小単語数）
             weight_freq (float): 頻度への重み
             weight_len (float): 長さへの重み
@@ -179,6 +185,8 @@ class PhraseExtracter:
         self.min_count = min_count
         self.weight_freq = weight_freq
         self.weight_len = weight_len
+        if max_length is None:
+            max_length = self._DEFAULT_MAX_LENGTH_BY_LANG.get(lang.lower().strip(), 16)
         self.max_length = max_length
         self.min_length = min_length
         self.removes = removes
@@ -227,7 +235,7 @@ class PhraseExtracter:
             if v >= self.min_count:
                 seq_char = k
                 seqchars.append(seq_char)
-                lengths.append(len(seq_char))
+                lengths.append(self._tokenizer.unit_length(seq_char))
                 freqs.append(float(v))
 
         df_ret = pd.DataFrame({
@@ -258,7 +266,7 @@ class PhraseExtracter:
 
         df = pd.DataFrame({
             self.clm_seqchar: dict_n.keys(),
-            self.clm_length: [len(k) for k in dict_n.keys()],
+            self.clm_length: [self._tokenizer.unit_length(k) for k in dict_n.keys()],
             self.clm_freq: dict_n.values()
         })
         return df
