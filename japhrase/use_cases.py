@@ -181,7 +181,7 @@ class WritingWorkflow:
         if len(habits) > 0:
             report.append(f"検出数: {len(habits)}個\n")
             for idx, row in habits.iterrows():
-                report.append(f"  {row['phrase']}: {int(row['frequency'])}回 (Z={row['z_score']:.2f})")
+                report.append(f"  {row['phrase']}: {int(row['freq_target'])}回 (Z={row['z_score']:.2f})")
         else:
             report.append("特別な習癖は見つかりません\n")
         report.append("")
@@ -412,7 +412,7 @@ class WritingWorkflow:
         if len(habits) > 0:
             report.append(f"検出数: {len(habits)}個\n")
             for idx, row in habits.iterrows():
-                report.append(f"  {row['phrase']}: {int(row['frequency'])}回")
+                report.append(f"  {row['phrase']}: {int(row['freq_target'])}回")
         else:
             report.append("特別な習癖は見つかりません")
         report.append("")
