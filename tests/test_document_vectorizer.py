@@ -14,7 +14,7 @@ import numpy as np
 
 from japhrase import DocumentVectorizer
 from japhrase.document_vectorizer import DocumentVectorizer as DV
-from japhrase.vectorization_utils import build_document_term_matrix
+from japhrase.vectorization_utils import build_document_term_matrix, _PhraseAnalyzer
 
 
 TEXT_CAT = "猫が好きだ。猫はかわいい。今日も猫を見た。猫と遊んだ。" * 8
@@ -119,5 +119,42 @@ class TestVocabularyRestrictedModes:
         # hybridの特徴数は通常tfidf単体より多い（low_pmi語彙が追加されるため）
         assert hybrid_matrix.shape[1] > tfidf_matrix.shape[1]
         # tfidf側の特徴が失われていないこと（低PMI語彙だけに制限されていないこと）
-        assert set(tfidf_names).issubset(set(hybrid_names))
+        assert set(f"tfidf:{name}" for name in tfidf_names).issubset(set(hybrid_names))
         assert (hybrid_matrix != 0).sum() > 0
+
+    def test_hybrid_feature_names_are_namespaced(self):
+        """tfidf空間とlow_pmi空間に同じ語（例:「猫が」）が入っても、
+        特徴名がprefixで区別でき、衝突しないこと"""
+        _, _, hybrid_names, _ = build_document_term_matrix(
+            [TEXT_CAT, TEXT_DOG],
+            feature_mode='hybrid',
+            min_count=3,
+            pmi_threshold=5.0,
+            ngram_range=(2, 3),
+            verbose=0,
+        )
+        assert len(hybrid_names) == len(set(hybrid_names))  # 重複なし
+        assert all(
+            name.startswith('tfidf:') or name.startswith('low_pmi:')
+            for name in hybrid_names
+        )
+
+
+class TestPhraseAnalyzerOverlapCounting:
+    """_PhraseAnalyzerの頻度定義がPhraseExtracterの重複カウントと一致すること"""
+
+    def test_counts_overlapping_occurrences(self):
+        # PhraseExtracter.make_ngrampieces()は1文字ずつ位置をずらすため、
+        # "aaaa"中の"aa"は3回（位置0,1,2）。str.count()は2回しか数えない。
+        analyzer = _PhraseAnalyzer(['aa'])
+        tokens = analyzer('aaaa')
+        assert tokens == ['aa', 'aa', 'aa']
+
+    def test_matches_phrase_extracter_frequency(self):
+        from japhrase import PhraseExtracter
+        extractor = PhraseExtracter(min_count=1, min_length=2, max_length=2, verbose=0)
+        df = extractor.get_dfphrase(["aaaa"])
+        expected_freq = int(df.loc[df['seqchar'] == 'aa', 'freq'].iloc[0])
+
+        analyzer = _PhraseAnalyzer(['aa'])
+        assert len(analyzer('aaaa')) == expected_freq

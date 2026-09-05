@@ -45,10 +45,31 @@ class _PhraseAnalyzer:
     def __call__(self, doc: str) -> List[str]:
         tokens = []
         for phrase in self.vocabulary:
-            count = doc.count(phrase)
+            count = self._count_overlapping(doc, phrase)
             if count:
                 tokens.extend([phrase] * count)
         return tokens
+
+    @staticmethod
+    def _count_overlapping(doc: str, phrase: str) -> int:
+        """重複を許して出現回数を数える（str.countは重複を数えない）
+
+        PhraseExtracter.make_ngrampieces()は1文字ずつ位置をずらしてN-gramを
+        生成するため、"aaaa"中の"aa"は3回（位置0,1,2）とカウントされる。
+        vocabularyの頻度定義とここでのカウントを一致させるため、
+        str.count()（"aaaa"で2回）ではなく重複を許す数え方を使う。
+        """
+        if not phrase:
+            return 0
+        count = 0
+        start = 0
+        while True:
+            pos = doc.find(phrase, start)
+            if pos == -1:
+                break
+            count += 1
+            start = pos + 1
+        return count
 
 
 def extract_pmi_filtered_phrases(
@@ -232,7 +253,9 @@ def build_document_term_matrix(
             max_df=max_df
         )
         tfidf_matrix = tfidf_vectorizer.fit_transform(texts)
-        tfidf_names = tfidf_vectorizer.get_feature_names_out().tolist()
+        # tfidf側とlow_pmi側で同じ語が両方に入りうる（例:「猫が」）ため、
+        # get_topic_terms()等でどちらの特徴空間由来か区別できるよう名前空間を分ける
+        tfidf_names = [f"tfidf:{name}" for name in tfidf_vectorizer.get_feature_names_out()]
 
         pmi_vocabulary = extract_pmi_filtered_phrases(
             texts,
@@ -249,7 +272,7 @@ def build_document_term_matrix(
                 max_df=max_df
             )
             pmi_matrix = pmi_vectorizer.fit_transform(texts)
-            pmi_names = pmi_vectorizer.get_feature_names_out().tolist()
+            pmi_names = [f"low_pmi:{name}" for name in pmi_vectorizer.get_feature_names_out()]
 
             from scipy.sparse import hstack
             matrix_sparse = hstack([tfidf_matrix, pmi_matrix]).tocsr()

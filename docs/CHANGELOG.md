@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `PhraseExtracter`: `max_length` off-by-one (and the resulting dead
+  `max_length=-1` branch), `min_count` boundary inconsistency between
+  `count_characters`/`df_from_counts`, `save_params`/`load_params` dropping
+  tuned weights, branching-entropy sentence-boundary leakage, and
+  `lang='en'` `length` being counted in characters instead of words
+- `DocumentVectorizer`/`vectorization_utils`: `low_pmi`/`high_pmi` feature
+  matrices were silently near-all-zero (analyzer/vocabulary mismatch);
+  `hybrid` mode now actually combines the TF-IDF and low-PMI feature
+  spaces instead of discarding the former; duplicate basenames from
+  different directories no longer collide in comparison labels
+- `CooccurrenceAnalyzer.extract_context`: infinite loop on an empty
+  `target`; overlapping/adjacent context windows around closely-spaced
+  target occurrences are now merged instead of double-counted
+
+### Changed
+- **Breaking:** `DocumentVectorizer.from_files()` / `.from_texts()` are no
+  longer `@classmethod`s — call them on a configured instance
+  (`DocumentVectorizer(...).from_files(...)`), not on the class directly.
+  The classmethod form silently discarded every constructor argument
+  except `n_topics`/`feature_mode` (including `pmi_threshold`, `min_count`,
+  `ngram_range`), so any code relying on that discarding behavior — or
+  calling `DocumentVectorizer.from_files(...)` on the class itself — will
+  need to construct an instance first.
+- `DocumentVectorizer` hybrid mode's feature names are now namespaced
+  (`tfidf:...` / `low_pmi:...`) since the same phrase can legitimately
+  appear in both feature spaces
+
 ### Added
 - English support (`lang='en'`) — word-level N-gram + Strategy pattern
 
