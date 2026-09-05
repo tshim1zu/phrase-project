@@ -43,6 +43,11 @@ class TestEnglishTokenizer:
         tok = EnglishTokenizer()
         assert tok.join(["machine", "learning"]) == "machine learning"
 
+    def test_unit_length_is_word_count(self):
+        tok = EnglishTokenizer()
+        assert tok.unit_length("machine learning") == 2
+        assert tok.unit_length("natural language processing") == 3
+
 
 class TestJapaneseTokenizer:
     def test_tokenize_basic(self):
@@ -53,6 +58,10 @@ class TestJapaneseTokenizer:
     def test_join(self):
         tok = JapaneseTokenizer()
         assert tok.join(["機", "械"]) == "機械"
+
+    def test_unit_length_is_char_count(self):
+        tok = JapaneseTokenizer()
+        assert tok.unit_length("機械学習") == 4
 
 
 # --- PhraseExtractor with lang='en' ---
@@ -108,6 +117,25 @@ class TestEnglishExtraction:
     def test_lang_stored(self):
         pe = PhraseExtractor(lang='en')
         assert pe.lang == 'en'
+
+    def test_length_column_is_word_count(self):
+        """lang='en'ではlength列は文字数ではなく単語数であること"""
+        pe = PhraseExtractor(lang='en', min_count=2, verbose=0)
+        df = pe.extract(EN_TEXT)
+        row = df[df["seqchar"] == "natural language processing"]
+        assert not row.empty
+        assert row.iloc[0]["length"] == 3
+
+    def test_default_max_length_is_word_scaled_for_english(self):
+        """lang='en'でmax_length省略時、文字数基準(16)ではなく単語数基準の既定値になること"""
+        pe = PhraseExtractor(lang='en', verbose=0)
+        assert pe.max_length == 5
+        pe_ja = PhraseExtractor(verbose=0)
+        assert pe_ja.max_length == 16
+
+    def test_explicit_max_length_overrides_lang_default(self):
+        pe = PhraseExtractor(lang='en', max_length=8, verbose=0)
+        assert pe.max_length == 8
 
     def test_save_load_preserves_lang(self):
         import tempfile, os

@@ -36,6 +36,10 @@ class JapaneseTokenizer:
     def unit_name(self) -> str:
         return "文字"
 
+    def unit_length(self, phrase: str) -> int:
+        """フレーズの「長さ」を単位（文字数）で返す"""
+        return len(phrase)
+
 
 class EnglishTokenizer:
     """英語: 単語レベルN-gram"""
@@ -76,6 +80,10 @@ class EnglishTokenizer:
 
     def unit_name(self) -> str:
         return "word"
+
+    def unit_length(self, phrase: str) -> int:
+        """フレーズの「長さ」を単位（単語数）で返す"""
+        return len(phrase.split())
 
 
 def get_tokenizer(lang: str = "ja", **kwargs):

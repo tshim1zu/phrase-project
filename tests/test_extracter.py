@@ -17,7 +17,7 @@ class TestPhraseExtracterInit:
         extractor = PhraseExtracter()
         assert extractor is not None
         assert extractor.min_count == 6
-        assert extractor.max_length == 17  # 16 + 1
+        assert extractor.max_length == 16
         assert extractor.min_length == 4
 
     def test_create_instance_with_params(self):
@@ -29,7 +29,7 @@ class TestPhraseExtracterInit:
             verbose=0
         )
         assert extractor.min_count == 10
-        assert extractor.max_length == 21  # 20 + 1
+        assert extractor.max_length == 20
         assert extractor.min_length == 3
         assert extractor.verbose == 0
 
@@ -223,3 +223,58 @@ class TestPhraseExtracterEdgeCases:
         df = extractor.get_dfphrase(sentences)
 
         assert isinstance(df, pd.DataFrame)
+
+
+class TestBoundaryBugRegressions:
+    """境界値バグの回帰テスト（レビューで指摘された問題の再発防止）"""
+
+    def test_max_length_not_exceeded(self):
+        """make_ngrampiecesが指定したmax_lengthより長いN-gramを生成しないこと"""
+        extractor = PhraseExtracter(min_count=1, max_length=5, min_length=1, verbose=0)
+        sentences = ["あ" * 20]
+        ngrams = extractor.make_ngrampieces(sentences)
+        assert all(len(ng) <= 5 for ng in ngrams)
+        assert any(len(ng) == 5 for ng in ngrams)
+
+    def test_max_length_minus_one_uses_half_sentence_count(self):
+        """max_length=-1のとき、sentences件数の半分をmax_lengthとして使う特殊ケースが機能すること
+        （従来はコンストラクタの+1補正のせいでこの分岐に絶対到達しなかった）"""
+        extractor = PhraseExtracter(min_count=1, max_length=-1, min_length=1, verbose=0)
+        sentences = ["あいうえおかきくけこ"] * 6  # 6件 -> 内部max_lengthは3
+        ngrams = extractor.make_ngrampieces(sentences)
+        assert max(len(ng) for ng in ngrams) == 3
+
+    def test_min_count_boundary_is_inclusive(self):
+        """min_countちょうどの出現回数のフレーズも残ること（count_charactersとdf_from_countsで挙動を統一）"""
+        extractor = PhraseExtracter(min_count=3, verbose=0)
+        phrases = ["テスト"] * 3 + ["サンプル"] * 2
+        df = extractor.count_characters(phrases)
+        assert "テスト" in df["seqchar"].values
+        assert "サンプル" not in df["seqchar"].values
+
+    def test_save_load_roundtrip_preserves_weights(self):
+        """save_params/load_paramsでweight_freq等のチューニング可能パラメータが失われないこと"""
+        import tempfile, os
+        extractor = PhraseExtracter(
+            weight_freq=0.4, weight_len=1.6,
+            pmi_weight=2.5, entropy_weight=0.3,
+            verbose=0,
+        )
+        path = os.path.join(tempfile.gettempdir(), "test_roundtrip_params.json")
+        try:
+            extractor.save_params(path)
+            restored = PhraseExtracter.load_params(path)
+            assert restored.params == extractor.params
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
+    def test_branching_entropy_no_cross_sentence_leak(self):
+        """分岐エントロピーが文境界をまたいだ偽の隣接文字を作らないこと"""
+        extractor = PhraseExtracter(min_count=1, verbose=0)
+        # "abc" の直後に本来存在しない "d" が続くように見えないことを確認
+        sentences = ["xyzabc", "dabc"]
+        scores = extractor.calculate_branching_entropy(sentences, ["abc"])
+        left_entropy, right_entropy, _ = scores["abc"]
+        # "abc"の右には常に何も続かない（各文の末尾）ため右エントロピーは0のはず
+        assert right_entropy == 0.0

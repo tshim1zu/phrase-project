@@ -129,10 +129,15 @@ class PhraseExtracter:
     clm_knowns = "knowns"
     clm_periodic = "periodic"
 
+    # lang='en'指定時、max_lengthが明示されなければこの値を使う
+    # （英語は単語レベルN-gramのため、文字レベル前提の既定値16語では
+    #   文丸ごとに近い長さまで候補が生成されてしまう）
+    _DEFAULT_MAX_LENGTH_BY_LANG = {"en": 5, "eng": 5, "english": 5}
+
     def __init__(
         self,
         min_count=2,
-        max_length=16,
+        max_length=None,
         min_length=2,
         weight_freq=1.0,
         weight_len=1.0,
@@ -154,7 +159,8 @@ class PhraseExtracter:
         """
         Parameters:
             min_count (int): フレーズ出現回数の最小閾値
-            max_length (int): フレーズの最大文字数（lang='en' の場合は最大単語数）
+            max_length (int): フレーズの最大文字数（lang='en' の場合は最大単語数）。
+                Noneの場合、lang='ja'なら16、lang='en'系なら5を使う。
             min_length (int): フレーズの最小文字数（lang='en' の場合は最小単語数）
             weight_freq (float): 頻度への重み
             weight_len (float): 長さへの重み
@@ -179,7 +185,9 @@ class PhraseExtracter:
         self.min_count = min_count
         self.weight_freq = weight_freq
         self.weight_len = weight_len
-        self.max_length = max_length + 1  # 指定された数よりも１つ多く数えて処理
+        if max_length is None:
+            max_length = self._DEFAULT_MAX_LENGTH_BY_LANG.get(lang.lower().strip(), 16)
+        self.max_length = max_length
         self.min_length = min_length
         self.removes = removes
         self.unnecessary = unnecessary
@@ -224,10 +232,10 @@ class PhraseExtracter:
         cnt_ = Counter(phrases)
         seqchars, lengths, freqs = [], [], []
         for k, v in cnt_.most_common():
-            if v > self.min_count:
+            if v >= self.min_count:
                 seq_char = k
                 seqchars.append(seq_char)
-                lengths.append(len(seq_char))
+                lengths.append(self._tokenizer.unit_length(seq_char))
                 freqs.append(float(v))
 
         df_ret = pd.DataFrame({
@@ -258,7 +266,7 @@ class PhraseExtracter:
 
         df = pd.DataFrame({
             self.clm_seqchar: dict_n.keys(),
-            self.clm_length: [len(k) for k in dict_n.keys()],
+            self.clm_length: [self._tokenizer.unit_length(k) for k in dict_n.keys()],
             self.clm_freq: dict_n.values()
         })
         return df
@@ -358,8 +366,9 @@ class PhraseExtracter:
         if not phrases or not sentences:
             return {}
 
-        # テキストを結合
-        all_text = "".join(sentences)
+        # テキストを結合（文境界には偽の隣接文字を作らないよう番兵を挟む）
+        boundary = "\x00"
+        all_text = boundary.join(sentences)
 
         entropy_scores = {}
 
@@ -374,11 +383,11 @@ class PhraseExtracter:
 
             for i, char in enumerate(all_text):
                 if all_text[i:i+len(phrase)] == phrase:
-                    # 左側の文字
-                    if i > 0:
+                    # 左側の文字（文境界の番兵は除外）
+                    if i > 0 and all_text[i - 1] != boundary:
                         left_chars.append(all_text[i - 1])
-                    # 右側の文字
-                    if i + len(phrase) < len(all_text):
+                    # 右側の文字（文境界の番兵は除外）
+                    if i + len(phrase) < len(all_text) and all_text[i + len(phrase)] != boundary:
                         right_chars.append(all_text[i + len(phrase)])
 
             # 左側のエントロピーを計算
@@ -540,7 +549,7 @@ class PhraseExtracter:
             df.loc[f_match, clm_nptn] = c
 
         # 長さフィルター
-        f_len = df[self.clm_length] < self.max_length
+        f_len = df[self.clm_length] <= self.max_length
 
         # 周期性フィルター
         f_periodic = df[self.clm_periodic] = df[self.clm_seqchar].map(self.doubt_periodic_letter)
@@ -1099,6 +1108,17 @@ class PhraseExtracter:
 
         return df, metadata
 
+    def _split_text_to_sentences(self, text: str) -> List[str]:
+        """プレーンテキストを文に分割する（lang に応じた区切り文字を使用）
+
+        lang='ja': 。！？改行で区切る
+        lang='en': .!?改行で区切る（英語の文末記号は全角の。！？と異なるため）
+        """
+        import re
+        pattern = r'[.!?\n]+' if self.lang in ("en", "eng", "english") else r'[。！？\n]+'
+        sentences = [s.strip() for s in re.split(pattern, text) if s.strip()]
+        return sentences if sentences else [text]
+
     def extract(self, input_data: Union[str, List[str]], column: str = None,
                 encoding: str = 'auto', auto_tune: bool = False,
                 tune_trials: int = 15) -> pd.DataFrame:
@@ -1135,11 +1155,7 @@ class PhraseExtracter:
             if Path(input_data).is_file():
                 sentences = read_file(input_data, column, encoding)
             else:
-                # テキストを文に分割（。！？改行で区切る）
-                import re
-                sentences = [s.strip() for s in re.split(r'[。！？\n]+', input_data) if s.strip()]
-                if not sentences:
-                    sentences = [input_data]
+                sentences = self._split_text_to_sentences(input_data)
                 if self.verbose:
                     logger.info(f"テキストを{len(sentences)}文に分割しました")
         elif isinstance(input_data, (list, tuple, pd.Series)):
@@ -1181,8 +1197,7 @@ class PhraseExtracter:
             >>> pe.show_params()
         """
         if isinstance(texts, str):
-            import re as _re
-            texts = [s.strip() for s in _re.split(r'[。！？\n]+', texts) if s.strip()]
+            texts = self._split_text_to_sentences(texts)
 
         if verbose is None:
             verbose = self.verbose
@@ -1195,10 +1210,7 @@ class PhraseExtracter:
         # パラメータを更新
         for k, v in best.items():
             if hasattr(self, k):
-                if k == 'max_length':
-                    self.max_length = v + 1  # 内部は +1 で保持
-                else:
-                    setattr(self, k, v)
+                setattr(self, k, v)
 
         if not hasattr(self, '_tune_history'):
             self._tune_history = []
@@ -1215,11 +1227,15 @@ class PhraseExtracter:
         """現在のパラメータを dict で返す。"""
         d = {
             'min_count': self.min_count,
-            'max_length': self.max_length - 1,  # 内部は +1 なので戻す
+            'max_length': self.max_length,
             'min_length': self.min_length,
+            'weight_freq': self.weight_freq,
+            'weight_len': self.weight_len,
             'threshold_originality': self.threshold_originality,
             'use_pmi': self.use_pmi,
             'use_branching_entropy': self.use_branching_entropy,
+            'pmi_weight': self.pmi_weight,
+            'entropy_weight': self.entropy_weight,
         }
         if self.lang != 'ja':
             d['lang'] = self.lang
@@ -1302,8 +1318,10 @@ class PhraseExtracter:
         # extract 用のパラメータのみ渡す（use_pmi等も含む）
         init_params = {k: v for k, v in params.items()
                        if k in ('min_count', 'max_length', 'min_length',
+                                'weight_freq', 'weight_len',
                                 'threshold_originality', 'use_pmi',
-                                'use_branching_entropy', 'lang')}
+                                'use_branching_entropy', 'pmi_weight',
+                                'entropy_weight', 'lang')}
         instance = cls(**init_params)
         instance._tune_history = data.get('tune_history', [])
         print(f"📂 パラメータを復元: {path}")
