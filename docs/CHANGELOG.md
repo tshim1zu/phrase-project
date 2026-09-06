@@ -8,6 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- `ContaminationScanner`/`japhrase.contamination` detectors: any detector
+  exception was silently swallowed and treated as "0 anomalies" (clean) for
+  that axis, with no field anywhere on `AxisScore`/`ContaminationProfile` to
+  distinguish "genuinely clean" from "detector crashed and we never
+  checked". This was reachable through the plain public API with entirely
+  ordinary-looking arguments: `scan(text, segment_size=1)` (or `=0`) crashed
+  `detect_distribution` with `ValueError: range() arg 3 must not be zero`
+  (`segment_size // 2 == 0`); the equivalent applied to `complexity`,
+  `language` (`segment_size`) and `repetition` (`repetition_window`).
+  `ContaminationScanner.__init__` now validates `segment_size`/
+  `repetition_window` (>= 2) and raises immediately instead of deferring to
+  a swallowed crash; the four affected detectors also guard against
+  degenerate window/segment sizes directly, since they're documented as a
+  supported low-level API callable without going through the scanner.
+  Independently of those specific triggers, `AxisScore` now carries an
+  `error: Optional[str]` field and `ContaminationProfile.failed_axes`
+  reports which axes failed, so a *future* detector bug can no longer look
+  identical to "no contamination found" — `report()`/`explain()` now call
+  out failed axes explicitly instead of only ever showing "✅ 問題なし".
 - `HabitDriftDetector.analyze()`: `worsening_count`/`improving_count` were
   computed *after* truncating the candidate list to the top `top_n` (default
   30) entries sorted by worsening slope descending. Once a Part had more than

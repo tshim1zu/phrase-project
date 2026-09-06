@@ -55,6 +55,10 @@ class ContaminationScanner:
         language_mix_threshold: float = 0.3,
     ):
         """各汚染検出器へ渡す閾値とウィンドウ設定を保持する。"""
+        if segment_size < 2:
+            raise ValueError(f"segment_size は2以上である必要があります: {segment_size}")
+        if repetition_window < 2:
+            raise ValueError(f"repetition_window は2以上である必要があります: {repetition_window}")
         self.params = {
             'similarity_threshold': duplicate_threshold,
             'window_size': repetition_window,
@@ -96,16 +100,24 @@ class ContaminationScanner:
             params['reference_text'] = reference_text
 
         # 各検出器を実行
+        # 検出器が例外を投げた場合でもスキャン全体は継続するが、その軸が
+        # 「異常0件」＝cleanなのか「検出器が失敗して何も見ていない」のかを
+        # 呼び出し側が区別できるよう、失敗はAxisScore.errorに記録する
+        # （単にresults[name]=[]にするだけだと両者が見分けられなくなる）。
         results: Dict[str, List[Anomaly]] = {}
+        errors: Dict[str, Optional[str]] = {}
         for name in ALL_DETECTOR_NAMES:
             if name in detectors and name in DETECTOR_REGISTRY:
                 try:
                     results[name] = DETECTOR_REGISTRY[name](text, lines, **params)
+                    errors[name] = None
                 except Exception as e:
                     logger.warning(f"検出器 {name} でエラー: {e}")
                     results[name] = []
+                    errors[name] = str(e)
             else:
                 results[name] = []
+                errors[name] = None
 
         def _axis(name: str, display_name: str) -> AxisScore:
             """検出結果から表示名付きの軸スコアを構築する。"""
@@ -115,6 +127,7 @@ class ContaminationScanner:
                 score=self._compute_axis_score(anomalies),
                 count=len(anomalies),
                 anomalies=anomalies,
+                error=errors.get(name),
             )
 
         return ContaminationProfile(

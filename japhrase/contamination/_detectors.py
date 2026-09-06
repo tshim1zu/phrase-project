@@ -463,6 +463,11 @@ def detect_repetition(
         List of Anomaly objects for detected phrase repetition.
     """
     anomalies = []
+    if window_size < 2:
+        # window_size//2 が0になりrange()のstepが0になってクラッシュするのを防ぐ。
+        # ContaminationScannerのコンストラクタでも検証しているが、この関数は
+        # 低水準APIとして直接呼び出されることもあるため、ここでも防御する。
+        return anomalies
     clean, idx_map = _strip_whitespace_with_map(text)
     if len(clean) < window_size:
         windows = [(0, clean)]
@@ -527,6 +532,12 @@ def detect_distribution(
         List of Anomaly objects for detected distribution anomalies.
     """
     anomalies = []
+    if segment_size < 2:
+        # segment_size//2 が0になりrange()のstepが0になってクラッシュするのを
+        # 防ぐ。ContaminationScannerのコンストラクタでも検証しているが、
+        # この関数は低水準APIとして直接呼び出されることもあるため、
+        # ここでも防御する。
+        return anomalies
     clean, idx_map = _strip_whitespace_with_map(text)
     if len(clean) < segment_size * 2:
         return anomalies
@@ -648,6 +659,12 @@ def detect_complexity(
         List of Anomaly objects for detected compression anomalies.
     """
     anomalies = []
+    if segment_size < 1:
+        # segment_size=0だとrange()のstepが0になってクラッシュする。
+        # ContaminationScannerのコンストラクタでも検証しているが、
+        # この関数は低水準APIとして直接呼び出されることもあるため、
+        # ここでも防御する。
+        return anomalies
     clean, idx_map = _collapse_excess_newlines_with_map(text)
     if len(clean) < segment_size:
         return anomalies
@@ -848,6 +865,12 @@ def detect_language(
     文字種比率のセグメント間変動で判定。
     """
     anomalies = []
+    if segment_size < 1:
+        # segment_size=0だとrange()のstepが0になってクラッシュする。
+        # ContaminationScannerのコンストラクタでも検証しているが、
+        # この関数は低水準APIとして直接呼び出されることもあるため、
+        # ここでも防御する。
+        return anomalies
     clean = text.replace('\n', ' ')
     if len(clean) < segment_size:
         return anomalies

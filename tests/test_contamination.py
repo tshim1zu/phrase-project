@@ -310,3 +310,76 @@ class TestLowLevel:
         from japhrase.contamination._detectors import DETECTOR_REGISTRY, ALL_DETECTOR_NAMES
         assert len(ALL_DETECTOR_NAMES) == 8
         assert 'consistency' in DETECTOR_REGISTRY
+
+
+class TestDetectorFailureVisibility:
+    """回帰テスト: 検出器が例外で失敗しても「異常0件=クリーン」と区別なく
+    green扱いされないこと（fail-open対策）。
+
+    以前は _scanner.py が検出器の例外を握り潰し、その軸を無条件で
+    score=0/count=0（クリーン）として扱っていた。AxisScore/ContaminationProfile
+    には失敗を示すフィールドが一切無く、呼び出し側は「本当にクリーン」なのか
+    「検出できなかっただけ」なのかを区別できなかった。
+    さらに、この不具合は `scan(text, segment_size=1)` のような、悪意のない
+    正当な公開APIの使い方だけで実際にトリガーできた
+    （segment_size//2 が0になりrange()のstepが0になってクラッシュする）。
+    """
+
+    def test_segment_size_too_small_raises_clear_error_instead_of_silent_failure(self):
+        """公開APIから到達可能なdegenerate paramはクラッシュではなく、
+        スキャナ構築時に明確なValueErrorを出すこと。"""
+        with pytest.raises(ValueError):
+            ContaminationScanner(segment_size=1)
+        with pytest.raises(ValueError):
+            ContaminationScanner(segment_size=0)
+        with pytest.raises(ValueError):
+            ContaminationScanner(repetition_window=1)
+        with pytest.raises(ValueError):
+            ContaminationScanner(repetition_window=0)
+
+    def test_low_level_detectors_do_not_crash_on_degenerate_segment_size(self):
+        """低水準API（検出器を直接呼び出す）から degenerate な segment_size/
+        window_size を渡してもクラッシュせず、空リストを返すこと
+        （scanner側のバリデーションを経由しない呼び出しに対する防御）。"""
+        from japhrase.contamination._detectors import (
+            detect_distribution, detect_complexity, detect_language, detect_repetition,
+        )
+        text = 'テストテキストです。' * 20
+        lines = text.split('\n')
+
+        assert detect_distribution(text, lines, segment_size=0) == []
+        assert detect_distribution(text, lines, segment_size=1) == []
+        assert detect_complexity(text, lines, segment_size=0) == []
+        assert detect_language(text, lines, segment_size=0) == []
+        assert detect_repetition(text, lines, window_size=0) == []
+        assert detect_repetition(text, lines, window_size=1) == []
+
+    def test_failed_detector_is_visible_not_reported_as_clean(self):
+        """検出器が(未知の理由で)例外を投げた場合、その軸のerrorフィールドと
+        profile.failed_axes に反映され、is_clean()/explain()だけを見ても
+        「クリーン」と誤認できないこと。"""
+        from japhrase.contamination import _detectors
+
+        def broken_detector(text, lines, **kw):
+            raise RuntimeError("simulated bug")
+
+        original = _detectors.DETECTOR_REGISTRY['duplicate']
+        _detectors.DETECTOR_REGISTRY['duplicate'] = broken_detector
+        try:
+            scanner = ContaminationScanner()
+            profile = scanner.scan(CLEAN_TEXT)
+
+            assert profile.duplicate.error is not None
+            assert profile.duplicate.score == 0
+            assert profile.duplicate.count == 0
+
+            failed_names = [ax.name for ax in profile.failed_axes]
+            assert len(failed_names) == 1
+
+            # 全体としては(実行できた軸だけを見れば)クリーンでも、
+            # explain()は「検出エラーで未検査」であることを明示する
+            assert profile.is_clean()
+            explanation = profile.explain()
+            assert '検出エラー' in explanation
+        finally:
+            _detectors.DETECTOR_REGISTRY['duplicate'] = original
