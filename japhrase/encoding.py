@@ -108,8 +108,9 @@ class EncodingDetector:
                 return encoding, confidence
 
         # 候補を順番に試す（文字化けのシグナルをチェック）
+        # garble_scoreは低いほど文字化けの可能性が低い＝良い候補
         best_encoding = None
-        best_score = -1
+        best_score = float('inf')
 
         for encoding in EncodingDetector.ENCODING_CANDIDATES:
             try:
@@ -119,7 +120,7 @@ class EncodingDetector:
                 garble_score = EncodingDetector._calculate_garble_score(text)
                 logger.debug(f"{encoding}: garble_score={garble_score:.2f}")
 
-                if garble_score > best_score:
+                if garble_score < best_score:
                     best_score = garble_score
                     best_encoding = encoding
 

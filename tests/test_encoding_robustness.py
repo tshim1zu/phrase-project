@@ -142,6 +142,38 @@ class TestEncodingDetection:
         assert isinstance(encoding, str)
         assert encoding != ''
 
+    def test_candidate_loop_picks_lowest_garble_score(self, monkeypatch):
+        """chardetの信頼度が低い場合の候補選択が、最も文字化けの少ない
+        （garble_scoreが最小の）候補を選ぶこと。
+
+        garble_scoreは「低いほど文字化けの可能性が低い」定義なので、
+        最大値ではなく最小値を選ぶ候補選択ロジックを直接検証する。
+        全候補が正常にデコードできる純ASCIIバイト列を使い、
+        ENCODING_CANDIDATESの順序通りに呼ばれる_calculate_garble_scoreへ
+        候補ごとの固定スコアを返させることで、選択ロジックだけを分離して検証する。
+        """
+        # chardetを無効化し、必ず候補ループを通す
+        monkeypatch.setattr('japhrase.encoding.HAS_CHARDET', False)
+
+        # ENCODING_CANDIDATES = ['utf-8', 'utf-8-sig', 'cp932', 'shift_jis',
+        #                        'euc-jp', 'iso-2022-jp', 'ascii']
+        scores = [5.0, 5.0, 0.0, 8.0, 3.0, 9.0, 4.0]  # cp932が最小(0.0)
+        call_index = {'i': 0}
+
+        def fake_score(text):
+            i = call_index['i']
+            call_index['i'] += 1
+            return scores[i]
+
+        monkeypatch.setattr(
+            EncodingDetector, '_calculate_garble_score', staticmethod(fake_score)
+        )
+
+        data = b'hello world'  # 全候補が例外なくデコードできる純ASCII
+        encoding, confidence = EncodingDetector.detect_with_fallback(data)
+
+        assert encoding == 'cp932'  # scores中の最小値(0.0)を持つ候補
+
 
 class TestGarbleRepair:
     """文字化け修復テスト"""
