@@ -41,6 +41,43 @@ class TestStreamingPhraseExtracter:
         assert stats['total_texts'] == 8, "テキスト数をカウント"
         assert stats['chunks_processed'] == 1, "チャンク数"
 
+    def test_chunk_failure_is_recorded_not_silently_dropped(self, monkeypatch):
+        """チャンク処理が例外で失敗した場合、テキストが黙って消えず
+        failed_chunksに記録されること（デフォルトはraise_on_chunk_error=False）"""
+        extractor = StreamingPhraseExtracter(min_count=1)
+
+        def boom(self, texts):
+            raise RuntimeError("simulated extraction failure")
+
+        from japhrase.extracter import PhraseExtracter
+        monkeypatch.setattr(PhraseExtracter, 'extract', boom)
+
+        df_results, stats = extractor.add_chunk(['a', 'b', 'c'])
+
+        assert stats['chunk_failed'] is True
+        assert stats['chunk_error'] is not None
+        assert len(extractor.failed_chunks) == 1
+        assert extractor.failed_chunks[0]['chunk_size'] == 3
+
+        final_stats = extractor.get_statistics()
+        assert final_stats['failed_chunks'] == 1
+        # 失敗した行数分もtotal_textsには数えられている（処理を試みたことは分かる）
+        assert final_stats['total_texts'] == 3
+
+    def test_raise_on_chunk_error_propagates_exception(self, monkeypatch):
+        """raise_on_chunk_error=Trueの場合、チャンク処理の例外がそのまま
+        呼び出し元に伝播すること"""
+        extractor = StreamingPhraseExtracter(min_count=1, raise_on_chunk_error=True)
+
+        def boom(self, texts):
+            raise RuntimeError("simulated extraction failure")
+
+        from japhrase.extracter import PhraseExtracter
+        monkeypatch.setattr(PhraseExtracter, 'extract', boom)
+
+        with pytest.raises(RuntimeError):
+            extractor.add_chunk(['a', 'b', 'c'])
+
     def test_add_multiple_chunks(self):
         """複数チャンクの追加"""
         extractor = StreamingPhraseExtracter(min_count=1)
@@ -306,6 +343,32 @@ class TestIncrementalAggregator:
 
 class TestStreamingAnalyzer:
     """ストリーミング分析の統合テスト"""
+
+    def test_progress_log_is_not_inflated(self, caplog):
+        """process_file()の途中経過ログ（'進捗: ...'）が、チャンクごとの
+        累積値を再度加算して三角数的に水増しされないこと。
+
+        3チャンク×30行なら、最終チャンクの進捗ログは90行であるべきで、
+        (30+60+90=180)のような水増し値になってはいけない。
+        """
+        import logging
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, encoding='utf-8') as f:
+            for i in range(90):
+                f.write(f'テキスト{i}\n')
+            filepath = f.name
+
+        try:
+            analyzer = StreamingAnalyzer(min_count=1, chunk_size=30)
+            with caplog.at_level(logging.INFO, logger='japhrase.streaming_processor'):
+                analyzer.process_file(filepath)
+
+            progress_lines = [r.message for r in caplog.records if '進捗:' in r.message]
+            assert len(progress_lines) == 3
+            # 最後の進捗ログは総行数(90)を超えてはいけない
+            assert '90 行' in progress_lines[-1]
+            assert '180' not in progress_lines[-1]
+        finally:
+            os.unlink(filepath)
 
     def test_process_file_basic(self):
         """基本的なファイル処理"""

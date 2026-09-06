@@ -16,21 +16,34 @@ logger = logging.getLogger(__name__)
 class StreamingPhraseExtracter:
     """ストリーミング処理対応のフレーズ抽出"""
 
-    def __init__(self, min_count: int = 3, min_length: int = 1, max_length: int = 10):
+    def __init__(
+        self,
+        min_count: int = 3,
+        min_length: int = 1,
+        max_length: int = 10,
+        raise_on_chunk_error: bool = False,
+    ):
         """
         Parameters:
             min_count: 最小出現回数
             min_length: 最小フレーズ長
             max_length: 最大フレーズ長
+            raise_on_chunk_error: Trueならチャンク処理中の例外をそのまま送出する。
+                Falseの場合は失敗したチャンクをスキップして続行するが、
+                self.failed_chunks / get_statistics()['failed_chunks'] で
+                何行が黙って失われたかを追跡できる。
         """
         self.min_count = min_count
         self.min_length = min_length
         self.max_length = max_length
+        self.raise_on_chunk_error = raise_on_chunk_error
 
         # ストリーミング状態
         self.phrase_counter = defaultdict(int)
         self.total_texts = 0
         self.chunks_processed = 0
+        # 処理に失敗したチャンクの記録（黙って欠落させないため）
+        self.failed_chunks: List[Dict] = []
 
     def add_chunk(self, texts: List[str]) -> Tuple[pd.DataFrame, Dict]:
         """
@@ -44,6 +57,10 @@ class StreamingPhraseExtracter:
         """
         from .extracter import PhraseExtracter
 
+        chunk_index = self.chunks_processed
+        chunk_failed = False
+        chunk_error = None
+
         # フレーズを抽出（ここから import されているはずなので使用）
         try:
             extractor = PhraseExtracter(
@@ -54,8 +71,17 @@ class StreamingPhraseExtracter:
             )
             df_chunk = extractor.extract(texts)
         except Exception as e:
-            logger.warning(f"チャンク処理エラー: {e}")
+            if self.raise_on_chunk_error:
+                raise
+            logger.warning(f"チャンク処理エラー（{len(texts)}行が失われました）: {e}")
             df_chunk = pd.DataFrame()
+            chunk_failed = True
+            chunk_error = str(e)
+            self.failed_chunks.append({
+                'chunk_index': chunk_index,
+                'chunk_size': len(texts),
+                'error': chunk_error,
+            })
 
         if df_chunk is not None and not df_chunk.empty:
             phrase_col = 'seqchar' if 'seqchar' in df_chunk.columns else 'phrase'
@@ -76,13 +102,21 @@ class StreamingPhraseExtracter:
             'chunks_processed': self.chunks_processed,
             'unique_phrases': len(self.phrase_counter),
             'chunk_size': len(texts),
+            'chunk_failed': chunk_failed,
+            'chunk_error': chunk_error,
         }
 
-        logger.info(
-            f"チャンク {self.chunks_processed} 処理完了: "
-            f"テキスト {len(texts)} 行, "
-            f"ユニークフレーズ {len(self.phrase_counter)} 個"
-        )
+        if chunk_failed:
+            logger.warning(
+                f"チャンク {self.chunks_processed} 処理失敗: "
+                f"テキスト {len(texts)} 行がフレーズ抽出から欠落"
+            )
+        else:
+            logger.info(
+                f"チャンク {self.chunks_processed} 処理完了: "
+                f"テキスト {len(texts)} 行, "
+                f"ユニークフレーズ {len(self.phrase_counter)} 個"
+            )
 
         return self.get_current_results(), stats
 
@@ -134,6 +168,8 @@ class StreamingPhraseExtracter:
             'unique_phrases': len(self.phrase_counter),
             'total_phrase_count': total_count,
             'avg_chunk_size': self.total_texts / self.chunks_processed if self.chunks_processed > 0 else 0,
+            'failed_chunks': len(self.failed_chunks),
+            'failed_chunk_details': list(self.failed_chunks),
         }
 
     def memory_estimate(self) -> Dict:
@@ -278,8 +314,10 @@ class StreamingAnalyzer:
                 callback(df_results, chunk_stats)
 
             # 統計を集約
+            # chunk_stats['total_texts']はextractor側の累積値なので、
+            # ここでさらに += すると三角数的に水増しされてしまう（代入する）
             stats_total['total_chunks'] += 1
-            stats_total['total_texts'] += chunk_stats['total_texts']
+            stats_total['total_texts'] = chunk_stats['total_texts']
 
             logger.info(
                 f"進捗: チャンク {stats_total['total_chunks']}, "
