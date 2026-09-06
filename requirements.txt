@@ -1,26 +1,27 @@
-# Core dependencies (synchronized with pyproject.toml)
-numpy>=1.20.0,<2.0
+# Core dependencies. Must be kept in sync with `dependencies` in pyproject.toml
+# (pyproject.toml is the source of truth; this file exists for `pip install -r`
+# workflows and is not otherwise consumed by the build).
+numpy>=1.20.0,<3.0
 pandas>=1.3.0,<3.0
-openpyxl>=3.0.0
+scipy>=1.7.0
 chardet>=4.0.0
 click>=8.0.0
 PyYAML>=6.0
+python-Levenshtein>=0.12.0
+scikit-learn>=0.24.0
 networkx>=2.6
+openpyxl>=3.0.0
 
-# Optional: For similarity analysis features
-# python-Levenshtein>=0.12.0
-# scikit-learn>=0.24.0
+# Optional: `pip install -e ".[viz]"` — required for `vectorize --visualize`
 # matplotlib>=3.3.0
 # seaborn>=0.11.0
 
-# Optional: For notebook support
-# ipython>=7.0.0
-# jupyter>=1.0.0
-
-# Development dependencies (use: pip install -e ".[dev]")
+# Optional: `pip install -e ".[dev]"` — development/testing tools
 # pytest>=6.0.0
 # pytest-cov>=2.0.0
 # black>=21.0
 # flake8>=3.9.0
 # mypy>=0.910
+
+# Optional: not declared as an extra, only needed for PhraseExtracter.tune()
 # optuna>=3.0.0

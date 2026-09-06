@@ -14,10 +14,17 @@ import pytest
 
 # optional 依存をブロックするフック
 class _BlockOptionalImports:
-    """optional な外部ライブラリの import を失敗させる"""
+    """optional な外部ライブラリの import を失敗させる
+
+    networkx/openpyxl は pyproject.toml のコア依存であり（Workflow検証や
+    export_excel()が無条件に使うため）、"clean install"を模擬する上で
+    ブロックしてはいけない。ブロックすると「importは通るが機能実行時に
+    死ぬ」欠陥（過去に実際発生: nx=Noneのままvalidate()がnx.DiGraph()を
+    呼びクラッシュ）を再現できなくなり、テストが偽の安心感を与える。
+    """
     BLOCKED = [
-        'sklearn', 'matplotlib', 'seaborn', 'networkx',
-        'Levenshtein', 'openpyxl', 'optuna', 'tqdm',
+        'sklearn', 'matplotlib', 'seaborn',
+        'Levenshtein', 'optuna', 'tqdm',
         'requests', 'plotly',
     ]
 
@@ -189,3 +196,49 @@ class TestCoreExecution:
         result = checker.check('テスト文章。' * 50, lang='jp')
         assert result.verdict in ('GO', 'WARN', 'NOGO')
         assert 0 <= result.quality_score <= 100
+
+    def test_workflow_validate_and_execute(self, tmp_path):
+        """WorkflowDefinition.validate()/WorkflowEngine.execute()は
+        importできるだけでなく、コア依存(networkx)がある通常のclean install
+        環境で実際に実行できること。
+
+        過去、この経路はimportテストだけがあり実行を通していなかったため、
+        `nx=None`のままvalidate()が無条件にnx.DiGraph()を呼びクラッシュする
+        不具合（networkxが未インストールの環境で発生）を見逃していた。
+        """
+        from japhrase import WorkflowDefinition, WorkflowEngine
+
+        input_file = tmp_path / "input.txt"
+        input_file.write_text("テスト文章です。テスト文章です。", encoding='utf-8')
+
+        workflow = WorkflowDefinition(name="clean_install_smoke")
+        workflow.add_task({
+            'id': 'extract',
+            'type': 'extract',
+            'input': str(input_file),
+            'params': {'min_count': 1},
+        })
+
+        valid, errors = workflow.validate()
+        assert valid, errors
+
+        order = workflow.get_execution_order()
+        assert order == ['extract']
+
+        engine = WorkflowEngine()
+        results = engine.execute(workflow)
+        assert results['extract'].status.value == 'completed'
+
+    def test_export_excel(self, tmp_path):
+        """export_excel()はopenpyxlがコア依存として入っている
+        clean install環境で実際に動作すること。"""
+        from japhrase import PhraseExtracter
+
+        extractor = PhraseExtracter(min_count=1, verbose=0)
+        df = extractor.extract(['テスト文章です。テスト文章です。テスト。'] * 5)
+
+        out_path = tmp_path / "output.xlsx"
+        extractor.export_excel(df, str(out_path))
+
+        assert out_path.is_file()
+        assert out_path.stat().st_size > 0

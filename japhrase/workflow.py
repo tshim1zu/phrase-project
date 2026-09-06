@@ -7,7 +7,7 @@ YAML定義に基づいて、複数タスクを依存関係を解決しながら�
 import yaml
 import json
 import logging
-from typing import Dict, List, Any, Optional, Callable
+from typing import Dict, List, Any, Optional, Callable, Tuple
 from pathlib import Path
 from dataclasses import dataclass, field
 from enum import Enum
@@ -17,7 +17,7 @@ try:
 except ImportError:
     nx = None
     _HAS_NETWORKX = False
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +71,9 @@ class WorkflowDefinition:
         self.name = name
         self.description = description
         self.tasks: Dict[str, TaskDefinition] = {}
+        # self.tasksはdictなので重複IDは上書きされ検出できない。
+        # 投入順のIDをそのまま保持し、validate()での重複検出に使う。
+        self._task_ids: List[str] = []
 
         if tasks:
             for task_data in tasks:
@@ -87,6 +90,7 @@ class WorkflowDefinition:
             depends_on=task_data.get('depends_on', []),
             params=task_data.get('params', {})
         )
+        self._task_ids.append(task.id)
         self.tasks[task.id] = task
 
     @staticmethod
@@ -129,13 +133,16 @@ class WorkflowDefinition:
             ]
         }
 
-    def validate(self) -> tuple[bool, List[str]]:
+    def validate(self) -> Tuple[bool, List[str]]:
         """ワークフロー定義の妥当性をチェック"""
         errors = []
 
         # タスクIDの重複チェック
-        if len(set(self.tasks.keys())) != len(self.tasks):
-            errors.append("タスクIDが重複しています")
+        # self.tasksはID重複を上書きしてしまうdictなので、投入順の
+        # self._task_idsで重複を検出する（self.tasks.keys()は常に一意）。
+        if len(set(self._task_ids)) != len(self._task_ids):
+            dupes = sorted({tid for tid in self._task_ids if self._task_ids.count(tid) > 1})
+            errors.append(f"タスクIDが重複しています: {', '.join(dupes)}")
 
         # 依存関係の妥当性チェック
         for task in self.tasks.values():
@@ -151,6 +158,10 @@ class WorkflowDefinition:
 
     def _has_circular_dependency(self) -> bool:
         """循環依存をチェック"""
+        if not _HAS_NETWORKX:
+            raise ImportError(
+                "networkxが必要です。`pip install networkx` を実行してください。"
+            )
         g = nx.DiGraph()
 
         for task in self.tasks.values():
@@ -163,6 +174,10 @@ class WorkflowDefinition:
 
     def get_execution_order(self) -> List[str]:
         """実行順序を計算（トポロジカルソート）"""
+        if not _HAS_NETWORKX:
+            raise ImportError(
+                "networkxが必要です。`pip install networkx` を実行してください。"
+            )
         g = nx.DiGraph()
 
         for task in self.tasks.values():
@@ -214,14 +229,20 @@ class TaskRegistry:
             return kwic.find_phrase(phrase)
 
         def check_divergence_task(
-            abstract_file: str,
-            body_file: str,
+            input_0: str,
+            input_1: str,
             params: Dict[str, Any],
             **kwargs
         ) -> Any:
-            """あらすじ vs 本文 チェックタスク"""
-            abstract = '\n'.join(self._read_file(abstract_file))
-            body = '\n'.join(self._read_file(body_file))
+            """あらすじ vs 本文 チェックタスク
+
+            YAML側は `inputs: [abstract_file, body_file]` の順で渡す。
+            _execute_task()は複数inputを input_0, input_1, ... として
+            渡すため、引数名はそれに合わせている
+            （abstract_file/body_fileというキーワードでは渡されない）。
+            """
+            abstract = '\n'.join(self._read_file(input_0))
+            body = '\n'.join(self._read_file(input_1))
             checker = AbstractBodyChecker(abstract, body)
             return {
                 'divergence_score': checker.get_divergence_score(),
@@ -283,6 +304,28 @@ class WorkflowEngine:
         logger.info(f"ワークフロー実行完了")
         return self.results
 
+    def _blocking_dependency(self, workflow: WorkflowDefinition, task_id: str) -> Optional[str]:
+        """依存タスクのうち、未完了または失敗しているものがあればそのIDを返す
+
+        戻り値がNoneなら全依存タスクがCOMPLETEDで、このタスクは実行してよい。
+        """
+        task = workflow.tasks[task_id]
+        for dep in task.depends_on:
+            dep_result = self.results.get(dep)
+            if dep_result is None or dep_result.status != TaskStatus.COMPLETED:
+                return dep
+        return None
+
+    def _skip_task(self, task_id: str, blocking_dep: str):
+        """依存タスクが未完了/失敗のため、このタスクをSKIPPEDとして記録する"""
+        message = f"依存タスク '{blocking_dep}' が完了していないためスキップ"
+        self.results[task_id] = TaskResult(
+            task_id=task_id,
+            status=TaskStatus.SKIPPED,
+            error=message
+        )
+        logger.warning(f"[{task_id}] {message}")
+
     def _execute_sequential(
         self,
         workflow: WorkflowDefinition,
@@ -290,6 +333,10 @@ class WorkflowEngine:
     ):
         """順序実行"""
         for task_id in execution_order:
+            blocking_dep = self._blocking_dependency(workflow, task_id)
+            if blocking_dep:
+                self._skip_task(task_id, blocking_dep)
+                continue
             self._execute_task(workflow, task_id)
 
     def _execute_parallel(
@@ -307,20 +354,26 @@ class WorkflowEngine:
                 # 実行可能なタスクを検出
                 ready_tasks = []
                 for task_id in execution_order:
-                    if task_id not in completed:
+                    if task_id not in completed and task_id not in futures:
                         task = workflow.tasks[task_id]
-                        deps_satisfied = all(d in completed for d in task.depends_on)
-                        if deps_satisfied and task_id not in futures:
+                        deps_settled = all(d in completed for d in task.depends_on)
+                        if deps_settled:
                             ready_tasks.append(task_id)
 
-                # 実行可能なタスクを送信
+                # 実行可能なタスクを送信（依存が失敗/未完了ならSKIPPEDとして即座に確定）
                 for task_id in ready_tasks:
+                    blocking_dep = self._blocking_dependency(workflow, task_id)
+                    if blocking_dep:
+                        self._skip_task(task_id, blocking_dep)
+                        completed.add(task_id)
+                        continue
                     future = executor.submit(self._execute_task, workflow, task_id)
                     futures[task_id] = future
 
-                # 完了を待つ
+                # 少なくとも1つ完了したら、新たにreadyになったタスクを
+                # 検出するためすぐ外側のループへ戻る（全件完了を待たない）
                 if futures:
-                    done, _ = as_completed(futures.values()), None
+                    done, _ = wait(futures.values(), return_when=FIRST_COMPLETED)
                     for future in done:
                         for task_id, f in list(futures.items()):
                             if f == future:
