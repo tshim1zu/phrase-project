@@ -16,9 +16,14 @@ __copyright__ = "Copyright 2023-2026"
 __license__ = "MIT"
 __email__ = "shim1zu@hotmail.com"
 
-from .extracter import PhraseExtracter, extracter, PRESETS
+from .extracter import PhraseExtracter, PRESETS
 # 正しい綴りをメインに、旧綴りも後方互換で残す
 PhraseExtractor = PhraseExtracter
+# 注意: extracter.py 内の後方互換エイリアス `extracter`（クラス）は、ここではパッケージ
+# トップレベルに再エクスポートしない。`japhrase.extracter` という名前はサブモジュール
+# `extracter.py` 自身のためにPythonが自動で予約する属性であり、同じ名前でクラスを
+# 再代入すると `import japhrase.extracter` がモジュールではなくクラスを返してしまう。
+# クラスとしての後方互換エイリアスが必要な場合は `from japhrase.extracter import extracter` を使う。
 from .constants import FIRST_KANJI, DEFAULT_REMOVES, DEFAULT_UNNECESSARY
 from .patterns import get_positive_patterns, get_negative_patterns
 
@@ -169,7 +174,6 @@ from .adaptive_tuner import AdaptiveTuner
 __all__ = [
     'PhraseExtracter',
     'PhraseExtractor',  # エイリアス（Extractor でも Extracter でも動く）
-    'extracter',  # 後方互換性のため
     'PRESETS',
     'FIRST_KANJI',
     'DEFAULT_REMOVES',

@@ -21,8 +21,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CooccurrenceAnalyzer.extract_context`: infinite loop on an empty
   `target`; overlapping/adjacent context windows around closely-spaced
   target occurrences are now merged instead of double-counted
+- `import japhrase.extracter` was returning the `PhraseExtracter` class
+  instead of the `extracter` submodule (namespace collision with the
+  package-level `extracter` class alias); `sys.modules['japhrase.extracter']`
+  itself was always correct, but any code binding the imported name
+  directly (`import japhrase.extracter as m`, or introspecting it as a
+  module) got the class
 
 ### Changed
+- **Breaking:** `from japhrase import extracter` (the package-level
+  backward-compat alias for the `PhraseExtracter` class) has been removed;
+  it collided with the `japhrase.extracter` submodule name and could not
+  coexist with a correct `import japhrase.extracter`. Use
+  `from japhrase.extracter import extracter` instead — the alias inside
+  the submodule itself is unchanged.
 - **Breaking:** `DocumentVectorizer.from_files()` / `.from_texts()` are no
   longer `@classmethod`s — call them on a configured instance
   (`DocumentVectorizer(...).from_files(...)`), not on the class directly.
