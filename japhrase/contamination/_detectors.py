@@ -21,11 +21,76 @@ import re
 import zlib
 import math
 from collections import Counter
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import numpy as np
 
 from .profile import Anomaly
+
+# ═══════════════════════════════════════════════════════════════
+# 位置マッピング共通ユーティリティ
+#
+# 複数の検出器が `clean = re.sub(r'\s+', '', text)` のような前処理をした
+# 文字列上でオフセットを計算するが、そのオフセットをそのまま元の `text` に
+# 対して使うと、削除された空白/改行の分だけ位置がズレる
+# （文書が長いほどズレが蓄積し、報告される行番号が実際より手前を指す）。
+# ここで「前処理後の文字列上の位置 → 元テキスト上の対応位置」の変換を提供する。
+# ═══════════════════════════════════════════════════════════════
+
+def _strip_whitespace_with_map(text: str) -> Tuple[str, List[int]]:
+    """`re.sub(r'\\s+', '', text)` の位置対応版。
+
+    Returns:
+        (clean, index_map) — clean[j] は text[index_map[j]] に対応する。
+    """
+    clean_chars = []
+    index_map = []
+    for i, ch in enumerate(text):
+        if not ch.isspace():
+            clean_chars.append(ch)
+            index_map.append(i)
+    return ''.join(clean_chars), index_map
+
+
+def _map_clean_range_to_text(
+    index_map: List[int], start_c: int, length: int, text_len: int
+) -> Tuple[int, int]:
+    """前処理後文字列上の [start_c, start_c+length) を元テキスト上の範囲へ変換する。"""
+    if not index_map:
+        return 0, text_len
+    start_t = index_map[start_c] if 0 <= start_c < len(index_map) else text_len
+    end_c = start_c + length - 1
+    end_t = index_map[end_c] + 1 if 0 <= end_c < len(index_map) else text_len
+    return start_t, end_t
+
+
+def _collapse_excess_newlines_with_map(text: str) -> Tuple[str, List[int]]:
+    """`re.sub(r'\\n{3,}', '\\n\\n', text)` の位置対応版。
+
+    Returns:
+        (clean, index_map) — clean[j] は text[index_map[j]] に対応する。
+    """
+    out_chars: List[str] = []
+    index_map: List[int] = []
+    i, n = 0, len(text)
+    while i < n:
+        ch = text[i]
+        if ch == '\n':
+            j = i
+            while j < n and text[j] == '\n':
+                j += 1
+            run_len = j - i
+            keep = 2 if run_len >= 3 else run_len
+            for k in range(keep):
+                out_chars.append('\n')
+                index_map.append(i + k)
+            i = j
+        else:
+            out_chars.append(ch)
+            index_map.append(i)
+            i += 1
+    return ''.join(out_chars), index_map
+
 
 # ═══════════════════════════════════════════════════════════════
 # 1. ENCODING — 文字化け・不正Unicode・mojibake残骸
@@ -398,7 +463,12 @@ def detect_repetition(
         List of Anomaly objects for detected phrase repetition.
     """
     anomalies = []
-    clean = re.sub(r'\s+', '', text)
+    if window_size < 2:
+        # window_size//2 が0になりrange()のstepが0になってクラッシュするのを防ぐ。
+        # ContaminationScannerのコンストラクタでも検証しているが、この関数は
+        # 低水準APIとして直接呼び出されることもあるため、ここでも防御する。
+        return anomalies
+    clean, idx_map = _strip_whitespace_with_map(text)
     if len(clean) < window_size:
         windows = [(0, clean)]
     else:
@@ -406,18 +476,25 @@ def detect_repetition(
         windows = [(i, clean[i:i+window_size]) for i in range(0, len(clean)-window_size+1, step)]
 
     seen_phrases = {}
+    seen_counts = {}
     for win_start, window in windows:
         for n in range(min_phrase_len, min_phrase_len+3):
             freq = Counter(window[i:i+n] for i in range(len(window)-n+1))
             for gram, count in freq.items():
                 if count > max_repeat:
-                    if gram not in seen_phrases or count > seen_phrases[gram].severity:
+                    # 同一フレーズが複数の(重なり合う)ウィンドウで検出された場合、
+                    # 生の出現回数(count)同士で比較して最悪ケースを残す
+                    # (以前は count を上限付きseverityと比較しており、
+                    #  より軽微な出現が誤って上書きすることがあった)
+                    if gram not in seen_counts or count > seen_counts[gram]:
                         pos = text.find(gram)
                         line_no = text[:pos].count('\n') if pos >= 0 else -1
+                        start_t, end_t = _map_clean_range_to_text(idx_map, win_start, window_size, len(text))
+                        seen_counts[gram] = count
                         seen_phrases[gram] = Anomaly(
                             detector='repetition',
                             severity=min(6, count - max_repeat + 3),
-                            start=win_start, end=win_start+window_size,
+                            start=start_t, end=end_t,
                             line_no=line_no,
                             description=f'「{gram}」が{window_size}字内に{count}回反復',
                             snippet=gram,
@@ -455,7 +532,13 @@ def detect_distribution(
         List of Anomaly objects for detected distribution anomalies.
     """
     anomalies = []
-    clean = re.sub(r'\s+', '', text)
+    if segment_size < 2:
+        # segment_size//2 が0になりrange()のstepが0になってクラッシュするのを
+        # 防ぐ。ContaminationScannerのコンストラクタでも検証しているが、
+        # この関数は低水準APIとして直接呼び出されることもあるため、
+        # ここでも防御する。
+        return anomalies
+    clean, idx_map = _strip_whitespace_with_map(text)
     if len(clean) < segment_size * 2:
         return anomalies
 
@@ -472,10 +555,11 @@ def detect_distribution(
         pos_c, seg_c, fc = segments[i]
         jsd = _jsd_from_counters(fp, fc)
         if jsd > jsd_threshold:
-            line_no = text[:pos_c].count('\n') if pos_c < len(text) else -1
+            start_t, end_t = _map_clean_range_to_text(idx_map, pos_c, segment_size, len(text))
+            line_no = text[:start_t].count('\n') if start_t <= len(text) else -1
             anomalies.append(Anomaly(
                 detector='distribution', severity=min(7, int(jsd*10)),
-                start=pos_c, end=pos_c+segment_size, line_no=line_no,
+                start=start_t, end=end_t, line_no=line_no,
                 description=f'分布断絶 JSD={jsd:.4f}',
                 snippet=seg_c[:30],
             ))
@@ -495,10 +579,11 @@ def detect_distribution(
                 foreign_count += lc
         ratio = foreign_count / local_total
         if ratio > foreign_threshold:
-            line_no = text[:pos].count('\n') if pos < len(text) else -1
+            start_t, end_t = _map_clean_range_to_text(idx_map, pos, segment_size, len(text))
+            line_no = text[:start_t].count('\n') if start_t <= len(text) else -1
             anomalies.append(Anomaly(
                 detector='distribution', severity=min(6, int(ratio*10)),
-                start=pos, end=pos+segment_size, line_no=line_no,
+                start=start_t, end=end_t, line_no=line_no,
                 description=f'外来語彙集中 {ratio:.0%}',
                 snippet=seg[:30],
             ))
@@ -574,7 +659,13 @@ def detect_complexity(
         List of Anomaly objects for detected compression anomalies.
     """
     anomalies = []
-    clean = re.sub(r'\n{3,}', '\n\n', text)
+    if segment_size < 1:
+        # segment_size=0だとrange()のstepが0になってクラッシュする。
+        # ContaminationScannerのコンストラクタでも検証しているが、
+        # この関数は低水準APIとして直接呼び出されることもあるため、
+        # ここでも防御する。
+        return anomalies
+    clean, idx_map = _collapse_excess_newlines_with_map(text)
     if len(clean) < segment_size:
         return anomalies
 
@@ -598,25 +689,26 @@ def detect_complexity(
     mean_r, std_r = np.mean(all_r), np.std(all_r)
 
     for pos, seg, ratio in ratios:
-        line_no = text[:pos].count('\n') if pos < len(text) else -1
+        start_t, end_t = _map_clean_range_to_text(idx_map, pos, segment_size, len(text))
+        line_no = text[:start_t].count('\n') if start_t <= len(text) else -1
         if ratio < compression_low:
             anomalies.append(Anomaly(
                 detector='complexity', severity=6,
-                start=pos, end=pos+segment_size, line_no=line_no,
+                start=start_t, end=end_t, line_no=line_no,
                 description=f'圧縮率極低 ({ratio:.3f}) — 同一パターン繰り返し',
                 snippet=seg[:40],
             ))
         elif ratio > compression_high:
             anomalies.append(Anomaly(
                 detector='complexity', severity=4,
-                start=pos, end=pos+segment_size, line_no=line_no,
+                start=start_t, end=end_t, line_no=line_no,
                 description=f'圧縮率極高 ({ratio:.3f}) — ランダムデータの可能性',
                 snippet=seg[:40],
             ))
         elif std_r > 0 and abs(ratio - mean_r) > 2.5 * std_r:
             anomalies.append(Anomaly(
                 detector='complexity', severity=5,
-                start=pos, end=pos+segment_size, line_no=line_no,
+                start=start_t, end=end_t, line_no=line_no,
                 description=f'圧縮率2.5σ逸脱 ({ratio:.3f}, μ={mean_r:.3f})',
                 snippet=seg[:40],
             ))
@@ -773,6 +865,12 @@ def detect_language(
     文字種比率のセグメント間変動で判定。
     """
     anomalies = []
+    if segment_size < 1:
+        # segment_size=0だとrange()のstepが0になってクラッシュする。
+        # ContaminationScannerのコンストラクタでも検証しているが、
+        # この関数は低水準APIとして直接呼び出されることもあるため、
+        # ここでも防御する。
+        return anomalies
     clean = text.replace('\n', ' ')
     if len(clean) < segment_size:
         return anomalies

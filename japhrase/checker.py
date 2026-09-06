@@ -185,37 +185,68 @@ class QualityChecker:
 
         return True
 
+    # run_all_checks が認識するルールキー（このいずれも設定されていなければ「チェックルール0件」）
+    _RULE_KEYS = (
+        'forbidden_phrases',
+        'required_keywords',
+        'spelling_rules',
+        'min_length',
+        'max_length',
+        'min_paragraphs',
+    )
+
     def run_all_checks(self) -> Tuple[bool, List[str], List[str]]:
         """
         設定に基づいてすべてのチェックを実行
+
+        [check] セクションが存在しない、またはルールキーが1つも無い場合は
+        「何もチェックしていないのに合格」という暗黙のfail-openを避けるため、
+        設定エラーとして扱い失敗させる。意図的にチェックを行わない場合は
+        `[check] enabled = false` を明示すること。
 
         Returns:
             (成功フラグ, エラーメッセージリスト, 警告メッセージリスト)
         """
         check_config = self.config.get('check', {})
 
-        # 禁止ワード
-        if 'forbidden_phrases' in check_config:
-            self.check_forbidden_phrases(check_config['forbidden_phrases'])
+        if check_config.get('enabled') is False:
+            # 明示的な無効化は合法的なスキップとして扱う（暗黙の0件とは区別する）
+            self.warnings.append({
+                'type': 'checks_disabled',
+                'message': '品質チェックは設定で無効化されています (check.enabled=false)',
+            })
+        elif not any(key in check_config for key in self._RULE_KEYS):
+            self.errors.append({
+                'type': 'no_rules_configured',
+                'message': (
+                    '有効なチェックルールが定義されていません。'
+                    '[check]セクションに forbidden_phrases 等のルールを指定するか、'
+                    '意図的にチェックしない場合は check.enabled=false を明示してください。'
+                ),
+            })
+        else:
+            # 禁止ワード
+            if 'forbidden_phrases' in check_config:
+                self.check_forbidden_phrases(check_config['forbidden_phrases'])
 
-        # 必須キーワード
-        if 'required_keywords' in check_config:
-            self.check_required_keywords(check_config['required_keywords'])
+            # 必須キーワード
+            if 'required_keywords' in check_config:
+                self.check_required_keywords(check_config['required_keywords'])
 
-        # 表記ゆれ
-        if 'spelling_rules' in check_config:
-            self.check_spelling_consistency(check_config['spelling_rules'])
+            # 表記ゆれ
+            if 'spelling_rules' in check_config:
+                self.check_spelling_consistency(check_config['spelling_rules'])
 
-        # 文書長
-        if 'min_length' in check_config or 'max_length' in check_config:
-            self.check_length_limits(
-                check_config.get('min_length'),
-                check_config.get('max_length')
-            )
+            # 文書長
+            if 'min_length' in check_config or 'max_length' in check_config:
+                self.check_length_limits(
+                    check_config.get('min_length'),
+                    check_config.get('max_length')
+                )
 
-        # 段落構成
-        if 'min_paragraphs' in check_config:
-            self.check_paragraph_structure(check_config['min_paragraphs'])
+            # 段落構成
+            if 'min_paragraphs' in check_config:
+                self.check_paragraph_structure(check_config['min_paragraphs'])
 
         error_messages = [e['message'] for e in self.errors]
         warning_messages = [w['message'] for w in self.warnings]

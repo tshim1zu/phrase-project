@@ -55,6 +55,10 @@ class AxisScore:
     score: int              # 0-100 (0=汚染なし, 100=完全に壊れている)
     count: int              # 検出件数
     anomalies: List[Anomaly] = field(default_factory=list)
+    error: Optional[str] = None  # 検出器が例外で失敗した場合のエラーメッセージ。
+                                  # Noneなら正常実行された（score=0は「本当にクリーン」）。
+                                  # 非Noneの場合、score=0/count=0は「検出できなかった」ことを
+                                  # 意味し、「クリーンだった」ことを意味しない。
 
     @property
     def label(self) -> str:
@@ -134,8 +138,23 @@ class ContaminationProfile:
         """全軸で検出された異常件数の合計を返す。"""
         return sum(ax.count for ax in self.axes)
 
+    @property
+    def failed_axes(self) -> List[AxisScore]:
+        """検出器が例外で失敗した軸のリスト（空なら全軸が正常に実行された）。
+
+        失敗した軸は score=0/count=0 のまま返るため、is_clean()/overall
+        だけを見ると「クリーン」に見えてしまう。信頼できる判定を行うには
+        必ずこのリストが空であることも確認すること。
+        """
+        return [ax for ax in self.axes if ax.error]
+
     def is_clean(self, threshold: int = 10) -> bool:
-        """汚染スコアが閾値以下なら clean"""
+        """汚染スコアが閾値以下なら clean
+
+        注意: 検出器が例外で失敗した軸はscore=0のまま扱われるため、
+        「本当にクリーン」なのか「一部の検査ができなかっただけ」なのかを
+        区別しない。厳密に確認したい場合は failed_axes も併せて見ること。
+        """
         return self.overall <= threshold
 
     # ─── ドリルダウン API ─────────────────────────────────
@@ -180,10 +199,20 @@ class ContaminationProfile:
         Returns:
             説明文字列。汚染なしなら「問題なし」。
         """
-        if self.is_clean():
+        failed = self.failed_axes
+        if self.is_clean() and not failed:
             return "✅ 問題なし: テキストに汚染は検出されませんでした。"
 
         lines = []
+
+        if failed:
+            names = ', '.join(ax.name for ax in failed)
+            lines.append(f"⚠️ 検出エラー: {names} は実行に失敗したため未検査です（結果には含まれていません）")
+            lines.append("")
+
+        if self.is_clean():
+            lines.append("✅ 実行できた軸では汚染は検出されませんでした（ただし上記の未検査軸を除く）。")
+            return "\n".join(lines)
 
         # 概要
         icon = '⚠️' if self.overall < 40 else '❌'
@@ -257,6 +286,9 @@ class ContaminationProfile:
         ]
 
         for axis in self.axes:
+            if axis.error:
+                lines.append(f"  ⚠️ {axis.name:<14s} 検出エラー（未検査）: {axis.error}")
+                continue
             icon = {
                 'clean': '🟢', 'minor': '🟡',
                 'moderate': '🟠', 'severe': '🔴', 'critical': '💀',

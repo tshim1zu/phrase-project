@@ -337,8 +337,14 @@ class CharacterStylometry:
     # ─── Private ────────────────────────────────────────────
 
     def _extract_speech(self, text: str, char_name: str) -> List[str]:
-        """キャラの台詞を抽出"""
+        """キャラの台詞を抽出
+
+        キャラ名が短い区間内に複数回登場すると（地の文中の言及の繰り返し等）、
+        同じ台詞が複数のname出現それぞれから見つかってしまう。台詞の絶対位置
+        (開始/終了オフセット)で重複排除し、同一台詞を二重に数えないようにする。
+        """
         segments = []
+        seen_spans = set()
         pat = self._SPEECH_JP if self.lang == 'jp' else self._SPEECH_EN
 
         # キャラ名の近くにある台詞を抽出
@@ -347,21 +353,35 @@ class CharacterStylometry:
             # キャラ名の後方200字以内の台詞を探す
             after = text[m.end():m.end() + self.context_window]
             for speech_m in pat.finditer(after):
+                span = (m.end() + speech_m.start(), m.end() + speech_m.end())
+                if span in seen_spans:
+                    break  # 別のname出現から既に拾い済みの同一台詞
                 speech_text = speech_m.group(1)
                 if len(speech_text) >= 2:
                     segments.append(speech_text)
+                    seen_spans.add(span)
                 break  # 最初の台詞のみ
 
         return segments
 
     def _extract_narration(self, text: str, char_name: str) -> List[str]:
-        """キャラ周辺の地の文を抽出"""
+        """キャラ周辺の地の文を抽出
+
+        キャラ名が短い区間内に複数回登場すると、各出現の前後コンテキスト
+        ウィンドウが重なり合い、同じ地の文が何度も数えられてしまう。
+        先に全出現のウィンドウ範囲を統合(マージ)してから、重ならない
+        区間ごとに1回だけ地の文を抽出する。
+        """
         segments = []
         pat = self._SPEECH_JP if self.lang == 'jp' else self._SPEECH_EN
 
+        ranges = []
         for m in re.finditer(re.escape(char_name), text):
             start = max(0, m.start() - self.context_window)
             end = min(len(text), m.end() + self.context_window)
+            ranges.append((start, end))
+
+        for start, end in self._merge_ranges(ranges):
             context = text[start:end]
 
             # 台詞を除去して地の文だけ残す
@@ -371,6 +391,20 @@ class CharacterStylometry:
                 segments.append(narration)
 
         return segments
+
+    @staticmethod
+    def _merge_ranges(ranges: List[Tuple[int, int]]) -> List[Tuple[int, int]]:
+        """重なり合う/隣接する (start, end) 区間を統合する。"""
+        if not ranges:
+            return []
+        merged = [sorted(ranges)[0]]
+        for start, end in sorted(ranges)[1:]:
+            last_start, last_end = merged[-1]
+            if start <= last_end:
+                merged[-1] = (last_start, max(last_end, end))
+            else:
+                merged.append((start, end))
+        return merged
 
     def _text_to_freq(self, text: str) -> Counter:
         """空白を除いた文字2-gramの頻度分布を返す。"""

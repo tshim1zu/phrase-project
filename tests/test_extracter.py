@@ -3,10 +3,13 @@
 extracter.pyのテスト
 """
 
+import types
+
 import pytest
 import pandas as pd
 import numpy as np
-from japhrase import PhraseExtracter, extracter
+from japhrase import PhraseExtracter
+from japhrase.extracter import extracter
 
 
 class TestPhraseExtracterInit:
@@ -36,6 +39,20 @@ class TestPhraseExtracterInit:
     def test_backward_compatibility(self):
         """後方互換性のためのエイリアスが存在することを確認"""
         assert extracter == PhraseExtracter
+
+    def test_submodule_import_yields_module(self):
+        """import japhrase.extracter がクラスではなくモジュールを返すことを確認
+
+        japhrase.__init__ がクラスエイリアス `extracter` をパッケージ直下に
+        再エクスポートしていた頃は、Pythonがサブモジュールに自動設定する
+        `japhrase.extracter` 属性をクラスで上書きしてしまい、
+        `import japhrase.extracter` がモジュールではなくクラスを返す不具合があった。
+        """
+        import japhrase
+        import japhrase.extracter as extracter_module
+
+        assert isinstance(extracter_module, types.ModuleType)
+        assert isinstance(japhrase.extracter, types.ModuleType)
 
 
 class TestPhraseExtracterMethods:
@@ -268,6 +285,15 @@ class TestBoundaryBugRegressions:
         finally:
             if os.path.exists(path):
                 os.remove(path)
+
+    def test_save_params_is_atomic_no_temp_file_left_behind(self):
+        """save_params()完了後、一時ファイルが残らないこと(クラッシュ耐性の回帰テスト)"""
+        import tempfile, os
+        extractor = PhraseExtracter(verbose=0)
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "params.json")
+            extractor.save_params(path)
+            assert os.listdir(d) == ["params.json"]
 
     def test_branching_entropy_no_cross_sentence_leak(self):
         """分岐エントロピーが文境界をまたいだ偽の隣接文字を作らないこと"""

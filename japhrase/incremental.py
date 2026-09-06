@@ -4,6 +4,15 @@ Incremental phrase extraction state.
 
 This keeps cumulative counts and allows resuming from disk without
 reprocessing prior inputs.
+
+Concurrency note: save()/load() are individually atomic (a crash mid-write
+cannot corrupt the file), but the save-to-a-shared-path workflow as a whole
+is a plain read-modify-write with no locking. Two processes that both
+load() the same state_path, update() independently, then save() will race:
+whichever save() lands last silently overwrites the other's update with no
+error raised. Do not point multiple concurrent runs at the same
+state_path. See tests/test_incremental.py for a regression test that
+documents this known limitation.
 """
 
 from __future__ import annotations
@@ -12,6 +21,8 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable
 import json
 from pathlib import Path
+
+from .utils import atomic_write_text
 
 
 STATE_VERSION = 1
@@ -110,20 +121,22 @@ class IncrementalPhraseState:
 
     def save(self, path: str) -> None:
         """Save state to JSON file.
-        
+
         Creates parent directories if needed. Overwrites existing file.
         Uses UTF-8 encoding.
-        
+
+        The write is atomic (temp file + os.replace) so a crash mid-write
+        cannot leave a truncated/corrupt state file. Note this does not by
+        itself prevent a lost update if two processes load-modify-save the
+        same path concurrently — see IncrementalPhraseState's module docs.
+
         Args:
             path: File path to save state to.
-        
+
         Returns:
             None.
         """
-        target = Path(path)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        with target.open("w", encoding="utf-8") as f:
-            json.dump(self.to_dict(), f, ensure_ascii=True)
+        atomic_write_text(path, json.dumps(self.to_dict(), ensure_ascii=True))
 
     @classmethod
     def load(cls, path: str) -> "IncrementalPhraseState":

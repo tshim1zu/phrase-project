@@ -18,7 +18,9 @@ from japhrase.utils import (
     export_to_json,
     export_to_excel,
     ensure_directory,
-    detect_encoding
+    detect_encoding,
+    atomic_write_text,
+    atomic_write_bytes,
 )
 
 
@@ -213,6 +215,70 @@ class TestExportFunctions:
 
         parent_dir = os.path.dirname(nested_dir)
         assert os.path.exists(parent_dir)
+
+
+class TestAtomicWrite:
+    """atomic_write_text/atomic_write_bytes のテスト（クラッシュ耐性の回帰テスト）"""
+
+    @pytest.fixture
+    def temp_dir(self):
+        """一時ディレクトリを提供"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield tmpdir
+
+    def test_atomic_write_text_writes_full_content(self, temp_dir):
+        """正常系: 指定した文字列がそのまま書き込まれること"""
+        path = os.path.join(temp_dir, "state.json")
+        atomic_write_text(path, '{"a": 1}')
+        assert Path(path).read_text(encoding="utf-8") == '{"a": 1}'
+
+    def test_atomic_write_bytes_writes_full_content(self, temp_dir):
+        """正常系: 指定したバイト列がそのまま書き込まれること"""
+        path = os.path.join(temp_dir, "state.bin")
+        atomic_write_bytes(path, b"\x00\x01binary-data")
+        assert Path(path).read_bytes() == b"\x00\x01binary-data"
+
+    def test_atomic_write_leaves_no_temp_file_behind(self, temp_dir):
+        """正常終了後、ディレクトリに一時ファイルが残らないこと"""
+        path = os.path.join(temp_dir, "state.json")
+        atomic_write_text(path, "content")
+        remaining = os.listdir(temp_dir)
+        assert remaining == ["state.json"]
+
+    def test_atomic_write_failure_does_not_touch_existing_file(self, temp_dir):
+        """書き込み中に例外が起きても、既存の対象ファイルは無傷のまま残ること
+        （クラッシュ/killで壊れた中身が残らないことの回帰テスト）"""
+        path = os.path.join(temp_dir, "state.json")
+        atomic_write_text(path, "original-content")
+
+        def _boom(f):
+            f.write("partial")
+            raise RuntimeError("simulated crash mid-write")
+
+        from japhrase.utils import _atomic_write
+
+        with pytest.raises(RuntimeError):
+            _atomic_write(path, "w", _boom, encoding="utf-8")
+
+        # 対象ファイルは書きかけの内容で上書きされていない
+        assert Path(path).read_text(encoding="utf-8") == "original-content"
+        # 一時ファイルも掃除されている
+        assert os.listdir(temp_dir) == ["state.json"]
+
+    def test_atomic_write_failure_does_not_create_target_when_missing(self, temp_dir):
+        """既存ファイルが無い状態で失敗した場合、対象パスは作成されないこと"""
+        path = os.path.join(temp_dir, "new_state.json")
+
+        def _boom(f):
+            raise RuntimeError("simulated crash mid-write")
+
+        from japhrase.utils import _atomic_write
+
+        with pytest.raises(RuntimeError):
+            _atomic_write(path, "w", _boom, encoding="utf-8")
+
+        assert not os.path.exists(path)
+        assert os.listdir(temp_dir) == []
 
 
 class TestIntegrationWithPhraseExtracter:

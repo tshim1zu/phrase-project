@@ -49,6 +49,40 @@ class TestInstanceConfigHonored:
         assert result.metadata['feature_mode'] == 'low_pmi'
 
 
+class TestVectorizationResultSaveIsAtomic:
+    """VectorizationResult.save() のアトミック書き込み回帰テスト
+
+    以前は open(path, 'wb') への直接書き込みだったため、保存中のクラッシュで
+    壊れたpickleファイルが残り得た。一時ファイル + os.replace に変更したことの
+    回帰テスト（並行更新のlost updateは対象外 — 単発の結果保存API）。
+    """
+
+    def test_save_load_roundtrip(self, tmp_path):
+        vectorizer = DocumentVectorizer(n_topics=2, feature_mode='tfidf', verbose=0)
+        result = vectorizer.from_texts(
+            [TEXT_CAT, TEXT_DOG, TEXT_FISH], labels=['A', 'B', 'C']
+        )
+
+        path = tmp_path / "result.pkl"
+        result.save(str(path))
+
+        from japhrase.document_vectorizer import VectorizationResult
+        restored = VectorizationResult.load(str(path))
+        assert restored.document_topic_matrix.shape == result.document_topic_matrix.shape
+        assert restored.labels == result.labels
+
+    def test_save_leaves_no_temp_file_behind(self, tmp_path):
+        vectorizer = DocumentVectorizer(n_topics=2, feature_mode='tfidf', verbose=0)
+        result = vectorizer.from_texts(
+            [TEXT_CAT, TEXT_DOG, TEXT_FISH], labels=['A', 'B', 'C']
+        )
+
+        path = tmp_path / "result.pkl"
+        result.save(str(path))
+
+        assert os.listdir(str(tmp_path)) == ["result.pkl"]
+
+
 class TestUniqueLabels:
     def test_unique_basenames_kept_as_is(self):
         labels = DV._make_unique_labels(['a/one.txt', 'b/two.txt'])

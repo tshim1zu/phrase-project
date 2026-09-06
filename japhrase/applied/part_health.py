@@ -291,8 +291,12 @@ class PartHealthReport:
         result = self.habit_detector.analyze(ep_texts)
 
         # 悪化中の癖が少ないほど良い
+        # (total_candidates は top_n による表示件数の制限を受けない全候補数。
+        #  len(result.habits) は表示用に上位top_n件へ絞られているため、
+        #  worsening_count と組み合わせて比率を取るとtop_n超過時に
+        #  分母が実態より小さくなり不当に悪いスコアになる)
         worsening = result.worsening_count
-        total = len(result.habits)
+        total = result.total_candidates
 
         if total == 0:
             score = 100.0

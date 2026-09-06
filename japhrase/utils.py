@@ -7,6 +7,7 @@ __copyright__ = "Copyright 2023"
 
 import os
 import logging
+import tempfile
 import pandas as pd
 from pathlib import Path
 from typing import List, Union
@@ -283,3 +284,43 @@ def ensure_directory(filepath: str):
     directory = os.path.dirname(filepath)
     if directory and not os.path.exists(directory):
         os.makedirs(directory)
+
+
+def _atomic_write(filepath: Union[str, Path], mode: str, write_fn, **fdopen_kwargs) -> None:
+    """同一ディレクトリ内の一時ファイルへ書き込んでから os.replace で原子的に差し替える。
+
+    プロセスがクラッシュ/killされても対象パスは「更新前の完全な内容」か
+    「更新後の完全な内容」のいずれかにしかならず、書きかけの壊れたファイルが
+    残ることはない（os.replace は同一ファイルシステム内であれば原子的）。
+    途中で例外が起きた場合は一時ファイルを削除して対象パスには一切触れない。
+
+    複数プロセス/スレッドが同じパスへ同時に書き込んだ場合の
+    read-modify-write lost update（後勝ちで片方の更新が消える）までは
+    防げない点に注意。それを防ぐには別途ロックが必要。
+    """
+    target = Path(filepath)
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    fd, tmp_path = tempfile.mkstemp(
+        dir=str(target.parent), prefix=f".{target.name}.", suffix=".tmp"
+    )
+    try:
+        with os.fdopen(fd, mode, **fdopen_kwargs) as f:
+            write_fn(f)
+        os.replace(tmp_path, target)
+    except BaseException:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+def atomic_write_text(filepath: Union[str, Path], data: str, encoding: str = "utf-8") -> None:
+    """テキストデータを対象パスへアトミックに書き込む（クラッシュ時に壊れたファイルを残さない）。"""
+    _atomic_write(filepath, "w", lambda f: f.write(data), encoding=encoding)
+
+
+def atomic_write_bytes(filepath: Union[str, Path], data: bytes) -> None:
+    """バイナリデータを対象パスへアトミックに書き込む（クラッシュ時に壊れたファイルを残さない）。"""
+    _atomic_write(filepath, "wb", lambda f: f.write(data))

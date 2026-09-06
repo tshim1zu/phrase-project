@@ -151,6 +151,45 @@ class TestQualityChecker:
         assert success is False
         assert len(errors) >= 1
 
+    def test_run_all_checks_no_rules_configured_is_failure(self):
+        """[check]セクションはあるがルールキーが1つも無い場合は失敗扱いにすること
+
+        回帰テスト: 以前はルールが1つも実行されない(=self.errorsが空のまま)ため
+        無条件で success=True になり、「何もチェックしていないのに合格」という
+        fail-openバグになっていた。
+        """
+        text = "何が書いてあってもチェックされないはずのテキスト"
+        config = {'check': {}}
+        checker = QualityChecker(text, config)
+        success, errors, warnings = checker.run_all_checks()
+
+        assert success is False
+        assert len(errors) >= 1
+
+    def test_run_all_checks_missing_check_section_is_failure(self):
+        """設定ファイル自体は非空だが[check]セクションが存在しない場合も失敗扱いにすること"""
+        text = "テキスト"
+        config = {'extract': {'min_count': 3}}  # [check]以外のセクションのみ
+        checker = QualityChecker(text, config)
+        success, errors, warnings = checker.run_all_checks()
+
+        assert success is False
+        assert len(errors) >= 1
+
+    def test_run_all_checks_explicitly_disabled_is_success(self):
+        """check.enabled=falseで明示的に無効化した場合は合法的なスキップとして成功扱いにすること
+
+        暗黙の0件ルール(エラー)と、明示的な無効化(成功だが警告で明示)を区別する。
+        """
+        text = "テキスト"
+        config = {'check': {'enabled': False}}
+        checker = QualityChecker(text, config)
+        success, errors, warnings = checker.run_all_checks()
+
+        assert success is True
+        assert len(errors) == 0
+        assert len(warnings) >= 1
+
     def test_get_report(self):
         """レポート生成"""
         text = "テキスト"

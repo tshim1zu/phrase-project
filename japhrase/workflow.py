@@ -137,6 +137,10 @@ class WorkflowDefinition:
         """ワークフロー定義の妥当性をチェック"""
         errors = []
 
+        # タスク0件チェック（0件は「検証を通過して何もせず成功する」fail-openになるため拒否する）
+        if not self.tasks:
+            errors.append("タスクが1件も定義されていません")
+
         # タスクIDの重複チェック
         # self.tasksはID重複を上書きしてしまうdictなので、投入順の
         # self._task_idsで重複を検出する（self.tasks.keys()は常に一意）。
