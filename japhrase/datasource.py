@@ -68,6 +68,11 @@ class AozoraBunkoSource(DataSource):
         Parameters:
             delay (float): リクエスト間の待機時間（秒）
         """
+        if requests is None:
+            raise ImportError(
+                "AozoraBunkoSourceには requests が必要です。"
+                "`pip install requests` を実行してください。"
+            )
         self.delay = delay
         self.session = requests.Session()
         self.session.headers.update({
@@ -167,15 +172,24 @@ class WikipediaSource(DataSource):
         >>> texts = source.fetch_random(100)
     """
 
-    API_URL = "https://ja.wikipedia.org/w/api.php"
+    #: HTTPリクエストのタイムアウト（秒）。ネットワーク障害時に無期限に
+    #: ブロックしないようにするため。
+    REQUEST_TIMEOUT = 10
 
     def __init__(self, language: str = 'ja', delay: float = 0.5):
         """
         Parameters:
-            language (str): 言語コード
+            language (str): 言語コード（例: 'ja', 'en'）。APIのエンドポイント
+                （https://{language}.wikipedia.org/...）に反映される。
             delay (float): リクエスト間の待機時間（秒）
         """
+        if requests is None:
+            raise ImportError(
+                "WikipediaSourceには requests が必要です。"
+                "`pip install requests` を実行してください。"
+            )
         self.language = language
+        self.api_url = f"https://{language}.wikipedia.org/w/api.php"
         self.delay = delay
         self.session = requests.Session()
         self.session.headers.update({
@@ -211,7 +225,9 @@ class WikipediaSource(DataSource):
                     'rnlimit': min(batch_size, n - i)
                 }
 
-                response = self.session.get(self.API_URL, params=params)
+                response = self.session.get(
+                    self.api_url, params=params, timeout=self.REQUEST_TIMEOUT
+                )
                 data = response.json()
 
                 # 各ページのコンテンツを取得
@@ -249,7 +265,9 @@ class WikipediaSource(DataSource):
                 'exsectionformat': 'plain'
             }
 
-            response = self.session.get(self.API_URL, params=params)
+            response = self.session.get(
+                self.api_url, params=params, timeout=self.REQUEST_TIMEOUT
+            )
             data = response.json()
 
             pages = data['query']['pages']
