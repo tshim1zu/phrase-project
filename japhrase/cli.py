@@ -258,7 +258,7 @@ def extract(input_file, output, config, preset, min_count, max_length, format, v
         extractor = _build_extractor(final_params, min_count, max_length, verbose, texts)
 
         # Extract
-        click.echo("?? ????????...", err=True)
+        click.echo("🔍 フレーズを抽出中...", err=True)
         state = _apply_incremental_state(extractor, texts, state_path, resume)
         if state:
             phrases_df = state.to_df(extractor)
@@ -272,6 +272,15 @@ def extract(input_file, output, config, preset, min_count, max_length, format, v
 
         click.echo(f"✅ {len(phrases_df)}個のフレーズを検出しました", err=True)
 
+        # csv/json形式は -o/--output が必須（未指定のままtable表示へ黙って
+        # フォールバックすると、意図した出力ファイルが作られないまま成功扱いになるため）
+        if format in ('csv', 'json') and not output:
+            click.echo(
+                f"❌ --format {format} を使用する場合は -o/--output でファイルパスを指定してください",
+                err=True,
+            )
+            sys.exit(1)
+
         # 出力
         if format == 'table':
             # PMI/エントロピー列があれば追加して表示
@@ -281,20 +290,12 @@ def extract(input_file, output, config, preset, min_count, max_length, format, v
             if 'boundary_score' in phrases_df.columns:
                 display_cols.append('boundary_score')
             click.echo(ensure_length_column(phrases_df)[display_cols].head(20).to_string(index=False))
-        elif format == 'csv' and output:
+        elif format == 'csv':
             export_to_csv(phrases_df, output)
             click.echo(f"💾 {output} に保存しました", err=True)
-        elif format == 'json' and output:
+        elif format == 'json':
             export_to_json(phrases_df, output)
             click.echo(f"💾 {output} に保存しました", err=True)
-        else:
-            # PMI/エントロピー列があれば追加して表示
-            display_cols = [resolve_phrase_column(phrases_df), resolve_frequency_column(phrases_df), 'length']
-            if 'pmi' in phrases_df.columns:
-                display_cols.append('pmi')
-            if 'boundary_score' in phrases_df.columns:
-                display_cols.append('boundary_score')
-            click.echo(ensure_length_column(phrases_df)[display_cols].to_string(index=False))
 
     except Exception as e:
         click.echo(f"❌ エラー: {e}", err=True)
@@ -988,11 +989,13 @@ def workflow(workflow_file, parallel, max_workers, output, verbose):
             click.echo(f"\n💾 {output} に保存しました", err=True)
 
         # 完了状況をチェック
+        # results が空、または一部でもCOMPLETED以外（FAILED/SKIPPED/RUNNING/PENDING等）が
+        # 残っている場合は成功と見なさない（0件のワークフローをgreen扱いしないための防御）
+        total = len(results)
         completed = sum(1 for r in results.values() if r.status.value == 'completed')
-        failed = sum(1 for r in results.values() if r.status.value == 'failed')
 
-        if failed > 0:
-            click.echo(f"\n⚠️ {completed}/{len(results)}個のタスクが完了しました", err=True)
+        if total == 0 or completed != total:
+            click.echo(f"\n⚠️ {completed}/{total}個のタスクが完了しました", err=True)
             sys.exit(1)
         else:
             click.echo(f"\n✅ すべてのタスクが正常に完了しました", err=True)

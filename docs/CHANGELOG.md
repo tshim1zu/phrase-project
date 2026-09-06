@@ -27,6 +27,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   itself was always correct, but any code binding the imported name
   directly (`import japhrase.extracter as m`, or introspecting it as a
   module) got the class
+- CLI fail-open audit: three commands could report success (exit 0) while
+  effectively doing nothing —
+  - `japhrase workflow`: a workflow YAML with zero tasks (`tasks: []`, or
+    the `tasks` key omitted) passed `WorkflowDefinition.validate()` (an
+    empty task graph is trivially acyclic) and was reported as
+    "0/0 succeeded" / "all tasks completed successfully". `validate()` now
+    rejects workflows with no tasks, and the CLI's success check now
+    requires every task to have actually reached `COMPLETED` (previously
+    it only checked `failed == 0`, which would also miss tasks stuck at
+    `PENDING`/`RUNNING`/`SKIPPED`)
+  - `japhrase extract --format csv` / `--format json` without `-o/--output`
+    silently fell back to printing a table and reported success, never
+    writing the requested file; it now errors and exits 1, matching the
+    `stats` command's existing (and now consistent) behavior
+  - `japhrase check`: a config file with no `[check]` section, or a
+    `[check]` section with none of the recognized rule keys, ran zero
+    checks and reported "✅ すべてのチェックに合格しました" (0 errors from
+    0 checks run); this is now treated as a configuration error (exit 1)
+    unless `[check] enabled = false` is set explicitly to opt out of
+    checking on purpose
+- `IncrementalPhraseState.save()`, `AdaptiveTuner.save()`,
+  `PhraseExtracter.save_params()`, `VectorizationResult.save()`: writes
+  went directly to the target path (`open(path, 'w'/'wb')`), so a process
+  crash/kill mid-write could leave a truncated, unreadable state file.
+  These now write through a temp file + `os.replace` and are atomic with
+  respect to crashes. This does **not** fix concurrent-write data loss —
+  see the known limitation below.
+
+### Known limitations
+- `IncrementalPhraseState` and `AdaptiveTuner`: the atomic-write fix above
+  only protects against crash-time corruption. The higher-level
+  load → update → save cycle used by `--state-path`/`--resume` and by
+  `AdaptiveTuner`'s auto-tuning still has no locking: if two processes
+  point at the same state/storage path concurrently, whichever one saves
+  last silently overwrites the other's update with no error (a classic
+  lost update). Do not run multiple concurrent jobs against the same
+  state path. Documented and pinned by negative-control regression tests
+  in `tests/test_incremental.py` and `tests/test_adaptive_tuner.py`.
 
 ### Changed
 - **Breaking:** `from japhrase import extracter` (the package-level

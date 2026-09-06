@@ -1337,14 +1337,12 @@ class PhraseExtracter:
             >>> pe.save_params("my_params.json")
         """
         import json
-        from pathlib import Path as _Path
-        _Path(path).parent.mkdir(parents=True, exist_ok=True)
+        from .utils import atomic_write_text
         data = {
             'params': self.params,
             'tune_history': getattr(self, '_tune_history', []),
         }
-        with open(path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+        atomic_write_text(path, json.dumps(data, indent=2, ensure_ascii=False))
         if self.verbose:
             print(f"💾 パラメータを保存: {path}")
 

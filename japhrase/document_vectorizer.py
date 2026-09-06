@@ -150,12 +150,14 @@ class VectorizationResult:
         """
         結果をファイルに保存
 
+        書き込みは一時ファイル経由でアトミックに行われる（途中でクラッシュしても
+        壊れたpickleファイルが残らない）。
+
         Parameters:
             filepath (Union[str, Path]): 保存先ファイルパス（.pkl拡張子）
         """
-        filepath = Path(filepath)
-        with open(filepath, 'wb') as f:
-            pickle.dump(self, f)
+        from .utils import atomic_write_bytes
+        atomic_write_bytes(filepath, pickle.dumps(self))
         logger.info(f"VectorizationResult saved to {filepath}")
 
     @classmethod

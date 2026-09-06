@@ -64,6 +64,20 @@ class TestWorkflowDefinition:
         assert not valid
         assert len(errors) > 0
 
+    def test_validate_rejects_empty_workflow(self):
+        """タスクが1件も無いワークフローはvalidate()で拒否されること
+
+        回帰テスト: タスク0件は空のDAGとして自明にvalid扱いされてしまい、
+        CLIの `japhrase workflow` が「0/0 成功」を無条件でexit 0の成功として
+        報告していた（fail-open）。validate()自体でタスク0件を拒否する。
+        """
+        workflow = WorkflowDefinition(name="empty")
+        assert len(workflow.tasks) == 0
+
+        valid, errors = workflow.validate()
+        assert not valid
+        assert len(errors) > 0
+
     def test_from_dict(self):
         """辞書からのワークフロー生成テスト"""
         data = {

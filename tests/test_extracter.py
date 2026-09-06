@@ -286,6 +286,15 @@ class TestBoundaryBugRegressions:
             if os.path.exists(path):
                 os.remove(path)
 
+    def test_save_params_is_atomic_no_temp_file_left_behind(self):
+        """save_params()完了後、一時ファイルが残らないこと(クラッシュ耐性の回帰テスト)"""
+        import tempfile, os
+        extractor = PhraseExtracter(verbose=0)
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "params.json")
+            extractor.save_params(path)
+            assert os.listdir(d) == ["params.json"]
+
     def test_branching_entropy_no_cross_sentence_leak(self):
         """分岐エントロピーが文境界をまたいだ偽の隣接文字を作らないこと"""
         extractor = PhraseExtracter(min_count=1, verbose=0)

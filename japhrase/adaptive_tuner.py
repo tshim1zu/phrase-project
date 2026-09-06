@@ -16,6 +16,15 @@ AdaptiveTuner — テキストを蓄積しながらパラメータを動的に�
     - テキストが蓄積されるほど、そのユーザー固有のコーパスに最適化される
     - チューニング結果はJSONに保存・復元できる
     - Optunaがなくてもヒューリスティック推定で動く（Optunaがあればベイズ最適化）
+
+並行実行に関する注意:
+    save()/load()（および storage_path 指定時に自動発火する _save_state()/_load_state()）
+    はファイル単体としてはアトミックに書き込まれる（クラッシュしても壊れたファイルは残らない）。
+    ただし load → 更新 → save という一連の流れ自体には排他制御が無いため、
+    同じ storage_path を指す複数の AdaptiveTuner インスタンス（並列プロセス/スレッド）が
+    同時に tune() すると、後から保存した側が先に保存した側のチューニング結果を
+    エラーなく上書きし、片方の更新が消える（lost update）。同じ storage_path への
+    並行更新は避けること。tests/test_adaptive_tuner.py に既知の制限として回帰テストがある。
 """
 
 import json
@@ -27,6 +36,7 @@ from typing import Any, Dict, List, Optional, Union
 import pandas as pd
 
 from .extracter import PhraseExtracter, PRESETS
+from .utils import atomic_write_text
 
 logger = logging.getLogger(__name__)
 
@@ -238,9 +248,7 @@ class AdaptiveTuner:
         p = Path(path) if path else self._storage_path
         if not p:
             raise ValueError("保存先が指定されていません。path引数かコンストラクタのstorage_pathを指定。")
-        p.parent.mkdir(parents=True, exist_ok=True)
-        with open(p, 'w', encoding='utf-8') as f:
-            json.dump(self._state.to_dict(), f, indent=2, ensure_ascii=False)
+        atomic_write_text(p, json.dumps(self._state.to_dict(), indent=2, ensure_ascii=False))
         print(f"💾 パラメータを保存: {p}")
 
     @classmethod
