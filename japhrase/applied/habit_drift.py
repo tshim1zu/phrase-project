@@ -49,11 +49,13 @@ class HabitEntry:
 @dataclass
 class DriftResult:
     """ドリフト分析結果"""
-    habits: List[HabitEntry]
-    worsening_count: int            # 悪化中の癖の数
-    improving_count: int            # 改善中の癖の数
+    habits: List[HabitEntry]        # 表示用（悪化度順、上位top_n件に制限）
+    total_candidates: int           # 分析対象となった癖候補の総数（top_nによる制限を受けない）
+    worsening_count: int            # 悪化中の癖の数（全候補ベース。habitsの件数には依存しない）
+    improving_count: int            # 改善中の癖の数（全候補ベース。habitsの件数には依存しない）
     new_habits: List[HabitEntry]    # 後半で新たに現れた癖
     top_worsening: List[HabitEntry] # 最も悪化している上位
+    top_improving: List[HabitEntry] # 最も改善している上位
     ep_labels: List[str]
 
     def report(self) -> str:
@@ -63,7 +65,7 @@ class DriftResult:
             "【書き癖ドリフト分析】",
             "=" * 70,
             "",
-            f"検出された癖: {len(self.habits)} 個",
+            f"検出された癖候補: {self.total_candidates} 個（表示: {len(self.habits)}件）",
             f"  悪化中: {self.worsening_count}",
             f"  改善中: {self.improving_count}",
             f"  新規出現: {len(self.new_habits)}",
@@ -100,11 +102,10 @@ class DriftResult:
                 )
 
         # 改善中
-        improving = [h for h in self.habits if h.trend_direction == 'improving']
-        if improving:
+        if self.top_improving:
             lines.append("")
             lines.append("【✅ 改善中の書き癖】")
-            for h in improving[:5]:
+            for h in self.top_improving[:5]:
                 lines.append(
                     f"  {h.phrase:<12s} slope={h.trend_slope:+.3f} "
                     f"(EP: {self._sparkline(h.ep_frequencies)})"
@@ -198,8 +199,8 @@ class HabitDriftDetector:
 
         if not candidates:
             return DriftResult(
-                habits=[], worsening_count=0, improving_count=0,
-                new_habits=[], top_worsening=[], ep_labels=labels,
+                habits=[], total_candidates=0, worsening_count=0, improving_count=0,
+                new_habits=[], top_worsening=[], top_improving=[], ep_labels=labels,
             )
 
         # 各候補に対して結合度スコア + ドリフトを計算
@@ -251,20 +252,29 @@ class HabitDriftDetector:
                 log_dice=round(cs.log_dice, 3),
             ))
 
-        # ソート（悪化度順）
-        habits.sort(key=lambda h: h.trend_slope, reverse=True)
-        habits = habits[:self.top_n]
+        # 集計は全候補に対して行う。top_nはあくまで表示件数の上限であり、
+        # worsening_count/improving_count等の集計対象を絞るものではない
+        # （以前はtop_n件に絞ってから集計していたため、悪化度順ソートの都合で
+        #  候補数がtop_nを超えると改善中の癖がほぼ集計から漏れ、
+        #  健康度が実態より大幅に悪く見積もられていた）。
+        worsening_all = [h for h in habits if h.trend_direction == 'worsening']
+        improving_all = [h for h in habits if h.trend_direction == 'improving']
+        new_habits_all = [h for h in habits if h.trend_direction == 'burst']
 
-        worsening = [h for h in habits if h.trend_direction == 'worsening']
-        improving = [h for h in habits if h.trend_direction == 'improving']
-        new_habits = [h for h in habits if h.trend_direction == 'burst']
+        worsening_all.sort(key=lambda h: h.trend_slope, reverse=True)
+        improving_all.sort(key=lambda h: h.trend_slope)  # 最も改善(負に大きい)順
+
+        # 表示用: 悪化度順に並べた上位top_n件
+        habits_for_report = sorted(habits, key=lambda h: h.trend_slope, reverse=True)[:self.top_n]
 
         return DriftResult(
-            habits=habits,
-            worsening_count=len(worsening),
-            improving_count=len(improving),
-            new_habits=new_habits,
-            top_worsening=worsening[:10],
+            habits=habits_for_report,
+            total_candidates=len(habits),
+            worsening_count=len(worsening_all),
+            improving_count=len(improving_all),
+            new_habits=new_habits_all,
+            top_worsening=worsening_all[:10],
+            top_improving=improving_all[:10],
             ep_labels=labels,
         )
 

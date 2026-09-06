@@ -165,9 +165,64 @@ class TestDuplicate:
         assert p.duplicate.count >= 1
 
 
+class TestDistribution:
+    def test_clean(self):
+        assert scan(CLEAN_TEXT, detectors=['distribution']).distribution.score == 0
+
+    def test_reported_location_matches_actual_content(self):
+        """回帰テスト: 検出器がwhitespace除去後の文字列上のオフセットを、
+        そのまま元テキストのオフセットとして誤用し、行番号・位置が
+        系統的にズレていた不具合の修正確認。
+
+        報告された a.start:a.end を元テキストから切り出して空白を除去すると、
+        検出器が実際に見ていたセグメント内容(a.snippet)と一致するはず。
+        """
+        import re as _re
+        from japhrase.contamination._detectors import detect_distribution
+
+        normal_block = ('あいうえおかきくけこさしすせそたちつてと\n' * 40)
+        weird_block = ('12345678901234567890\n' * 40)
+        text = normal_block + weird_block + normal_block
+
+        anomalies = detect_distribution(text, text.split('\n'), jsd_threshold=0.1)
+        assert len(anomalies) > 0
+
+        for a in anomalies:
+            region_clean = _re.sub(r'\s+', '', text[a.start:a.end])
+            assert region_clean.startswith(a.snippet[:10]), (
+                f"reported start={a.start} end={a.end} does not point at the "
+                f"flagged content {a.snippet!r} in the original text"
+            )
+
+
 class TestRepetition:
     def test_heavy(self):
         assert scan('男は歩いた。男は止まった。' * 30, detectors=['repetition']).repetition.count > 0
+
+    def test_keeps_worst_case_count_across_overlapping_windows(self):
+        """回帰テスト: 同じフレーズが複数の重なり合うウィンドウで検出されたとき、
+        以前は生の出現回数(count)を上限付きseverity(最大6)と比較していたため、
+        より軽微な出現が誤ってより深刻な出現を上書きすることがあった。
+        いまは生のcount同士を比較し、最悪ケースの出現回数を保持する。
+        """
+        from japhrase.contamination._detectors import detect_repetition
+
+        gram = 'zzzz'
+        heavy = gram * 50          # 1つのウィンドウ内で「zzzz」が50回近く反復
+        filler = 'a' * 400
+        light = (gram + 'bb') * 4  # 別のウィンドウでは反復回数がずっと少ない
+
+        text = heavy + filler + light + ('c' * 2000)
+        anomalies = detect_repetition(text, text.split('\n'))
+
+        zzzz_anomalies = [a for a in anomalies if a.snippet == gram]
+        assert len(zzzz_anomalies) == 1
+        reported_count = int(
+            __import__('re').search(r'(\d+)回反復', zzzz_anomalies[0].description).group(1)
+        )
+        # 軽微な方(light)の出現回数(4)ではなく、深刻な方(heavy由来)の出現回数が
+        # 残っていること
+        assert reported_count > 10
 
 
 class TestConsistency:

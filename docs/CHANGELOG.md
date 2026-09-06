@@ -8,6 +8,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- `HabitDriftDetector.analyze()`: `worsening_count`/`improving_count` were
+  computed *after* truncating the candidate list to the top `top_n` (default
+  30) entries sorted by worsening slope descending. Once a Part had more than
+  `top_n` candidate habit phrases (routine for any real manuscript), this
+  systematically discarded improving habits from the count — a synthetic
+  worst-case reproduction went from a true 18 worsening / 21 improving split
+  down to a reported 5 worsening / 0 improving. This fed directly into
+  `PartHealthReport._diagnose_habits()`'s health score, making "書き癖負債"
+  look far worse than reality. Aggregate counts are now computed over the
+  full candidate set; `top_n` only bounds the displayed list. Added
+  `DriftResult.total_candidates` (the correct, untruncated denominator) and
+  `top_improving` (so `report()`'s "改善中の書き癖" section stops re-deriving
+  from the already-truncated display list); `PartHealthReport._diagnose_habits`
+  now divides by `total_candidates` instead of `len(result.habits)`.
+- `CharacterStylometry._extract_speech` / `_extract_narration`: when a
+  character's name appeared multiple times in a short span (e.g. repeated in
+  narration before a single line of dialogue), the same quoted speech or the
+  same overlapping narration context window was captured once per name
+  occurrence, duplicating it in the character's corpus. This skewed every
+  downstream style metric (MATTR, hapax ratio, sentence length, keyness) by
+  how often a character's name happened to be mentioned nearby rather than by
+  their actual dialogue/narration content. Speech is now deduplicated by
+  absolute span; narration context windows are merged before extraction so
+  overlapping regions are only counted once.
+- `japhrase.contamination` detectors (`detect_distribution`, `detect_complexity`,
+  `detect_repetition`): these strip whitespace/collapse newlines into an
+  internal `clean` string before computing offsets, but were using those
+  `clean`-string offsets directly as if they were offsets into the original
+  `text` when building `Anomaly.start`/`.end`/`.line_no`. Since `clean` is
+  always shorter than `text`, the reported location drifted further off the
+  longer the document, so `profile.explain()`/`anomaly.location` could point
+  at the wrong line entirely. Fixed via a proper clean-offset → text-offset
+  mapping. Also fixed `detect_repetition` comparing a phrase's raw occurrence
+  count against a previously-recorded *capped severity* (max 6) instead of
+  the previous raw count when the same phrase repeated across overlapping
+  windows, which could let a milder occurrence overwrite a far worse one in
+  the reported `回反復` count (severity itself was usually unaffected since
+  it saturates quickly, so this mainly affected the displayed count, not
+  the axis score).
 - `PhraseExtracter`: `max_length` off-by-one (and the resulting dead
   `max_length=-1` branch), `min_count` boundary inconsistency between
   `count_characters`/`df_from_counts`, `save_params`/`load_params` dropping
