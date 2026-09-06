@@ -1,0 +1,4 @@
+[submodule "webai"]
+	path = webai
+	url = https://github.com/tshim1zu/webai.git
+	branch = main
