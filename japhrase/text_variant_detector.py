@@ -20,6 +20,8 @@ from .utils_advanced import CachingAnalyzer, MetricsCollector, ContextAnalyzer
 
 logger = logging.getLogger(__name__)
 
+_DEFAULT = object()  # 引数省略の目印（None は「上限なし」の意味で使うため）
+
 
 @dataclass
 class VariantCandidate:
@@ -86,7 +88,8 @@ class TextVariantDetector:
         self,
         df_phrases: pd.DataFrame,
         texts: Optional[List[str]] = None,
-        context_window: int = 2
+        context_window: int = 2,
+        top_n=_DEFAULT,
     ) -> List[VariantCandidate]:
         """
         表記ゆれ候補を検出
@@ -95,6 +98,9 @@ class TextVariantDetector:
             df_phrases: フレーズDataFrame （seqchar, freq 列必須）
             texts: 元テキスト（コンテキスト分析用）
             context_window: 前後何単語を見るか
+            top_n: 頻度上位何件だけ比較するか。省略時は DEFAULT_TOP_N(500)、
+                None なら上限なし（ブロッキングが有効なら先頭文字ごとの組だけ比較するので
+                数千語でも現実的な時間で走る）
 
         Returns:
             確信度の高い順にソートされた候補リスト
@@ -120,18 +126,35 @@ class TextVariantDetector:
         sorted_phrases = sorted(phrase_dict.items(), key=lambda x: x[1], reverse=True)
 
         # 計算量削減：上位 N 件のみ比較対象にする
-        if len(sorted_phrases) > self.DEFAULT_TOP_N:
+        limit = self.DEFAULT_TOP_N if top_n is _DEFAULT else top_n
+        if limit is not None and len(sorted_phrases) > limit:
             logger.warning(
                 f"フレーズ数 ({len(sorted_phrases)}) が多すぎます。"
-                f"上位 {self.DEFAULT_TOP_N} 件のみを比較対象とします。"
+                f"上位 {limit} 件のみを比較対象とします。"
             )
-            sorted_phrases = sorted_phrases[: self.DEFAULT_TOP_N]
+            sorted_phrases = sorted_phrases[: limit]
 
         comparison_count = 0
 
+        # ブロッキング有効時は「先頭文字が同じ」候補だけを内側ループで回す
+        # （従来は全件を回して先頭文字違いを捨てていた。比較される組は同じで、順序も同じ）
+        bucket_tail = None
+        if self.enable_blocking:
+            buckets = defaultdict(list)
+            bucket_tail = []
+            for item in sorted_phrases:
+                b = buckets[item[0][:1]]
+                b.append(item)
+                bucket_tail.append((b, len(b)))
+
         for i, (phrase1, freq1) in enumerate(sorted_phrases):
+            if bucket_tail is not None:
+                b, pos = bucket_tail[i]
+                inner = b[pos:]
+            else:
+                inner = sorted_phrases[i + 1:]
             # 内側ループの早期終了（ブロッキング）
-            for phrase2, freq2 in sorted_phrases[i + 1:]:
+            for phrase2, freq2 in inner:
                 pair_key = tuple(sorted([phrase1, phrase2]))
                 if pair_key in compared:
                     continue
@@ -141,7 +164,7 @@ class TextVariantDetector:
                     if abs(len(phrase1) - len(phrase2)) > self.MAX_LENGTH_DIFF:
                         continue
                     # 最初の文字が異なる場合は明らかに異なるので比較対象から外す
-                    if phrase1[0] != phrase2[0]:
+                    if phrase1[:1] != phrase2[:1]:
                         continue
 
                 compared.add(pair_key)

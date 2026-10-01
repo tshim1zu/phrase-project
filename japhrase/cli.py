@@ -1387,6 +1387,66 @@ def check(input_file, config, output):
         sys.exit(1)
 
 
+@cli.command(name='corpus-terms')
+@click.argument('extra_paths', nargs=-1)
+@click.option('--glob', 'globs', multiple=True, help='入力ファイルの glob（繰り返し可、** 可）。Windowsでは引用符なしの * をシェル/click が先に展開するため、余りの引数もファイルとして受ける')
+@click.option('--chunk-by', type=click.Choice(['file', 'dir', 'lines']), default='file',
+              help='塊の単位: file=1ファイル / dir=ディレクトリ / lines=一定行数')
+@click.option('--lines-per-chunk', type=int, default=100, help='--chunk-by lines のときの行数')
+@click.option('--line-regex', default=None, help='本文を取り出す正規表現（named group "text"。マッチしない行は捨てる）')
+@click.option('--min-chunks', type=int, default=3, help='出現する塊の最小数（講義数）')
+@click.option('--min-count', type=int, default=5, help='全体での最小出現回数')
+@click.option('--min-length', type=int, default=2, help='語の最小文字数')
+@click.option('--max-length', type=int, default=12, help='語の最大文字数')
+@click.option('--edge-filter', type=click.Choice(['content', 'kana', 'none']), default='content',
+              help='content=ひらがな始まり・助詞終わりの断片を捨てる / kana=ひらがなの端を全部捨てる')
+@click.option('--cache-dir', type=click.Path(), default=None, help='塊ごとの結果の保存先（中断しても続きから）')
+@click.option('--variants/--no-variants', default=True, help='表記ゆれ候補も出す')
+@click.option('--similar/--no-similar', default=False, help='編集距離の近い語も表記ゆれ候補に出す（兄弟句の偽陽性が多いので既定は無効）')
+@click.option('--top', type=int, default=0, help='語を上位N件だけ出力（0=全件）')
+@click.option('-o', '--output', type=click.Path(), default=None, help='JSON の出力先（省略時は標準出力に表）')
+def corpus_terms(extra_paths, globs, chunk_by, lines_per_chunk, line_regex, min_chunks, min_count, min_length,
+                 max_length, edge_filter, cache_dir, variants, similar, top, output):
+    """コーパスを塊に分けて数え、塊（講義）をまたぐ頻出語を「出現回数・塊数」つきで出す。
+
+    
+        japhrase corpus-terms --glob "courses/*/week*/content*.md" \
+            --line-regex "「(?P<text>.+)」" --chunk-by file --min-chunks 3 -o terms.json
+    """
+    import json as _json
+    import time as _time
+    from .corpus_terms import (ChunkedPhraseExtractor, chunks_from_files, expand_globs,
+                               find_term_variants)
+    paths = expand_globs(list(globs) + list(extra_paths))
+    if not paths:
+        click.echo("❌ glob に一致するファイルがありません", err=True)
+        sys.exit(1)
+    t0 = _time.time()
+    chunks = chunks_from_files(paths, chunk_by=chunk_by, lines_per_chunk=lines_per_chunk,
+                               line_regex=line_regex)
+    ex = ChunkedPhraseExtractor(min_length=min_length, max_length=max_length, min_count=min_count,
+                                min_chunks=min_chunks, edge_filter=edge_filter, cache_dir=cache_dir)
+    df, kept = ex.extract_with_table(chunks)
+    t_terms = _time.time() - t0
+    vrows = find_term_variants(ex.variant_table, include_similar=similar) if variants else []
+    shown = df.head(top) if top else df
+    result = {
+        'files': len(paths), 'chunks': len(chunks), 'terms_total': int(len(df)),
+        'seconds_terms': round(t_terms, 2), 'seconds_total': round(_time.time() - t0, 2),
+        'cache': ex.stats,
+        'terms': shown.to_dict(orient='records'),
+        'variants': vrows,
+    }
+    if output:
+        Path(output).write_text(_json.dumps(result, ensure_ascii=False, indent=1), encoding='utf-8')
+        click.echo(f"💾 {output} に保存: 語 {len(df)} 件 / 表記ゆれ候補 {len(vrows)} 件 / "
+                   f"{result['seconds_total']} 秒 (キャッシュ {ex.stats})", err=True)
+    else:
+        click.echo(shown.to_string(index=False))
+        for r in vrows[:50]:
+            click.echo(f"{r['kind']}	{r['a']}({r['freq_a']})	{r['b']}({r['freq_b']})	co={r['cooccur_chunks']}")
+
+
 def main():
     """CLIのメインエントリーポイント"""
     cli()

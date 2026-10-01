@@ -189,6 +189,27 @@ result = ta.analyze_series([ch1, ch2, ch3], labels=["1章", "2章", "3章"])
 print(f"語彙飽和度: {result['vocab_saturation']:.2f}")
 ```
 
+### 大きなコーパスを塊に分けて、塊（講義・章）をまたぐ語を出す
+
+`PhraseExtractor.extract()` は候補フレーズを全部 DataFrame にして O(n²) の走査をするので、数百KBを超える文章をまとめて渡すと終わらない（台本1冊 約9,000字で125秒、その97秒は `hold_higherrank`、28秒は `remove_similar`、n-gram の列挙と数え上げは合計0.5秒未満）。大きなコーパスは `ChunkedPhraseExtractor` で塊（本・章・N行）ごとに数えて統合する。長さ k の n-gram は「前半と後半（長さ k-1）が全体で生き残ったもの」だけを数える（Apriori 法。回数も出る塊の数も部分文字列ほど大きいので枝刈りは厳密）。塊の順序に依存せず結果は決定的で、塊ごとの途中結果は `cache_dir` に保存される（中断しても続きから。塊の本文やパラメータが変わると作り直す）。
+
+```bash
+japhrase corpus-terms --glob "courses/*/week*/content*.md" \
+    --line-regex "「(?P<text>.+)」" --chunk-by file --min-chunks 3 --min-count 5 \
+    --cache-dir .cache/terms -o terms.json
+```
+
+```python
+from japhrase.corpus_terms import ChunkedPhraseExtractor, chunks_from_files, find_term_variants
+
+chunks = chunks_from_files(paths, chunk_by="file")          # {塊ID: [行...]}
+ex = ChunkedPhraseExtractor(min_chunks=3, min_count=5, cache_dir=".cache/terms")
+df, table = ex.extract_with_table(chunks)                   # df: seqchar / freq(出現回数) / chunks(出る塊の数)
+variants = find_term_variants(ex.variant_table)             # 表記ゆれ候補（かな/カナ・全半角・長音の違い）
+```
+
+実測（psyzunda の講義台本 96本・約11,300発話、`--min-chunks 3 --min-count 5`）: 語の抽出から出力まで合計 約3〜5秒（Python 起動と JSON 出力を除く。塊キャッシュを使い切った2回目は読み込みに約3秒かかるので、キャッシュは高速化でなく中断再開のためのもの）、語 5,481 件、表記ゆれ候補 8 件。語は文字 n-gram なので `考え`（考える/考えた の語幹）や `図を示すよう` のような活用の断片・定型句も出る。表記ゆれは「字種だけの違い」しか見つけない（`ズレ/ずれ`・`うん/うーん`・`ダメ/だめ` は拾うが、`嘘/うそ/ウソ` のように漢字と仮名で割れているものは辞書なしでは結べない）。`--similar`（編集距離の近い語）は、実コーパスでは `今日のテーマ/今日の内容` のような兄弟句ばかりで表記ゆれにならなかったので既定で無効。
+
 ---
 
 ## 執筆支援として使う
