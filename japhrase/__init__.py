@@ -170,6 +170,12 @@ from .temporal_analyzer import (
 )
 # Phase 3: 適応型パラメータチューナー
 from .adaptive_tuner import AdaptiveTuner
+from .reading_consistency import (
+    ReadingConsistencyAnalyzer,
+    ReadingObservation,
+    ReadingConflict,
+    normalize_reading as normalize_reading_consistency,
+)
 
 __all__ = [
     'PhraseExtracter',
@@ -307,6 +313,10 @@ __all__ = [
     'run_demo',
     # 適応型チューナー
     'AdaptiveTuner',
+    'ReadingConsistencyAnalyzer',
+    'ReadingObservation',
+    'ReadingConflict',
+    'normalize_reading_consistency',
 ]
 
 
